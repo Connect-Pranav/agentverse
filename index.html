@@ -519,6 +519,18 @@ body.glass .vtitle{margin-left:112px}
 @media(max-width:1350px){body.glass .vtitle{margin-left:104px}}
 @media(max-width:760px){body.glass .vtitle{margin-left:12px}}
 
+/* bottom nav removed — left dock is the only navigation */
+.gnav{display:none!important}
+body.glass{padding-bottom:28px}
+body.glass .board{margin-bottom:40px}
+body.glass #vani:not(.min){bottom:20px}
+@media(max-width:760px){
+  body.glass .dock{display:flex;position:static;transform:none;flex-direction:row;overflow-x:auto;margin:10px 10px 0;border-radius:99px;padding:6px;gap:4px;justify-content:space-between}
+  body.glass .dock .sep{display:none}
+  .dock button span{display:none}
+  body.glass #vani:not(.min){bottom:10px}
+}
+
 </style>
 </head>
 <body>
@@ -527,7 +539,7 @@ body.glass .vtitle{margin-left:112px}
 <nav class="dock" aria-label="Sections">
   <button data-go="top" class="on"><span data-i="house"></span><span>Overview</span></button>
   <button data-go="pDeps"><span data-i="users"></span><span>Agents</span></button>
-  <button data-go="queue"><span data-i="list-checks"></span><span>Approvals</span></button>
+  <button data-go="board"><span data-i="list-checks"></span><span>Work</span></button>
   <button data-go="leads"><span data-i="crosshair"></span><span>Leads</span></button>
   <button data-go="pFocus"><span data-i="activity"></span><span>Live feed</span></button>
   <div class="sep"></div>
@@ -742,15 +754,7 @@ body.glass .vtitle{margin-left:112px}
     </div>
   </div>
 </div>
-<nav class="gnav" aria-label="Main">
-  <button data-go="top" class="on">Overview</button>
-  <button data-go="pDeps">Agents</button>
-  <button data-go="board">Work</button>
-  <button data-go="leads">Leads</button>
-  <button data-go="memory">Memory</button>
-  <button data-go="settings">Settings</button>
-  <button class="plus" data-go="run" aria-label="Run a cycle now"><span data-i="plus"></span></button>
-</nav>
+
 <div class="toast" id="toast"></div>
 
 <script>/*!
@@ -1526,7 +1530,7 @@ $("vinput").onkeydown=function(e){if(e.key==="Enter"){$("vsend").onclick();}};
 /* ---------------- glass motion system ---------------- */
 var MOTION = HAS_GSAP && !REDUCED;
 function navPills(){
-  var navs=document.querySelectorAll(".dock,.gnav");
+  var navs=document.querySelectorAll(".dock");
   for(var i=0;i<navs.length;i++){ if(!navs[i].querySelector(".navpill")){ var p=document.createElement("i"); p.className="navpill"; navs[i].insertBefore(p,navs[i].firstChild); } }
   movePills(true);
 }
@@ -1725,7 +1729,6 @@ function intro(){
     .from(".ticker",{opacity:0,duration:.5},"<")
     .from(".panel",document.body.classList.contains("glass")?{opacity:0,y:36,scale:.94,filter:"blur(18px)",duration:.95,stagger:{each:.07,from:"start"},ease:"expo.out",clearProps:"filter,transform,opacity"}:{opacity:0,y:28,scale:.97,duration:.7,stagger:{each:.06},ease:"expo.out"},"<.15")
     .from(".dock",{opacity:0,x:-30,filter:"blur(10px)",duration:.7,ease:"expo.out",clearProps:"filter"},"<.1")
-    .from(".gnav",{opacity:0,y:30,filter:"blur(10px)",duration:.7,ease:"expo.out",clearProps:"filter"},"<.1")
     .from(".tool",{opacity:0,scale:.5,y:6,duration:.45,stagger:{each:.006,from:"random"},ease:"back.out(2)",clearProps:"transform"},"<.35")
     .from(".loop,.legend,#vani",{opacity:0,y:10,duration:.5,stagger:.08,clearProps:"opacity,transform"},"<.3")
     .add(function(){var a={v:0};gsap.to(a,{v:CONFIG.agents,duration:1.2,ease:"power2.out",onUpdate:function(){$("agentCount").innerHTML=Math.round(a.v);}});startLoops();},"-=.6");
