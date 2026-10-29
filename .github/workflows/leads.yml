@@ -1,0 +1,29 @@
+name: AGENTVERSE lead scraper
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # every 6 hours
+  workflow_dispatch: {}       # run by hand from the Actions tab
+permissions:
+  contents: write
+concurrency: leads
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Scrape leads
+        run: node scraper/scrape.mjs
+        env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Save leads
+        run: |
+          git config user.name "agentverse-bot"
+          git config user.email "agentverse-bot@users.noreply.github.com"
+          git add data/leads.json
+          git diff --staged --quiet || (git commit -m "leads: update $(date -u +%F' '%H:%M)" && git push)

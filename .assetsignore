@@ -1,0 +1,8 @@
+.git
+.github
+scraper
+node_modules
+leads.config.json
+wrangler.jsonc
+README.md
+.assetsignore
