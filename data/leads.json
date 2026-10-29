@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-29T13:48:12.323Z",
+ "updated": "2026-10-29T13:49:47.614Z",
  "count": 0,
  "health": {
   "reddit": {
@@ -18,13 +18,8 @@
    "ok": 1,
    "errors": 0,
    "items": 0,
-   "lastError": null
-  },
-  "bluesky": {
-   "ok": 0,
-   "errors": 12,
-   "items": 0,
-   "lastError": "403 https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%22stories%20fo"
+   "lastError": null,
+   "thread": "Ask HN: Freelancer? Seeking freelancer? (October 2025)"
   },
   "mastodon": {
    "ok": 4,
