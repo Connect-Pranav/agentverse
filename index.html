@@ -428,7 +428,7 @@ body.glass.ready .panel{transition:filter .5s var(--ease),opacity .5s var(--ease
 body.glass.spot .panel{filter:blur(2px) saturate(.8);opacity:.55}
 body.glass.spot .panel.spotlit{filter:none;opacity:1;transform:scale(1.015)}
 .dock,.gnav{position:fixed}
-.navpill{position:absolute;border-radius:99px;background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.25);z-index:0;pointer-events:none}
+.navpill{position:absolute;left:0;top:0;border-radius:99px;background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.25);z-index:0;pointer-events:none}
 .gnav .navpill{background:rgba(255,255,255,.24);box-shadow:none}
 .dock button,.gnav button{position:relative;z-index:1}
 body.glass .dock button.on{background:transparent}
@@ -488,6 +488,18 @@ body.glass #vani:not(.min){bottom:84px}
   .wrap.v-agents{grid-template-areas:"c" "d";grid-template-columns:1fr}
 }
 @media(max-width:760px){.wrap{grid-template-columns:1fr;grid-template-areas:"a" "b" "c" "d"}.wrap.v-agents{grid-template-areas:"c" "d"}}
+
+#vani.wake .orb{box-shadow:0 0 0 3px rgba(94,240,160,.35),0 0 18px rgba(139,108,255,.7)}
+#vani.wake .orb:after{border-color:rgba(94,240,160,.5);animation:ring 2.4s infinite}
+/* tile alignment: equal-height dept cards, centred icon grid, consistent shadows */
+.deps{align-items:stretch}
+.dep{height:100%;justify-content:space-between}
+.dep .tools{justify-items:center;align-items:start}
+.dep .tool{width:100%}
+body.glass .dock button.on,body.glass .gnav button.on{box-shadow:none}
+body.glass .navpill{box-shadow:0 4px 14px rgba(0,0,0,.22)}
+body.glass .gnav .navpill{box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+body.glass .ic.glow{transform:translateY(-2px) scale(1.08)}
 
 </style>
 </head>
@@ -647,6 +659,7 @@ body.glass #vani:not(.min){bottom:84px}
     <div class="vopts">
       <label><input type="checkbox" id="optSpeak"> VANI bolkar jawab de</label>
       <label><input type="checkbox" id="optConvo"> Conversation mode</label>
+      <label><input type="checkbox" id="optWake"> "Hi Vani" wake word</label>
     </div>
   </div>
 </aside>
@@ -677,6 +690,9 @@ body.glass #vani:not(.min){bottom:84px}
     <div class="fg">
       <div class="f"><label for="sLang">Language</label><select id="sLang"><option value="en-IN">English (India) · best for Hinglish</option><option value="hi-IN">Hindi</option><option value="en-US">English (US)</option></select></div>
       <div class="f"><label for="sRate">Speaking speed</label><input id="sRate" type="number" min="0.6" max="1.6" step="0.1"></div>
+      <div class="f"><label for="sVoice">VANI's voice</label><select id="sVoice"></select><small>Auto picks the most natural Indian female voice on this device (best: Edge → "Neerja Natural").</small></div>
+      <div class="f"><label>&nbsp;</label><button class="ibtn" id="sPreview" type="button"><span data-i="play"></span>Preview voice</button></div>
+      <div class="f" style="grid-column:1/-1"><label><input type="checkbox" id="sWake"> Wake word: say <b>"Hi Vani"</b> and she answers</label><small>Needs mic permission. Works on the GitHub Pages / Cloudflare link in Chrome or Edge (not inside claude.ai). Listens only while this tab is open and visible.</small></div>
     </div>
 
     <h5>Brand brain</h5>
@@ -768,7 +784,7 @@ var DEFAULT_BRANDS = {
   "LittleLoop":{what:"Instagram channel @little_loop09 with short animated stories for kids.",aud:"Parents of young children.",voice:"Playful, gentle, wholesome.",goal:"Followers who share reels.",ch:"Instagram Reels",top:"bedtime story|good habits|sharing is caring|morning routine for kids"},
   "NIKHILs TECH STUDIO":{what:"AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",aud:"Students, job seekers and professionals learning AI.",voice:"Calm, authoritative, premium tech-documentary. Never hyped.",goal:"Followers and first paying learners.",ch:"Instagram Reels, YouTube",top:"SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"}
 };
-var DEF_SET = {provider:"auto",gkey:"",gmodel:"gemini-2.5-flash",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",speak:true,convo:false,leadsUrl:"data/leads.json"};
+var DEF_SET = {provider:"auto",gkey:"",gmodel:"gemini-2.5-flash",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
 
 var SIGNALS = [["Lead scraper","LS","#ff3d7f"],["Reddit","R","#ff4500"],["Hacker News","Y","#ff6600"],["RSS feeds","RS","#f59e0b"],["Owner notes","ON","#8b6cff"],["Team memory","M","#4fd1e8"],["YouTube","▶","#e00000"],["Instagram","IG","#d62976"]];
 var RECORD = [["Work board","WB","#f5a623"],["Lead store","LD","#ff7a59"],["Approvals","AP","#8b6cff"],["Activity log","LG","#64748b"],["Brand brains","BB","#16a34a"],["Settings","ST","#3b7ae0"],["Memory","MM","#0ea5e9"]];
@@ -1332,7 +1348,7 @@ $("brandSel").onchange=function(){setBrand(this.value);};
 /* ---------------- settings modal ---------------- */
 function openSettings(){
   $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
-  $("sLang").value=SET.lang;$("sTheme").value=SET.theme;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
+  $("sLang").value=SET.lang;$("sTheme").value=SET.theme;fillVoices();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
   renderBrands();$("sBrand").value=ST.brand;loadBrandForm(ST.brand);renderMem();updateBrain();
   $("settings").className="open";modalIn();$("setClose").focus();
 }
@@ -1351,7 +1367,7 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("settings
 $("sSave").onclick=function(){
   SET.provider=$("sProv").value;SET.gkey=$("sKey").value.trim();SET.gmodel=$("sModel").value.trim()||DEF_SET.gmodel;
   SET.interval=Math.max(2,+$("sInt").value||30);SET.maxHour=Math.min(20,Math.max(1,+$("sMax").value||4));
-  SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
+  SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.voice=$("sVoice").value||"auto";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
   var eb=$("sBrand").value;ST.brands[eb]={what:$("bWhat").value,aud:$("bAud").value,voice:$("bVoice").value,goal:$("bGoal").value,ch:$("bCh").value,top:$("bTop").value||"general update"};
   var nb=$("sNewBrand").value.trim();
   if(nb&&!ST.brands[nb]){ST.brands[nb]={what:"Describe "+nb,aud:"Describe the audience",voice:"Friendly, clear",goal:"Grow followers and leads",ch:"Instagram",top:"intro post|behind the scenes|how it works"};ST.brand=nb;}
@@ -1384,31 +1400,44 @@ function loopBurst(){ if(!HAS_GSAP||REDUCED)return; gsap.fromTo("#loop",{boxShad
 /* =====================================================================
    VANI — voice agent
    ===================================================================== */
-var SR=window.SpeechRecognition||window.webkitSpeechRecognition, REC=null, listening=false, finalText="", VH=[];
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition, REC=null, listening=false, finalText="", VH=[], speaking=false, afterSpeak=null, WREC=null, waking=false;
 $("optSpeak").checked=!!SET.speak;$("optConvo").checked=!!SET.convo;
 $("optSpeak").onchange=function(){SET.speak=this.checked;saveSet();if(!this.checked&&window.speechSynthesis)speechSynthesis.cancel();};
 $("optConvo").onchange=function(){SET.convo=this.checked;saveSet();};
 function vaniOpen(){return !$("vani").classList.contains("min");}
 function vmode(m){var v=$("vani");v.classList.remove("listen","speak","think");if(m)v.classList.add(m);
-  $("vstate").innerHTML=m==="listen"?"listening… bolo":(m==="speak"?"speaking…":(m==="think"?"thinking…":"voice agent · "+(SR?"tap mic to talk":"type to talk")));}
+  $("vstate").innerHTML=m==="listen"?"listening… bolo":(m==="speak"?"speaking…":(m==="think"?"thinking…":(SET.wake&&WREC?"say \"Hi Vani\"…":"voice agent · "+(SR?"tap mic to talk":"type to talk"))));}
 function vmsg(cls,t){var d=document.createElement("div");d.className="vm "+cls;d.textContent=t;$("vlog").appendChild(d);$("vlog").scrollTop=$("vlog").scrollHeight;
   if(HAS_GSAP&&!REDUCED)gsap.from(d,{y:10,opacity:0,duration:.35,ease:"expo.out"});}
 function vsys(t){vmsg("s",t);}
+var VOICE_PREF=[/neerja.*natural/i,/swara.*natural/i,/aarti|ananya.*natural/i,/heera/i,/neerja/i,/swara/i,/kalpana/i,/veena/i,/lekha/i,/google\s*हिन्दी|google hindi/i,/india.*female|female.*india/i];
+function allVoices(){try{return window.speechSynthesis?speechSynthesis.getVoices():[];}catch(e){return [];}}
 function pickVoice(){
-  if(!window.speechSynthesis)return null; var vs=speechSynthesis.getVoices(),i;
-  for(i=0;i<vs.length;i++){if(vs[i].lang===SET.lang&&/female|heera|swara|neerja|google/i.test(vs[i].name))return vs[i];}
-  for(i=0;i<vs.length;i++){if(vs[i].lang===SET.lang)return vs[i];}
+  var vs=allVoices(),i,j;
+  if(SET.voice&&SET.voice!=="auto"){for(i=0;i<vs.length;i++){if(vs[i].name===SET.voice)return vs[i];}}
+  for(j=0;j<VOICE_PREF.length;j++){for(i=0;i<vs.length;i++){if(VOICE_PREF[j].test(vs[i].name))return vs[i];}}
+  for(i=0;i<vs.length;i++){if(vs[i].lang==="en-IN")return vs[i];}
+  for(i=0;i<vs.length;i++){if(vs[i].lang==="hi-IN")return vs[i];}
   for(i=0;i<vs.length;i++){if(vs[i].lang&&vs[i].lang.indexOf(SET.lang.split("-")[0])===0)return vs[i];}
   return null;
 }
+function fillVoices(){
+  var vs=allVoices(),h='<option value="auto">Auto · best Indian female'+(pickVoiceAutoName()?" ("+esc(pickVoiceAutoName())+")":"")+'</option>',i,ind=[],oth=[];
+  for(i=0;i<vs.length;i++){ (/IN$/.test(vs[i].lang)?ind:oth).push(vs[i]); }
+  if(ind.length){h+='<optgroup label="Indian">';for(i=0;i<ind.length;i++)h+='<option value="'+esc(ind[i].name)+'">'+esc(ind[i].name)+' · '+ind[i].lang+'</option>';h+='</optgroup>';}
+  if(oth.length){h+='<optgroup label="Other">';for(i=0;i<oth.length&&i<60;i++)h+='<option value="'+esc(oth[i].name)+'">'+esc(oth[i].name)+' · '+oth[i].lang+'</option>';h+='</optgroup>';}
+  if(!vs.length)h+='<option disabled>No voices found on this device</option>';
+  $("sVoice").innerHTML=h;$("sVoice").value=SET.voice||"auto";if(!$("sVoice").value)$("sVoice").value="auto";
+}
+function pickVoiceAutoName(){var keep=SET.voice;SET.voice="auto";var v=pickVoice();SET.voice=keep;return v?v.name:"";}
 function speak(t){
-  if(!SET.speak||!window.speechSynthesis){ if(SET.convo)setTimeout(listen,300); return; }
+  if(!SET.speak||!window.speechSynthesis){ if(afterSpeak){var f0=afterSpeak;afterSpeak=null;setTimeout(f0,200);} else if(SET.convo)setTimeout(listen,300); else setTimeout(resumeWake,300); return; }
   try{
     speechSynthesis.cancel();
     var u=new SpeechSynthesisUtterance(t);u.lang=SET.lang;u.rate=+SET.rate||1;var v=pickVoice();if(v)u.voice=v;
-    u.onstart=function(){vmode("speak");};
-    u.onend=function(){vmode("");if(SET.convo&&vaniOpen())setTimeout(listen,250);};
-    u.onerror=function(){vmode("");};
+    u.onstart=function(){speaking=true;stopWake();vmode("speak");};
+    u.onend=function(){speaking=false;vmode("");if(afterSpeak){var f=afterSpeak;afterSpeak=null;setTimeout(f,200);}else if(SET.convo&&vaniOpen())setTimeout(listen,250);else resumeWake();};
+    u.onerror=function(){speaking=false;vmode("");resumeWake();};
     speechSynthesis.speak(u);
   }catch(e){vmode("");}
 }
@@ -1416,6 +1445,7 @@ function vsay(t,spoken){vmsg("a",t);VH.push("VANI: "+t);if(spoken)speak(t);}
 function listen(){
   if(!SR){vsys("Is browser mein voice input nahi hai. Chrome ya Edge mein kholo, tab tak type karo.");return;}
   if(listening){try{REC.stop();}catch(e){}return;}
+  stopWake();
   if(window.speechSynthesis)speechSynthesis.cancel();
   REC=new SR();REC.lang=SET.lang;REC.interimResults=true;REC.continuous=false;REC.maxAlternatives=1;finalText="";
   REC.onresult=function(e){var t="";for(var i=0;i<e.results.length;i++){t+=e.results[i][0].transcript;if(e.results[i].isFinal)finalText=t;}$("vinput").value=t;};
@@ -1424,8 +1454,8 @@ function listen(){
     else if(e.error==="no-speech")vsys("Kuch sunai nahi diya. Dobara mic dabao.");
     else vsys("Voice error: "+e.error);
   };
-  REC.onend=function(){listening=false;vmode("");var t=finalText||"";finalText="";if(t.trim()){$("vinput").value="";ask(t.trim());}};
-  try{REC.start();listening=true;vmode("listen");}catch(err){listening=false;vsys("Mic start nahi hua: "+err.message);}
+  REC.onend=function(){listening=false;vmode("");var t=finalText||"";finalText="";if(t.trim()){$("vinput").value="";ask(t.trim());}else{resumeWake();}};
+  setTimeout(function(){ try{REC.start();listening=true;vmode("listen");}catch(err){listening=false;vsys("Mic start nahi hua: "+err.message);resumeWake();} },waking?250:0);
 }
 function stateSummary(){
   var w=waiting(),i,s="Active brand: "+ST.brand+". Brands: "+Object.keys(ST.brands).join(", ")+". Autopilot: "+(autopilot?"on":"off")+". Brain: "+provider()+". Cycles done: "+ST.cycles+". Ready to post: "+readyCount()+".";
@@ -1443,7 +1473,7 @@ function ask(text){
       vmode("");var reply=(r&&r.reply)||"Hmm, samajh nahi aaya. Dobara bolo?";
       vsay(reply,true);
       doActions((r&&r.actions)||[]);
-    }).catch(function(e){vmode("");vsys("Brain error: "+((e&&e.message)||e).toString().slice(0,120));});
+    }).catch(function(e){vmode("");vsys("Brain error: "+((e&&e.message)||e).toString().slice(0,120));resumeWake();});
 }
 function doActions(acts){
   for(var i=0;i<acts.length&&i<10;i++){
@@ -1467,7 +1497,7 @@ $("vmin").onclick=function(e){e.stopPropagation();var v=$("vani");if(vaniOpen())
 $("mic").onclick=listen;
 $("vsend").onclick=function(){var t=$("vinput").value.trim();if(t){$("vinput").value="";ask(t);}};
 $("vinput").onkeydown=function(e){if(e.key==="Enter"){$("vsend").onclick();}};
-if(window.speechSynthesis&&speechSynthesis.onvoiceschanged!==undefined){speechSynthesis.onvoiceschanged=function(){};}
+
 
 
 
@@ -1597,6 +1627,50 @@ function go(t){
 navPills();window.addEventListener("resize",function(){movePills(true);});
 $("askIn").onkeydown=function(e){ if(e.key==="Enter"&&this.value.trim()){ var t=this.value.trim(); this.value=""; openVani(); ask(t); } };
 $("askMic").onclick=function(){ openVani(); listen(); };
+
+
+/* ---------------- "Hi Vani" wake word ---------------- */
+var WAKE_RE=/(?:^|\s)(?:hi|hii|hey|hay|hai|hello|ok|okay|oye|अरे|हाय|हे)\s*,?\s*(?:vani|vaani|wani|waani|bani|baani|vanee|vani ji|वाणी|वानी|बानी)\b/i;
+function wakeSupported(){return !!SR;}
+function setWake(on){
+  SET.wake=!!on;saveSet();$("optWake").checked=SET.wake;if($("sWake"))$("sWake").checked=SET.wake;
+  if(SET.wake){ if(!wakeSupported()){vsys("Is browser mein wake word nahi chalega. Chrome ya Edge use karo.");SET.wake=false;saveSet();$("optWake").checked=false;return;} resumeWake(); vsys("Wake word on. Bolo \"Hi Vani\" aur main jawab dungi."); }
+  else stopWake();
+  vmode("");
+}
+function stopWake(){ if(WREC){ var w=WREC; WREC=null; waking=false; try{w.onend=null;w.abort();}catch(e){} } $("vani").classList.remove("wake"); }
+function resumeWake(){
+  if(!SET.wake||!SR||listening||speaking||WREC||document.hidden)return;
+  var w=new SR(); w.lang=SET.lang; w.continuous=true; w.interimResults=true; w.maxAlternatives=2;
+  w.onresult=function(e){
+    for(var i=e.resultIndex;i<e.results.length;i++){
+      var r=e.results[i],txt="";
+      for(var a=0;a<r.length;a++){ txt=r[a].transcript; var m=txt.match(WAKE_RE); if(m){
+        var rest=txt.slice(m.index+m[0].length).replace(/^[\s,.!?]+/,"");
+        if(!r.isFinal&&rest.length<4){ continue; }
+        onWake(r.isFinal?rest:""); return;
+      } }
+    }
+  };
+  w.onerror=function(ev){ if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){ vsys("Wake word ke liye mic permission chahiye. claude.ai ke andar ye block hai — GitHub Pages/Cloudflare link par kholo."); SET.wake=false;saveSet();$("optWake").checked=false;WREC=null; } };
+  w.onend=function(){ if(WREC===w){ WREC=null; waking=false; setTimeout(resumeWake,400); } };
+  try{ w.start(); WREC=w; waking=true; $("vani").classList.add("wake"); }catch(err){ WREC=null; }
+}
+function onWake(rest){
+  stopWake();
+  if(!vaniOpen()){ $("vani").classList.remove("min"); $("vmin").innerHTML=icon("chevron-down"); }
+  pulse("VANI","Orchestrator","#8b6cff");
+  if(rest&&rest.length>3){ ask(rest); return; }
+  var greet=pick(["Haan "+CONFIG.owner+", boliye?","Ji "+CONFIG.owner+", main sun rahi hoon.","Haan bolo, kya karna hai?"]);
+  vmsg("a",greet); VH.push("VANI: "+greet);
+  if(SET.speak&&window.speechSynthesis){ afterSpeak=listen; speak(greet); } else listen();
+}
+document.addEventListener("visibilitychange",function(){ if(document.hidden)stopWake(); else resumeWake(); });
+$("optWake").checked=!!SET.wake;
+$("optWake").onchange=function(){ setWake(this.checked); };
+$("sPreview").onclick=function(){ var keep=SET.voice; SET.voice=$("sVoice").value||"auto"; var was=SET.speak; SET.speak=true; speak("Namaste "+CONFIG.owner+"! Main VANI hoon. Aaj Foliocraft ke liye teen naye leads mile hain."); SET.speak=was; SET.voice=keep; };
+if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=function(){ if($("settings").className)fillVoices(); }; }catch(e){} }
+if(SET.wake){ setTimeout(resumeWake,3000); }
 
 /* ---------------- render all ---------------- */
 function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();updateBrain();}
