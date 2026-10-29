@@ -767,6 +767,7 @@ body.glass #sig .sbox{border-radius:28px}
       <div class="f"><label for="sModel">Gemini model</label><input id="sModel" placeholder="auto"></div>
       <div class="f"><label for="sOR">OpenRouter API key — free models (openrouter.ai/keys)</label><input id="sOR" type="password" autocomplete="off"></div>
       <div class="f"><label for="sORM">OpenRouter model</label><input id="sORM" placeholder="auto (picks a :free model)"></div>
+      <div class="f" style="grid-column:1/-1"><label><input type="checkbox" id="sFree"> <b>Free AI (optional)</b> — Pollinations, no key needed. Slower (≈1 call / 15 s). Add a Groq key for speed.</label></div>
       <div class="f" style="grid-column:1/-1"><small>Leave models on <b>auto</b>: AGENTVERSE reads each provider's live model list and picks a working free model, so retired models never break it. Keys stay in this browser only (localStorage), never in the page or repo.</small></div>
     </div>
 
@@ -886,7 +887,7 @@ var DEFAULT_BRANDS = {
   "LittleLoop":{what:"Instagram channel @little_loop09 with short animated stories for kids.",aud:"Parents of young children.",voice:"Playful, gentle, wholesome.",goal:"Followers who share reels.",ch:"Instagram Reels",top:"bedtime story|good habits|sharing is caring|morning routine for kids"},
   "NIKHILs TECH STUDIO":{what:"AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",aud:"Students, job seekers and professionals learning AI.",voice:"Calm, authoritative, premium tech-documentary. Never hyped.",goal:"Followers and first paying learners.",ch:"Instagram Reels, YouTube",top:"SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"}
 };
-var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",immWake:true,ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
+var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",freeAI:false,immWake:true,ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
 
 var SIGNALS = [["Lead scraper","LS","#ff3d7f"],["Reddit","R","#ff4500"],["Hacker News","Y","#ff6600"],["RSS feeds","RS","#f59e0b"],["Owner notes","ON","#8b6cff"],["Team memory","M","#4fd1e8"],["YouTube","▶","#e00000"],["Instagram","IG","#d62976"]];
 var RECORD = [["Work board","WB","#f5a623"],["Lead store","LD","#ff7a59"],["Approvals","AP","#8b6cff"],["Activity log","LG","#64748b"],["Brand brains","BB","#16a34a"],["Settings","ST","#3b7ae0"],["Memory","MM","#0ea5e9"]];
@@ -967,14 +968,14 @@ if (window.claude && typeof window.claude.use==="function"){
 
 /* ---------------- brain ---------------- */
 /* ---------------- multi-brain with live model discovery + automatic fallback ---------------- */
-var BRAIN_NAMES={claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",none:"not connected",rules:"rules"};
+var BRAIN_NAMES={ganesha:"Ganesha keys",claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",free:"Free AI",none:"not connected",rules:"rules"};
 var LAST_BRAIN="", LAST_MODEL="";
 function chain(){
   var p=SET.provider,c=[];
   function add(x){ if(c.indexOf(x)<0)c.push(x); }
-  var ok={claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey};
+  var ok={ganesha:!!ganeshaToken(),claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey,free:SET.freeAI===true};
   if(p!=="auto"&&ok[p])add(p);
-  var order=["claude","groq","gemini","openrouter"];
+  var order=["ganesha","claude","groq","gemini","openrouter","free"];
   for(var i=0;i<order.length;i++){ if(ok[order[i]])add(order[i]); }
   return c;
 }
@@ -983,7 +984,7 @@ function updateBrain(){
   var c=chain(),p=c[0]||"none",name=BRAIN_NAMES[p];
   $("brainName").innerHTML=esc(LAST_BRAIN&&c.indexOf(LAST_BRAIN)>=0?BRAIN_NAMES[LAST_BRAIN]:name); $("brainChip").className="brainchip"+(p==="none"?" demo":"");
   $("brainChip").title=LAST_MODEL?("Model: "+LAST_MODEL):"Which AI brain the agents use";
-  $("brainNote").innerHTML = p==="none" ? "<b>No AI brain connected.</b> Add a free Groq key (console.groq.com/keys) in settings — agents start working right away." :
+  $("brainNote").innerHTML = p==="none" ? (ON_GANESHA?"<b>Ganesha login nahi mila.</b> Pehle Ganesha AI Studio kholo aur owner token se login karo — phir yahan sab keys apne aap jud jaayengi.":"<b>No AI brain here.</b> Aapki keys Ganesha mein hain — <a href=\"https://ganesha-studio.pravanigroup.workers.dev/agentverse/\" style=\"color:#fff;text-decoration:underline\">AGENTVERSE on Ganesha</a> kholo, wahan brain apne aap connect hai.") :
     "Brain chain: <b>"+c.map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>. If one fails, the next takes over automatically."+(LAST_MODEL?" Now: "+esc(LAST_MODEL)+".":"");
   if(SERVER&&SERVER.updated) $("brainNote").innerHTML+=" · 24/7 agent last ran "+ago(Date.parse(SERVER.updated))+" ago ("+esc((SERVER.last&&SERVER.last.brain)||"")+").";
   var note=$("sProvNote"); if(note) note.innerHTML = "Order now: <b>"+(c.length?c.map(function(x){return BRAIN_NAMES[x];}).join(" → "):"none — add a key")+"</b>"+(SAMPLE?"":" · Claude works only inside claude.ai");
@@ -996,6 +997,7 @@ function parseJSON(t){
 }
 function friendly(e){
   var st=e&&e.status,m=String((e&&e.message)||e);
+  if(/^Ganesha 401/.test(m))return "Ganesha mein login token purana hai — Ganesha kholo aur dobara login karo";
   if(st===401||st===403||/invalid api key|api key not valid|unauthor/i.test(m))return "key galat hai — settings mein dobara copy-paste karo";
   if(st===429||/quota|rate/i.test(m))return "free limit khatam — thodi der baad chalega";
   if(st===404)return "model band ho gaya — naya model dhoondh raha hai";
@@ -1056,7 +1058,34 @@ function oaiChat(url,key,model,system,user,opts,extra,json){
     return r.json().then(function(j){ var t=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content; return parseJSON(t); });
   });
 }
+/* Free AI: Pollinations (no key, no signup). Anonymous limit ≈ 1 request / 15 s, so calls are queued. */
+var FREE_LAST=0;
+function freeChat(system,user,opts){
+  var wait=Math.max(0,FREE_LAST+15500-Date.now()); FREE_LAST=Date.now()+wait;
+  if(wait>1500)addTerm([["w","free AI: waiting "+Math.round(wait/1000)+"s (rate limit)"]]);
+  var body=JSON.stringify({model:"openai",messages:[{role:"system",content:system+"\nReturn ONLY one valid JSON object."},{role:"user",content:user}],temperature:opts.quick?0.6:0.85,private:true,referrer:"agentverse"});
+  var urls=["https://text.pollinations.ai/openai","https://gen.pollinations.ai/v1/chat/completions"];
+  function tryU(i){
+    if(i>=urls.length)return Promise.reject(new Error("Free AI busy — try again in a minute"));
+    return fetch(urls[i],{method:"POST",headers:{"Content-Type":"application/json"},body:body}).then(function(r){
+      if(!r.ok)return r.text().then(function(t){ if(r.status===429||r.status>=500||r.status===401||r.status===402||r.status===403)return tryU(i+1); throw httpErr("Free AI",r,t); });
+      return r.text().then(function(t){ var c=t; try{var j=JSON.parse(t); c=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||t;}catch(e){} LAST_MODEL="Pollinations ("+(i?"gen":"text")+")"; return parseJSON(c); });
+    },function(){ return tryU(i+1); });
+  }
+  return new Promise(function(res){setTimeout(res,wait);}).then(function(){FREE_LAST=Date.now();return tryU(0);});
+}
+/* Ganesha AI Studio backend: same site, uses the keys already saved on the Worker */
+var ON_GANESHA=/ganesha-studio\./.test(location.hostname);
+function ganeshaToken(){ if(!ON_GANESHA)return null; try{return localStorage.getItem("gas.adminToken");}catch(e){return null;} }
+function ganeshaChat(system,user,opts){
+  return fetch("/api/agentverse/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+ganeshaToken()},body:JSON.stringify({system:system,prompt:user,quick:!!opts.quick})})
+    .then(function(r){ return r.text().then(function(t){ var j={}; try{j=JSON.parse(t);}catch(e){}
+      if(!r.ok){ var e=new Error("Ganesha "+r.status+": "+((j&&j.error)||t).toString().slice(0,160)); e.status=r.status; e.code=r.status===429?"rate_limited":(r.status===401?"auth":"error"); throw e; }
+      LAST_MODEL=(j.provider||"")+" · "+(j.model||""); return j.json||parseJSON(j.text); }); });
+}
 function callBrain(p,system,user,opts){
+  if(p==="ganesha")return ganeshaChat(system,user,opts);
+  if(p==="free")return freeChat(system,user,opts);
   if(p==="claude"){
     return SAMPLE([{role:"user",content:system+"\n\n"+user+"\n\nReturn ONLY one valid JSON object, nothing else."}],{cache:false,modelTier:opts.quick?"quick":"default"})
       .then(function(r){LAST_MODEL="Claude";return parseJSON(r&&r.text);});
@@ -1430,7 +1459,7 @@ setInterval(function(){
   if(!autopilot||busy||paused)return;
   var hourAgo=Date.now()-3600000; cycleTimes=cycleTimes.filter(function(t){return t>hourAgo;});
   if(provider()==="none")return;
-  var gap=Math.max(2,+SET.interval||30)*60000;
+  var gap=Math.max(provider()==="free"?10:2,+SET.interval||30)*60000;
   var max=Math.max(1,+SET.maxHour||4);
   if(Date.now()-lastCycle>=gap&&cycleTimes.length<max)runCycle();
 },5000);
@@ -1448,9 +1477,10 @@ function setLeads(data,src){
   addTerm([["c","leads.load()"],["","✓ "+LEADS.length+" leads · "+freshCount()+" fresh"]]);
   renderBoard();refreshStats();updateTicker();
 }
+var DATA_BASE=/github\.io$/.test(location.hostname)||/^localhost|^127\./.test(location.hostname)?"":"https://raw.githubusercontent.com/Connect-Pranav/agentverse/main/";
 function loadLeads(){
   if(!window.fetch)return;
-  fetch(SET.leadsUrl+(SET.leadsUrl.indexOf("?")>=0?"&":"?")+"t="+Date.now()).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  fetch((SET.leadsUrl==="data/leads.json"?DATA_BASE:"")+SET.leadsUrl+(SET.leadsUrl.indexOf("?")>=0?"&":"?")+"t="+Date.now()).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
     .then(function(j){setLeads(j,"from repo");})
     .catch(function(){ LEADS_INFO="No leads file reachable here. On GitHub Pages it loads data/leads.json automatically; here you can import one in settings."; renderBoard(); });
 }
@@ -1550,7 +1580,7 @@ $("brandSel").onchange=function(){setBrand(this.value);};
 
 /* ---------------- settings modal ---------------- */
 function openSettings(){
-  $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sGroq").value=SET.groqKey;$("sGroqM").value=SET.groqModel;$("sOR").value=SET.orKey;$("sORM").value=SET.orModel;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
+  $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sGroq").value=SET.groqKey;$("sGroqM").value=SET.groqModel;$("sOR").value=SET.orKey;$("sORM").value=SET.orModel;$("sFree").checked=SET.freeAI!==false;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
   $("sLang").value=SET.lang;$("sTheme").value=SET.theme;fillVoices();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
   renderBrands();$("sBrand").value=ST.brand;loadBrandForm(ST.brand);renderMem();updateBrain();
   $("settings").className="open";modalIn();$("setClose").focus();
@@ -1571,7 +1601,7 @@ $("sSave").onclick=function(){
   SET.provider=$("sProv").value;
   var mk=function(id,key){var v=$(id).value.trim()||"auto";if(v!==SET[key])mcDel(key==="gmodel"?"gemini":(key==="groqModel"?"groq":"openrouter"));SET[key]=v;};
   var ck=function(v){return String(v||"").replace(/^[\s"'`]+|[\s"'`]+$/g,"").replace(/\s+/g,"");};
-  SET.gkey=ck($("sKey").value);SET.groqKey=ck($("sGroq").value);SET.orKey=ck($("sOR").value);
+  SET.freeAI=$("sFree").checked; SET.gkey=ck($("sKey").value);SET.groqKey=ck($("sGroq").value);SET.orKey=ck($("sOR").value);
   var warn=[];
   if(SET.groqKey&&!/^gsk_/.test(SET.groqKey))warn.push("Groq key 'gsk_' se shuru honi chahiye");
   if(SET.gkey&&!/^AIza/.test(SET.gkey))warn.push("Gemini key 'AIza' se shuru hoti hai");
@@ -1589,7 +1619,7 @@ $("sSave").onclick=function(){
 $("sTest").onclick=function(){
   var out=$("sTestOut"); out.innerHTML="testing…";
   var keep={g:SET.gkey,q:SET.groqKey,o:SET.orKey}; var ck2=function(v){return String(v||"").replace(/^[\s"'`]+|[\s"'`]+$/g,"").replace(/\s+/g,"");}; SET.gkey=ck2($("sKey").value);SET.groqKey=ck2($("sGroq").value);SET.orKey=ck2($("sOR").value);
-  var list=[]; if(SAMPLE)list.push("claude"); if(SET.groqKey)list.push("groq"); if(SET.gkey)list.push("gemini"); if(SET.orKey)list.push("openrouter");
+  var list=[]; if(ganeshaToken())list.push("ganesha"); if($("sFree").checked)list.push("free"); if(SAMPLE)list.push("claude"); if(SET.groqKey)list.push("groq"); if(SET.gkey)list.push("gemini"); if(SET.orKey)list.push("openrouter");
   if(!list.length){out.innerHTML="Add at least one key first.";return;}
   var res=[],n=0;
   list.forEach(function(p){
@@ -1928,7 +1958,7 @@ var SIGKEYS={"Lead scraper":"scraper","Reddit":"reddit","Hacker News":"hn","RSS 
 var DEFAULT_KW={"Foliocraft":["portfolio website","personal website","build my portfolio","resume website"],"NIKHILs TECH STUDIO":["learn chatgpt","resume writing","sql interview","build an ai agent"],"Sunverse":["hindi song","hindi lofi","background music for my video"],"LittleLoop":["bedtime story","kids animation","stories for toddlers"]};
 var DEFAULT_SUBS={"Foliocraft":["forhire","freelance_forhire","resumes","careerguidance"],"NIKHILs TECH STUDIO":["forhire","resumes","ChatGPT","smallbusiness"],"Sunverse":["bollywoodmusic","IndianMusicLounge","NewMusicRecs"],"LittleLoop":["Parenting","toddlers","Mommit"]};
 var INTENT=["need","looking for","hiring","recommend","anyone know","who can","help me","budget","suggest","where can i"];
-function loadCfg(){ if(LEADS_CFG)return Promise.resolve(LEADS_CFG); return fetch("leads.config.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){LEADS_CFG=j;return j;}).catch(function(){return null;}); }
+function loadCfg(){ if(LEADS_CFG)return Promise.resolve(LEADS_CFG); return fetch(DATA_BASE+"leads.config.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){LEADS_CFG=j;return j;}).catch(function(){return null;}); }
 function brandProd(cfg){ var b=ST.brand,p=null; if(cfg&&cfg.products){for(var i=0;i<cfg.products.length;i++){if(cfg.products[i].name===b)p=cfg.products[i];}} return p||{name:b,keywords:DEFAULT_KW[b]||[b.toLowerCase()],subreddits:DEFAULT_SUBS[b]||["forhire"]}; }
 function liveScore(title,text,kws){
   var t=(title+" "+text).toLowerCase(),sc=0,m=[],i;
@@ -2114,7 +2144,7 @@ function ytRender(){
 var SERVER=null;
 function loadWork(){
   if(!window.fetch)return;
-  fetch("data/work.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(w){
+  fetch(DATA_BASE+"data/work.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(w){
     SERVER=w; var have={},i,n=0; for(i=0;i<ST.outputs.length;i++)have[ST.outputs[i].id]=1;
     ST.serverSeen=ST.serverSeen||{};
     for(i=(w.items||[]).length-1;i>=0;i--){ var it=w.items[i]; if(have[it.id]||ST.serverSeen[it.id])continue; ST.serverSeen[it.id]=1; ST.outputs.unshift(it); n++;
