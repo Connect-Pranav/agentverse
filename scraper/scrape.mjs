@@ -108,11 +108,12 @@ let hnFreelanceCache = null;
 async function hnFreelance(product) {
   try {
     if (!hnFreelanceCache) {
-      const s = await getJSON("https://hn.algolia.com/api/v1/search_by_date?query=%22Seeking%20freelancer%22&tags=story,author_whoishiring&hitsPerPage=2");
-      const story = (s.hits || [])[0];
+      const s = await getJSON("https://hn.algolia.com/api/v1/search_by_date?query=freelancer&tags=story,author_whoishiring&hitsPerPage=10");
+      const story = (s.hits || []).find((h) => /seeking freelancer/i.test(h.title || ""));
+      hp("hn-freelance").thread = story ? story.title : "not found";
       hnFreelanceCache = [];
       if (story) {
-        const c = await getJSON(`https://hn.algolia.com/api/v1/search?tags=comment,story_${story.objectID}&hitsPerPage=500`);
+        const c = await getJSON(`https://hn.algolia.com/api/v1/search?tags=comment,story_${story.objectID}&hitsPerPage=1000`);
         hnFreelanceCache = (c.hits || []).filter((h) => /seeking freelancer/i.test(h.comment_text || ""));
       }
       hp("hn-freelance").ok++; hp("hn-freelance").items = hnFreelanceCache.length;

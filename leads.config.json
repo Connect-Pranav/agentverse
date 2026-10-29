@@ -120,7 +120,7 @@
   "maxAgeDays": 10,
   "minScore": 5,
   "maxLeads": 300,
-  "bluesky": true,
+  "bluesky": false,
   "mastodonServer": "mastodon.social",
   "mastodonTags": [
     "hiring",
