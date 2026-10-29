@@ -66,10 +66,55 @@ test('full flow: create → upload page → analysis → approval in chat → vi
   assert.ok(ready.video_url && ready.thumbnail_url);
   const v = await worker.fetch(new Request(ready.video_url), e);
   assert.deepEqual([...new Uint8Array(await v.arrayBuffer())], [1, 2, 3]);
+  // progress + YouTube posting (only after the owner says post)
+  assert.equal((await (await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e)).json()).job, null, 'nothing posted before owner approval');
+  const pub = (await tool(e, 'publish_to_youtube', { job_id: id, privacy: 'unlisted' })).structuredContent;
+  assert.equal(pub.publish.state, 'requested');
+  assert.equal((await tool(e, 'publish_to_youtube', { job_id: id })).isError, true, 'no double post');
+  const pc = await (await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e)).json();
+  assert.equal(pc.stage, 'publish');
+  assert.equal(pc.job.publish.privacy, 'unlisted');
+  const rv = await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video`, { headers: R }), e);
+  assert.deepEqual([...new Uint8Array(await rv.arrayBuffer())], [1, 2, 3]);
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/progress`, { method: 'POST', headers: R, body: JSON.stringify({ stage: 'publish', step: 'Uploading to YouTube', done: 1, total: 3, eta_s: 40 }) }), e);
+  assert.equal((await tool(e, 'get_song_job', { job_id: id })).structuredContent.progress.eta_s, 40);
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/fail`, { method: 'POST', headers: R, body: JSON.stringify({ error: 'quota' }) }), e);
+  assert.equal((await tool(e, 'get_song_job', { job_id: id })).structuredContent.publish.state, 'requested', 'retry after a failure');
+  await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e);
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/published`, { method: 'POST', headers: R, body: JSON.stringify({ video_id: 'abcDEF12345', privacy: 'unlisted' }) }), e);
+  const done = (await tool(e, 'get_song_job', { job_id: id })).structuredContent;
+  assert.equal(done.publish.state, 'published');
+  assert.equal(done.publish.url, 'https://youtu.be/abcDEF12345');
+  assert.equal(done.lyrics_preview[0], 'Shaam ki laali');
   const meta = (await tool(e, 'get_youtube_metadata', { job_id: id })).structuredContent;
   assert.equal(meta.title, 'Shaam Ki Laali | Sunverse');
   const list = (await tool(e, 'list_song_jobs', {})).structuredContent.jobs;
   assert.equal(list[0].status, 'ready');
   assert.equal((await tool(e, 'delete_song_job', { job_id: id })).structuredContent.deleted, id);
   assert.equal((await tool(e, 'get_song_job', { job_id: id })).isError, true);
+});
+
+test('owner REST publish needs token and a ready video; instant start dispatch', async () => {
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u, o) => { calls.push([String(u), o]); return new Response(null, { status: 204 }); };
+  try {
+    const e = { ...env(), GH_DISPATCH_TOKEN: 'ghp_x' };
+    const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+    const waits = [];
+    const ctx = { waitUntil: (p) => waits.push(p) };
+    const c = await (await worker.fetch(new Request(B + '/api/songvideo', { method: 'POST', headers: H, body: '{"title":"T"}' }), e, ctx)).json();
+    const id = c.job.job_id;
+    assert.equal(c.job.instant_start, true);
+    assert.equal((await worker.fetch(new Request(B + `/api/songvideo/${id}/publish`, { method: 'POST', body: '{}' }), e, ctx)).status, 401);
+    assert.equal((await worker.fetch(new Request(B + `/api/songvideo/${id}/publish`, { method: 'POST', headers: H, body: '{}' }), e, ctx)).status, 409);
+    const up = await worker.fetch(new Request(B + `/api/songvideo/${id}/audio`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-type': 'audio/mpeg', 'content-length': '10' }, body: new Uint8Array(10) }), e, ctx);
+    assert.equal((await up.json()).job.status, 'queued');
+    await Promise.all(waits);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0][0], /actions\/workflows\/songvideo\.yml\/dispatches$/);
+    assert.equal(calls[0][1].headers.authorization, 'Bearer ghp_x');
+    const h = await (await worker.fetch(new Request(B + '/health'), e)).json();
+    assert.equal(h.instantStart, true);
+  } finally { globalThis.fetch = realFetch; }
 });

@@ -7,9 +7,12 @@ approve the image spend.
 Stage "render" (paid images, after approval): makes one 16:9 image per scene (Gemini image model, or OpenAI
 gpt-image when SONGVIDEO_IMAGE_ENGINE=openai), renders a 1080p MP4 with ffmpeg (Sunverse logo intro,
 credits card, Ken Burns motion, crossfades, lyric captions, end card) and uploads it in parts.
-Nothing is published from here.
+Stage "publish" (only after the owner pressed "Post to YouTube"): uploads the MP4 to the owner's channel with
+the YouTube Data API (title, description with credits, tags, Music category, AI-content disclosure, thumbnail).
+Every stage reports progress + estimated time left to the Worker for the AGENTVERSE MCP tile.
 
 Env: SV_MCP_URL (the sunverse-mcp Worker), SV_MCP_TOKEN (its MCP_TOKEN), GEMINI_API_KEY (+ OPENAI_API_KEY for the openai engine).
+YouTube: YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.upload).
 Optional: GEMINI_TEXT_MODEL, GEMINI_IMAGE_MODEL, OPENAI_IMAGE_MODEL, SONGVIDEO_IMAGE_ENGINE, SONGVIDEO_IMAGE_USD.
 """
 import base64, json, math, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request
@@ -64,6 +67,14 @@ def ganesha(method, path, body=None, headers=None, timeout=300, want="json"):
     h = {"authorization": f"Bearer {env('SV_MCP_TOKEN')}"}
     h.update(headers or {})
     return http(method, env("SV_MCP_URL").rstrip("/") + path, body, h, timeout, want)
+
+
+def progress(jid, stage, step, done=0, total=0, eta=0):
+    """Best effort: tell the dashboard what is happening and how long is left."""
+    try:
+        ganesha("POST", f"/api/songvideo/runner/{jid}/progress", {"stage": stage, "step": step, "done": done, "total": total, "eta_s": int(max(0, eta))}, timeout=30)
+    except Exception as e:
+        log(f"[{jid}] progress not saved: {redact(e)}")
 
 
 def run(cmd):
@@ -202,9 +213,11 @@ Rules:
 def analyze(job, work):
     jid = job["id"]
     audio = os.path.join(work, "song")
+    progress(jid, "analyze", "Downloading the song", 1, 4, 120)
     raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/audio", want="raw", timeout=600)
     open(audio, "wb").write(raw)
     dur = probe_duration(audio)
+    progress(jid, "analyze", "Sending the song to Gemini", 2, 4, 100)
     n = max(6, min(16, round(dur / 15)))
     models = gemini_models()
     f = gemini_upload(audio, job.get("audioMime") or "audio/mpeg")
@@ -215,6 +228,7 @@ def analyze(job, work):
                             lyrics_rule=("Use these lyrics from the owner (same words), only add timing. If any line is in Devanagari, transliterate it to Roman/Latin letters (Hinglish):\n" + lyrics[:8000]) if lyrics
                             else "Transcribe the sung lyrics in Roman/Latin letters only (Hindi words written in Hinglish, e.g. 'Shaam ki laali chhaayi hai'). Never use Devanagari.")
     last = None
+    progress(jid, "analyze", "Gemini is listening: mood, theme, lyrics, scenes", 3, 4, 75)
     for model in pick_text_model(models):
         try:
             a = gemini_json(model, [{"file_data": {"mime_type": f.get("mimeType") or "audio/mpeg", "file_uri": f["uri"]}}, {"text": prompt}])
@@ -418,6 +432,12 @@ def render(job, work):
     per = float(os.environ.get("SONGVIDEO_IMAGE_USD") or 0.067)
     imgs, used = [], None
     models = pick_image_models(gemini_models()) if engine == "gemini" else None
+    n_sc = len(scenes)
+    enc_est = 40 + dur * 0.9  # ffmpeg on a 2-core runner, 1080p30
+    up_est = 25
+    per_img = 20.0
+    t0 = time.time()
+    progress(jid, "render", f"Gemini image 1 of {n_sc}", 0, n_sc, n_sc * per_img + enc_est + up_est)
     for i, s in enumerate(scenes):
         out = os.path.join(work, f"img{i:02d}.png")
         p = s["image_prompt"] + " Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
@@ -426,6 +446,9 @@ def render(job, work):
         run(["ffmpeg", "-y", "-v", "error", "-i", out, "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}", norm])
         imgs.append(norm)
         log(f"[{jid}] image {i + 1}/{len(scenes)} via {used}")
+        per_img = (time.time() - t0) / (i + 1)
+        left = n_sc - i - 1
+        progress(jid, "render", f"Gemini image {i + 2} of {n_sc}" if left else "Images done, building the video", i + 1, n_sc, left * per_img + enc_est + up_est)
     cost = round(len(imgs) * per, 3)
 
     # logo from the studio (Sunverse brand asset)
@@ -468,6 +491,7 @@ def render(job, work):
     filt.append(f"[wi][oc]overlay=0:0:eof_action=pass,subtitles='{ass}'[vout]")
     filt.append(f"[{n + 2}:a]afade=t=in:d=1.5,apad,atrim=0:{total:.3f},afade=t=out:st={dur - 2:.3f}:d=2[aout]")
     out = os.path.join(work, "video.mp4")
+    progress(jid, "render", "Encoding the MP4 (logo intro, credits, lyrics)", n_sc, n_sc, enc_est + up_est)
     run(["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(filt), "-map", "[vout]", "-map", "[aout]",
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-r", str(FPS),
          "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", f"{total:.3f}", out])
@@ -475,6 +499,7 @@ def render(job, work):
     size = os.path.getsize(out)
     log(f"[{jid}] rendered {vdur:.1f}s, {size / 1e6:.1f} MB")
 
+    progress(jid, "render", "Uploading the finished video", n_sc, n_sc, up_est)
     th = os.path.join(work, "thumb.jpg")
     thumbnail(imgs[0], logo, title, th)
     tb = open(th, "rb").read()
@@ -489,8 +514,85 @@ def render(job, work):
     log(f"[{jid}] uploaded in {parts} part(s)")
 
 
+# ---------------- YouTube (only after the owner pressed "Post to YouTube") ----------------
+def yt_token():
+    cid, sec, rt = (os.environ.get(k, "").strip() for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"))
+    if not (cid and sec and rt):
+        raise RuntimeError("YouTube is not connected: add repo secrets YT_CLIENT_ID, YT_CLIENT_SECRET and YT_REFRESH_TOKEN")
+    body = urllib.parse.urlencode({"client_id": cid, "client_secret": sec, "refresh_token": rt, "grant_type": "refresh_token"}).encode()
+    r = http("POST", "https://oauth2.googleapis.com/token", body, {"content-type": "application/x-www-form-urlencoded"}, 60)
+    if not r.get("access_token"):
+        raise RuntimeError("Google did not return an access token (refresh token expired or revoked?)")
+    return r["access_token"]
+
+
+def yt_text(job):
+    y = job.get("youtube") or {}
+    cr = job.get("credits") or {}
+    title = re.sub(r"[<>]", "", (y.get("title") or job.get("title") or "Sunverse").strip())[:100]
+    desc = re.sub(r"[<>]", "", (y.get("description") or "").strip())
+    need = []
+    if cr.get("lyrics") and cr["lyrics"].lower() not in desc.lower():
+        need.append(f"Lyrics: {cr['lyrics']}")
+    if cr.get("singer") and cr["singer"].lower() not in desc.lower():
+        need.append(f"Singer: {cr['singer']}")
+    if need:
+        desc = (desc + "\n\n" + " | ".join(need)).strip()
+    if "sunverse" not in desc.lower():
+        desc += "\n\nSubscribe to SUNVERSE for more music."
+    desc = desc[:4900]
+    tags, total = [], 0
+    for t in y.get("tags") or []:
+        t = re.sub(r"[<>,]", "", str(t)).strip()[:40]
+        if t and total + len(t) + 2 <= 450:
+            tags.append(t)
+            total += len(t) + 2
+    return title, desc, tags
+
+
+def publish(job, work):
+    jid = job["id"]
+    p = job.get("publish") or {}
+    privacy = p.get("privacy") if p.get("privacy") in ("public", "unlisted", "private") else "public"
+    size = int(job.get("videoBytes") or 0)
+    up_est = 20 + size / 4e6
+    progress(jid, "publish", "Connecting to your YouTube channel", 1, 4, up_est + 20)
+    token = yt_token()
+    progress(jid, "publish", "Downloading the finished video", 2, 4, up_est + 10)
+    raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/video", want="raw", timeout=900)
+    title, desc, tags = yt_text(job)
+    meta = {"snippet": {"title": title, "description": desc, "tags": tags, "categoryId": "10"},
+            "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True, "embeddable": True}}
+    req = urllib.request.Request("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+                                 data=json.dumps(meta).encode(), method="POST",
+                                 headers={"authorization": f"Bearer {token}", "content-type": "application/json; charset=UTF-8",
+                                          "x-upload-content-type": "video/mp4", "x-upload-content-length": str(len(raw))})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            loc = r.headers.get("location")
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"YouTube refused the upload: HTTP {e.code} {redact(e.read().decode(errors='replace'))}")
+    if not loc:
+        raise RuntimeError("YouTube did not return an upload address")
+    progress(jid, "publish", f"Uploading to YouTube ({len(raw) / 1e6:.0f} MB)", 3, 4, up_est)
+    v = http("PUT", loc, raw, {"content-type": "video/mp4"}, 1800)
+    vid = v.get("id")
+    if not vid:
+        raise RuntimeError("YouTube upload finished without a video id")
+    eff = (v.get("status") or {}).get("privacyStatus") or privacy
+    log(f"[{jid}] posted to YouTube: https://youtu.be/{vid} ({eff})")
+    if job.get("thumb"):
+        try:
+            tb, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/thumb", want="raw", timeout=60)
+            http("POST", f"https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId={vid}", tb,
+                 {"authorization": f"Bearer {token}", "content-type": "image/jpeg"}, 120)
+        except Exception as e:  # custom thumbnails need a phone-verified channel
+            log(f"[{jid}] thumbnail not set: {redact(e)}")
+    ganesha("POST", f"/api/songvideo/runner/{jid}/published", {"video_id": vid, "privacy": eff})
+
+
 def main():
-    for _ in range(3):  # up to three jobs per run
+    for _ in range(4):  # up to four jobs per run
         c = ganesha("POST", "/api/songvideo/runner/claim", {})
         job = c.get("job")
         if not job:
@@ -498,7 +600,7 @@ def main():
             return
         work = tempfile.mkdtemp(prefix="sv_")
         try:
-            (analyze if c["stage"] == "analyze" else render)(job, work)
+            {"analyze": analyze, "render": render, "publish": publish}[c["stage"]](job, work)
         except Exception as e:
             log(f"[{job['id']}] {c['stage']} failed: {redact(e)}")
             try:

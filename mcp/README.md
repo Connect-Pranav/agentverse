@@ -16,3 +16,24 @@ YouTube is **not** auto-published: API uploads from an unaudited Google project 
    (Claude Desktop/Code: URL `/mcp` with header `Authorization: Bearer <MCP_TOKEN>`.)
 
 Tests: `node --test mcp/test/server.test.mjs`
+
+## MCP tile (dashboard) and YouTube posting
+
+The AGENTVERSE overview has an **MCP · Song → Video** tile: upload → Gemini analysis (mood, theme, lyrics) →
+your approval of the image cost → Gemini images → MP4 → **Post to YouTube** (tap twice to confirm). Every
+stage shows a live step and an estimated time left (the renderer reports progress to `/api/songvideo/runner/<id>/progress`).
+
+YouTube posting needs three GitHub repo secrets (free, YouTube Data API v3):
+
+1. Google Cloud console → new project → enable **YouTube Data API v3**.
+2. OAuth consent screen → External → add yourself as a user → **Publish app** (in "Testing" the refresh token expires after 7 days).
+3. Credentials → OAuth client ID → *Web application* → redirect URI `https://developers.google.com/oauthplayground`.
+4. <https://developers.google.com/oauthplayground> → ⚙ → *Use your own OAuth credentials* → scope
+   `https://www.googleapis.com/auth/youtube.upload` → Authorize (choose the Sunverse channel) → Exchange → copy the refresh token.
+5. Repo secrets: `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`.
+
+Until Google audits the API project, YouTube keeps API uploads **private**; the tile then says so and links to
+YouTube Studio, where one click makes it public.
+
+Optional instant start: add Cloudflare Worker secret `GH_DISPATCH_TOKEN` (GitHub fine-grained token for this repo with
+**Actions: read and write**). Without it the renderer runs every 15 minutes and the time estimate includes that wait.

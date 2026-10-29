@@ -9,11 +9,15 @@
 // Flow: create_song_job → upload MP3 → runner (Gemini, free) plans lyrics timing + scenes + YouTube text →
 // owner approves the paid image cost in chat (approve_song_job) → runner makes Gemini images and renders the
 // MP4 (Sunverse logo intro, credits, lyric captions, end card) → get_song_job returns the MP4 link + metadata.
-// Nothing is published to YouTube automatically (API uploads from an unaudited project are locked private).
+// YouTube: only after the owner presses "Post to YouTube" (publish_to_youtube); the runner uploads with the
+// owner's OAuth refresh token. Uploads from an unaudited Google API project are locked private by YouTube.
 //
-// Bindings: KV namespace MEDIA. Secret: MCP_TOKEN. Optional vars: SONGVIDEO_IMAGE_USD, INR_PER_USD, PUBLIC_BASE_URL.
+// Bindings: KV namespace MEDIA. Secret: MCP_TOKEN. Optional secret GH_DISPATCH_TOKEN (GitHub fine-grained token,
+// Actions read/write on the repo) starts the renderer instantly. Optional vars: SONGVIDEO_IMAGE_USD, INR_PER_USD,
+// PUBLIC_BASE_URL, GH_REPO (default Connect-Pranav/agentverse).
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
+const PRIVACY = ['public', 'unlisted', 'private'];
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const MAX_AUDIO = 24 * 1024 * 1024;
 const MAX_PART = 24 * 1024 * 1024;
@@ -81,6 +85,11 @@ function view(env, request, j) {
     plan: j.analysis ? { mood: j.analysis.mood, theme: j.analysis.theme, language: j.analysis.language, scenes: (j.analysis.scenes ?? []).map((s) => ({ start: s.start, end: s.end, summary: s.summary })) } : null,
     image_count: j.imageCount ?? null, est_cost_usd: j.estCostUsd ?? null, est_cost_inr: j.estCostInr ?? null, cost_usd: j.costUsd ?? null,
     youtube: j.youtube ?? null,
+    lyrics_preview: (j.analysis?.lyrics_lines ?? []).slice(0, 8).map((l) => l.text),
+    lyrics_lines_count: (j.analysis?.lyrics_lines ?? []).length,
+    progress: j.progress ?? null,
+    publish: j.publish ? { state: j.publish.state, privacy: j.publish.privacy, url: j.publish.url ?? null, video_id: j.publish.videoId ?? null, privacy_effective: j.publish.privacyEffective ?? null, error: j.publish.error ?? null, requested_at: j.publish.requestedAt ?? null, at: j.publish.at ?? null } : null,
+    instant_start: Boolean(env.GH_DISPATCH_TOKEN), queued_at: j.queuedAt ?? null, decided_at: j.decidedAt ?? null,
     video_url: j.status === 'ready' && j.ticket ? `${b}/sv/${j.ticket}.mp4` : null,
     thumbnail_url: j.status === 'ready' && j.ticket && j.thumb ? `${b}/sv/${j.ticket}.jpg` : null,
     video_mb: j.videoBytes ? Math.round(j.videoBytes / 1e5) / 10 : null, error: j.error ?? null, created_at: j.createdAt, updated_at: j.updatedAt,
@@ -109,7 +118,7 @@ async function storeAudio(env, j, body, length, mime) {
   if (!['uploading', 'failed'].includes(j.status)) throw new HttpError(409, `Job is ${j.status}; create a new job for another song`);
   const m = checkAudio(length, mime);
   await kv(env).put(`sv/audio/${j.id}`, body, { metadata: { mime: m, bytes: length } });
-  Object.assign(j, { status: 'queued', audioBytes: length, audioMime: m, attempts: 0, error: null, leaseUntil: null });
+  Object.assign(j, { status: 'queued', audioBytes: length, audioMime: m, attempts: 0, error: null, leaseUntil: null, queuedAt: nowIso(), progress: null });
   return saveJob(env, j);
 }
 async function importFromUrl(env, j, url) {
@@ -133,6 +142,22 @@ async function decide(env, j, decision) {
   if (j.status !== 'needs_approval') throw new HttpError(409, `Job is ${j.status}, not waiting for approval`);
   j.status = decision === 'approve' ? 'approved' : 'rejected';
   j.decidedAt = nowIso();
+  j.attempts = 0;
+  j.progress = null;
+  return saveJob(env, j);
+}
+async function requestPublish(env, j, a = {}) {
+  if (j.status !== 'ready') throw new HttpError(409, `Video is ${j.status}; it must be ready before posting`);
+  if (j.publish && ['requested', 'publishing', 'published'].includes(j.publish.state)) throw new HttpError(409, `Already ${j.publish.state}${j.publish.url ? ': ' + j.publish.url : ''}`);
+  const privacy = PRIVACY.includes(a.privacy) ? a.privacy : 'public';
+  const yt = j.youtube ?? {};
+  if (a.title) yt.title = clean(a.title, 100);
+  if (a.description) yt.description = clean(a.description, 4800);
+  if (Array.isArray(a.tags)) yt.tags = a.tags.map((t) => clean(t, 40)).filter(Boolean).slice(0, 25);
+  if (!clean(yt.title, 100)) throw new HttpError(400, 'A YouTube title is required');
+  j.youtube = yt;
+  j.publish = { state: 'requested', privacy, requestedAt: nowIso(), attempts: 0 };
+  j.progress = null;
   return saveJob(env, j);
 }
 async function removeJob(env, j) {
@@ -144,8 +169,22 @@ async function removeJob(env, j) {
   await k.put(INDEX, JSON.stringify((await index(env)).filter((x) => x !== j.id)));
 }
 
+/* ---------------- instant start (optional) ---------------- */
+const CTX = new WeakMap();
+const ctxOf = (request) => CTX.get(request);
+function kick(env, ctx) {
+  if (!env.GH_DISPATCH_TOKEN) return false;
+  const repo = env.GH_REPO || 'Connect-Pranav/agentverse';
+  const p = fetch(`https://api.github.com/repos/${repo}/actions/workflows/songvideo.yml/dispatches`, {
+    method: 'POST', body: JSON.stringify({ ref: 'main' }),
+    headers: { authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'agentverse-worker', 'content-type': 'application/json' },
+  }).then((r) => { if (!r.ok) console.error('dispatch failed', r.status); }).catch((e) => console.error('dispatch error', e));
+  if (ctx?.waitUntil) ctx.waitUntil(p);
+  return true;
+}
+
 /* ---------------- runner API ---------------- */
-const runnerView = (j) => ({ id: j.id, title: j.title, style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts });
+const runnerView = (j) => ({ id: j.id, title: j.title, style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb) });
 async function claim(env) {
   const now = Date.now();
   for (const id of await index(env)) {
@@ -161,6 +200,12 @@ async function claim(env) {
       Object.assign(j, { status: 'rendering', leaseUntil: isoIn(LEASE_MS), attempts: (j.attempts ?? 0) + 1 });
       await saveJob(env, j);
       return { job: runnerView(j), stage: 'render' };
+    }
+    const p = j.publish;
+    if (j.status === 'ready' && p && (p.state === 'requested' || (p.state === 'publishing' && !(p.leaseUntil && Date.parse(p.leaseUntil) > now)))) {
+      Object.assign(p, { state: 'publishing', leaseUntil: isoIn(LEASE_MS), attempts: (p.attempts ?? 0) + 1 });
+      await saveJob(env, j);
+      return { job: runnerView(j), stage: 'publish' };
     }
   }
   return { job: null };
@@ -182,7 +227,7 @@ async function saveAnalysis(env, j, a) {
   j.imageCount = scenes.length;
   j.estCostUsd = Math.round(scenes.length * per * 1000) / 1000;
   j.estCostInr = Number(env.INR_PER_USD) > 0 ? Math.round(j.estCostUsd * Number(env.INR_PER_USD)) : null;
-  Object.assign(j, { status: 'needs_approval', leaseUntil: null, error: null });
+  Object.assign(j, { status: 'needs_approval', leaseUntil: null, error: null, progress: null });
   return saveJob(env, j);
 }
 async function putVideoPart(env, j, { body, length, part, parts, meta }) {
@@ -200,16 +245,36 @@ async function putVideoPart(env, j, { body, length, part, parts, meta }) {
     j.videoMeta = meta ?? null;
     j.costUsd = Number(meta?.imageCostUsd) || null;
     j.ticket = hex(16);
-    Object.assign(j, { status: 'ready', leaseUntil: null, error: null });
+    Object.assign(j, { status: 'ready', leaseUntil: null, error: null, progress: null });
   }
   return saveJob(env, j);
 }
+async function saveProgress(env, j, a) {
+  j.progress = { stage: clean(a.stage, 20), step: clean(a.step, 120), done: Number(a.done) || 0, total: Number(a.total) || 0, eta_s: Math.max(0, Math.round(Number(a.eta_s) || 0)), at: nowIso() };
+  return saveJob(env, j);
+}
+async function markPublished(env, j, a) {
+  if (!j.publish || j.publish.state !== 'publishing') throw new HttpError(409, 'Not publishing');
+  const id = clean(a.video_id, 20);
+  if (!/^[\w-]{6,20}$/.test(id)) throw new HttpError(400, 'video_id is required');
+  Object.assign(j.publish, { state: 'published', videoId: id, url: `https://youtu.be/${id}`, privacyEffective: clean(a.privacy, 20) || j.publish.privacy, leaseUntil: null, error: null, at: nowIso() });
+  j.progress = null;
+  return saveJob(env, j);
+}
 async function failJob(env, j, error) {
+  if (j.status === 'ready' && j.publish?.state === 'publishing') {
+    j.publish.state = (j.publish.attempts ?? 0) >= MAX_ATTEMPTS ? 'failed' : 'requested';
+    j.publish.error = clean(error, 1000) || 'unknown error';
+    j.publish.leaseUntil = null;
+    j.progress = null;
+    return saveJob(env, j);
+  }
   if (!['analyzing', 'rendering'].includes(j.status)) return j;
   const back = j.status === 'analyzing' ? 'queued' : 'approved';
   j.status = (j.attempts ?? 0) >= MAX_ATTEMPTS ? 'failed' : back;
   j.error = clean(error, 1000) || 'unknown error';
   j.leaseUntil = null;
+  j.progress = null;
   if (j.status === 'failed') j.uploadTicket = j.uploadTicket || hex(16);
   return saveJob(env, j);
 }
@@ -227,22 +292,25 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: false, idempotentHint: true } },
   { name: 'reject_song_job', title: 'Reject plan', description: 'Owner says no to the plan; nothing is spent.', inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false } },
   { name: 'get_youtube_metadata', title: 'YouTube title & description', description: 'Ready-to-paste YouTube title, description and tags for a job.', inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false } },
+  { name: 'publish_to_youtube', title: 'Post video to YouTube', description: 'Owner approval to post the finished video on the Sunverse YouTube channel with its title, description, tags and thumbnail. Only call after the owner explicitly says to post. privacy: public (default), unlisted or private. Optional title/description/tags override the generated ones.',
+    inputSchema: { type: 'object', properties: { job_id: { type: 'string' }, privacy: { type: 'string', enum: PRIVACY }, title: { type: 'string' }, description: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: false, openWorldHint: true } },
   { name: 'delete_song_job', title: 'Delete song job', description: 'Delete a job and its files.', inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: true } },
 ];
 async function callTool(env, request, name, a = {}) {
   const v = (j) => view(env, request, j);
   switch (name) {
     case 'create_song_job': { const j = await createJob(env, a); return { ...v(j), next: 'Open upload_url and upload the MP3 (max 24 MB), or call import_song_from_url.' }; }
-    case 'import_song_from_url': return v(await importFromUrl(env, await jobOf(env, a.job_id), a.url));
+    case 'import_song_from_url': { const j = await importFromUrl(env, await jobOf(env, a.job_id), a.url); kick(env, ctxOf(request)); return v(j); }
     case 'list_song_jobs': {
       const out = [];
       for (const id of (await index(env)).slice(0, 30)) { const j = await kv(env).get(jobKey(id), 'json'); if (j) out.push({ job_id: j.id, title: j.title, status: j.status, status_text: STATUS_TEXT[j.status], updated_at: j.updatedAt }); }
       return { jobs: out };
     }
     case 'get_song_job': return v(await jobOf(env, a.job_id));
-    case 'approve_song_job': return { ...v(await decide(env, await jobOf(env, a.job_id), 'approve')), next: 'Images and video are being made; check get_song_job in ~15–30 minutes.' };
+    case 'approve_song_job': return { ...v(await decide(env, await jobOf(env, a.job_id), 'approve')), started: kick(env, ctxOf(request)), next: 'Images and video are being made; check get_song_job in ~15–30 minutes.' };
     case 'reject_song_job': return v(await decide(env, await jobOf(env, a.job_id), 'reject'));
     case 'get_youtube_metadata': { const j = await jobOf(env, a.job_id); if (!j.youtube) throw new HttpError(409, 'No metadata yet — the song has not been analysed'); return { ...j.youtube, upload_page: 'https://www.youtube.com/upload' }; }
+    case 'publish_to_youtube': { const j = await requestPublish(env, await jobOf(env, a.job_id), a); kick(env, ctxOf(request)); return { ...v(j), next: 'The renderer uploads it to YouTube (a few minutes). Check get_song_job for the link.' }; }
     case 'delete_song_job': { const j = await jobOf(env, a.job_id); await removeJob(env, j); return { deleted: j.id }; }
     default: throw Object.assign(new Error(`Unknown tool: ${name}`), { rpc: -32602 });
   }
@@ -264,7 +332,7 @@ async function mcp(request, env) {
       if (m.method === 'initialize') {
         const want = m.params?.protocolVersion;
         ok({ protocolVersion: PROTOCOLS.includes(want) ? want : PROTOCOLS[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'agentverse-sunverse', title: 'AGENTVERSE · SUNVERSE Song → Video', version: VERSION },
-          instructions: 'Turns a Sunverse song into a finished music video. Always ask the owner before calling approve_song_job (it spends money on images). Videos are not published automatically; give the owner the MP4 link and the YouTube title/description.' });
+          instructions: 'Turns a Sunverse song into a finished music video. Always ask the owner before calling approve_song_job (it spends money on images) and before publish_to_youtube (it posts publicly on the channel). Show the owner the title/description first.' });
       } else if (m.method === 'ping') ok({});
       else if (m.method === 'tools/list') ok({ tools: TOOLS });
       else if (m.method === 'tools/call') {
@@ -315,6 +383,9 @@ async function serveMedia(env, name) {
     const t = await kv(env).get(`sv/thumb/${j.id}`, 'stream');
     return t ? new Response(t, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'content-disposition': `inline; filename="${safe}.jpg"` } }) : new Response('Not found', { status: 404 });
   }
+  return streamVideo(env, j, `${safe}.mp4`);
+}
+function streamVideo(env, j, filename) {
   const { readable, writable } = new TransformStream();
   (async () => {
     try {
@@ -325,7 +396,7 @@ async function serveMedia(env, name) {
       }
     } catch (e) { await writable.abort(e).catch(() => {}); }
   })();
-  return new Response(readable, { headers: { 'content-type': 'video/mp4', 'content-length': String(j.videoBytes), 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'content-disposition': `attachment; filename="${safe}.mp4"` } });
+  return new Response(readable, { headers: { 'content-type': 'video/mp4', 'content-length': String(j.videoBytes), 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'content-disposition': `attachment; filename="${filename}"` } });
 }
 
 /* ---------------- router ---------------- */
@@ -347,14 +418,14 @@ async function route(request, env) {
   const method = request.method;
   const len = Number(request.headers.get('content-length') ?? 0);
 
-  if (path === '/health') return json({ ok: true, app: 'agentverse', songStudio: true, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN) });
+  if (path === '/health') return json({ ok: true, app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN) });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1]);
   if (seg[0] === 'u' && seg[1]) {
     const j = /^[0-9a-f]{32}$/.test(seg[1]) ? await jobByTicket(env, 'uploadTicket', seg[1]) : null;
     if (!j) return new Response('This upload link is not valid.', { status: 404 });
     if (method === 'GET') return new Response(uploadPage(j), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
-    if (method === 'PUT') return json(view(env, request, await storeAudio(env, j, request.body, len, request.headers.get('content-type'))));
+    if (method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctxOf(request)); return json(view(env, request, r)); }
     throw new HttpError(405, 'Use GET or PUT');
   }
   // Owner REST (AGENTVERSE dashboard → Song Studio), same token as MCP
@@ -366,9 +437,11 @@ async function route(request, env) {
     const j = await jobOf(env, seg[2]);
     if (!seg[3] && method === 'GET') return json({ job: v(j) });
     if (!seg[3] && method === 'DELETE') { await removeJob(env, j); return json({ deleted: j.id }); }
-    if (seg[3] === 'audio' && method === 'PUT') return json({ job: v(await storeAudio(env, j, request.body, len, request.headers.get('content-type'))) });
-    if (seg[3] === 'import' && method === 'POST') return json({ job: v(await importFromUrl(env, j, (await readJson(request)).url)) });
-    if ((seg[3] === 'approve' || seg[3] === 'reject') && method === 'POST') return json({ job: v(await decide(env, j, seg[3])) });
+    const ctx = ctxOf(request);
+    if (seg[3] === 'audio' && method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctx); return json({ job: v(r) }); }
+    if (seg[3] === 'import' && method === 'POST') { const r = await importFromUrl(env, j, (await readJson(request)).url); kick(env, ctx); return json({ job: v(r) }); }
+    if ((seg[3] === 'approve' || seg[3] === 'reject') && method === 'POST') { const r = await decide(env, j, seg[3]); if (seg[3] === 'approve') kick(env, ctx); return json({ job: v(r) }); }
+    if (seg[3] === 'publish' && method === 'POST') { const r = await requestPublish(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     throw new HttpError(404, 'Not found');
   }
   if (seg[0] === 'api' && seg[1] === 'songvideo' && seg[2] === 'runner') {
@@ -394,6 +467,10 @@ async function route(request, env) {
       await saveJob(env, j);
       return json({ ok: true });
     }
+    if (seg[4] === 'progress' && method === 'POST') { const r = await saveProgress(env, j, await readJson(request)); return json({ ok: true, status: r.status }); }
+    if (seg[4] === 'published' && method === 'POST') { const r = await markPublished(env, j, await readJson(request)); return json({ job: { id: r.id, publish: r.publish } }); }
+    if (seg[4] === 'video' && method === 'GET') { if (j.status !== 'ready') throw new HttpError(409, 'Video not ready'); return streamVideo(env, j, 'video.mp4'); }
+    if (seg[4] === 'thumb' && method === 'GET') { const t = await kv(env).get(`sv/thumb/${j.id}`, 'stream'); if (!t) throw new HttpError(404, 'No thumbnail'); return new Response(t, { headers: { 'content-type': 'image/jpeg' } }); }
     if (seg[4] === 'fail' && method === 'POST') { const r = await failJob(env, j, (await readJson(request)).error); return json({ job: { id: r.id, status: r.status } }); }
   }
   // everything else: the AGENTVERSE dashboard (static assets)
@@ -403,7 +480,8 @@ async function route(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    if (ctx) CTX.set(request, ctx);
     try {
       return await route(request, env);
     } catch (e) {

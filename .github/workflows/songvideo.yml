@@ -3,7 +3,9 @@ name: SUNVERSE song → video (MCP renderer)
 # Renders songs queued through the sunverse-mcp server (mcp/). Stage 1 (free): Gemini listens and plans.
 # Stage 2 (paid images) runs only after the owner approves in chat (approve_song_job).
 # Repo secrets: GEMINI_API_KEY (billing on, for images), SV_MCP_TOKEN (= the Worker's MCP_TOKEN).
-# Repo variable: SV_MCP_URL (e.g. https://agentverse.pravanigroup.workers.dev). Nothing is published from here.
+# Stage 3 posts to YouTube only after the owner presses "Post to YouTube" (secrets YT_CLIENT_ID, YT_CLIENT_SECRET,
+# YT_REFRESH_TOKEN). The Worker starts this workflow instantly when it has GH_DISPATCH_TOKEN; otherwise every 15 min.
+# Repo variable: SV_MCP_URL (e.g. https://agentverse.pravanigroup.workers.dev).
 
 on:
   schedule:
@@ -53,4 +55,7 @@ jobs:
           GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
           SONGVIDEO_IMAGE_ENGINE: ${{ vars.SONGVIDEO_IMAGE_ENGINE }}
           SONGVIDEO_IMAGE_USD: ${{ vars.SONGVIDEO_IMAGE_USD }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
         run: python3 scripts/songvideo-runner.py
