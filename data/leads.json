@@ -1,1 +1,168 @@
-{"updated":null,"count":0,"leads":[]}
+{
+ "updated": "2026-10-29T13:39:01.379Z",
+ "count": 9,
+ "leads": [
+  {
+   "id": "hn_50188040",
+   "source": "hacker news",
+   "title": "Drupal is now light-years ahead of its reputation",
+   "text": "Well, to a CMS developer, a lot of problems look like CMS problems. I know because I used to be paid to think like that. Portfolio website? CMS. Support ticket database? CMS. Newspaper layout system, intranet portal, blog, restaurant menu, identity verification system, etc? Yeah, we built all of it using a CMS. It made a lot of sense at the time because HTML and CSS were young and difficult to wrangle. Today, most of the reasons to build or use a CMS have evaporated.",
+   "url": "https://news.ycombinator.com/item?id=50188040",
+   "author": "hathawsh",
+   "created": "2026-10-21T21:38:39Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 7,
+   "matched": [
+    "portfolio website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50281533",
+   "source": "hacker news",
+   "title": "Show HN: Fast, Zero Allocation, AOT Safe, Compile-Time Safe .NET Template Engine",
+   "text": "I built a text templating engine, that I've named Lissic, as part of a personal website project I'm working on. It fits a niche that I don't think anything else in the .NET ecosystem fills. I prefer to keep code out the template itself (separation of concerns, view vs model, and all that). I also wanted to build something simple enough that I could imagine low&#x2F;medium-tech UI dev working with it, but it still needs to build things in a modular way, support loops, support conditional&#x2F;branching views, and have the ability to format&#x2F;filter values inserted into the text. I've improved Lissic to the point that I think it's worth sharing with the community. A quick overview of the features: - Renders near twice as fast as the fastest major .NET templating engine (see below) - Zero allocation with default settings, when rendering to a buffer (e.g. to HttpResponse.BodyWriter) - 100% AOT compatible without any restrictions (no use of Reflection or dynamic) - Simple but powerful tagging system that keeps a clear division between layout and logic - Compile-time safety with source-generated Data Transfer Objects that automatically adjust to each template's text - Define templates",
+   "url": "https://news.ycombinator.com/item?id=50281533",
+   "author": "ggende",
+   "created": "2026-10-28T22:00:11Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 5,
+   "matched": [
+    "personal website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50262852",
+   "source": "hacker news",
+   "title": "A private Kubernetes cluster for a personal website",
+   "text": "",
+   "url": "https://news.ycombinator.com/item?id=50262852",
+   "author": "indigodaddy",
+   "created": "2026-10-27T17:42:09Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 4,
+   "matched": [
+    "personal website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50238492",
+   "source": "hacker news",
+   "title": "Ask HN: Are tab completion models dead?",
+   "text": "I still want it for small edits. When I'm renaming a field or filling in a match arm, opening an agent is slower than hitting tab. I use agents for anything that required codebase exploration and changes across multiple files , and prefer completion for changing 2 lines in my portfolio website for example.",
+   "url": "https://news.ycombinator.com/item?id=50238492",
+   "author": "nottanjune",
+   "created": "2026-10-26T02:49:50Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 4,
+   "matched": [
+    "portfolio website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50238487",
+   "source": "hacker news",
+   "title": "Ask HN: Are tab completion models dead?",
+   "text": "I still want it for small edits. When I'm renaming a field or filling in a match arm, opening an agent is slower than hitting tab. I'd use agents for any changes that require entire codebase exploration and changing multiple files, and perfer completion for the 2 line change to my portfolio website update for example.",
+   "url": "https://news.ycombinator.com/item?id=50238487",
+   "author": "nottanjune",
+   "created": "2026-10-26T02:49:06Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 4,
+   "matched": [
+    "portfolio website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50207780",
+   "source": "hacker news",
+   "title": "Color Names",
+   "text": "Man, this comment section is not good. I was surprised recently when I tried to really dial in the colors on my personal website, and found that I perceive and get a different feeling from a hex code change of only 1. I didn’t test whether it’s just me or whether this particular color makes it more visible, but I did test a few monitors, including a bad one. So, I get feeling some way about a specific hex code, if you spent longer picking it than we usually do. I do, though, wonder what the idea behind assembling a centralized registry is. Is it about making a few favorite very specific colors easier to refer to? Browsing colors? Browsing ideas people have about what colors mean? What would the ideal ultimate form of this list include, every color? What’s the difference between a good name and a bad one?",
+   "url": "https://news.ycombinator.com/item?id=50207780",
+   "author": "kqp",
+   "created": "2026-10-23T12:17:52Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 4,
+   "matched": [
+    "personal website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50196470",
+   "source": "hacker news",
+   "title": "OpenAI CLI",
+   "text": "The code examples from their own website show the use of cURL and this CLI are roughly as verbose. Not sure I understand the need for maintaining a CLI. openai responses create \\ --model gpt-6-astra \\ --input \"Write a short bedtime story about a unicorn.\" \\ --raw-output \\ --transform 'output.#(type==\"message\").content.0.text' Versus curl https:&#x2F;&#x2F;api.openai.com&#x2F;v1&#x2F;responses \\ -H \"Content-Type: application&#x2F;json\" \\ -H \"Authorization: Bearer $OPENAI_API_KEY\" \\ -d '{ \"model\": \"gpt-6-astra\", \"input\": \"Write a short bedtime story about a unicorn.\" }'",
+   "url": "https://news.ycombinator.com/item?id=50196470",
+   "author": "gavinray",
+   "created": "2026-10-22T15:09:02Z",
+   "product": "LittleLoop",
+   "products": [
+    "LittleLoop"
+   ],
+   "score": 4,
+   "matched": [
+    "bedtime story"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50175956",
+   "source": "hacker news",
+   "title": "A noncommercial collection of easy-to-read history timelines",
+   "text": "This is an interesting concept. The collaborative aspect of it needs to be highlighted and made easier, since IMO its true value will come from crowdsourced data. Another minor feedback: The \"Report an error\" button currently points to the creator's personal website.",
+   "url": "https://news.ycombinator.com/item?id=50175956",
+   "author": "nivter",
+   "created": "2026-10-21T04:04:06Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 4,
+   "matched": [
+    "personal website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  },
+  {
+   "id": "hn_50154530",
+   "source": "hacker news",
+   "title": "More Powerful Than Ever, (can't find work)",
+   "text": "Try this book https:&#x2F;&#x2F;essenceofsoftware.com&#x2F; For example your personal website has a concept with no purpose the upper right oval things which are PgUp&#x2F;Dn on my phone display. If you learn basic conceptual design you can easily architect small sites like the things in your portfolio while sitting in front of someone, then have AI of choice immediately build the entire user interface and they can test it out themselves. Translating concepts into typescript code is trivial and exampled here https:&#x2F;&#x2F;61040-fa23.github.io&#x2F;pages&#x2F;concept-implementations.h... and AI can do this for you. The idea is concepts are reusable and modular and self contained. Whatever the user sees or has functional access to is what you design for and AI generates the hidden backend. If you design this way you discover many things are identical and can reuse an existing concept for it. You also discover many things have no real purpose and should be removed such as the 'don't hire me' section. Some of the problems with your personal biz advertising site others have mentioned would've been caught by conceptual design such as what is the purpose of this site? To display a por",
+   "url": "https://news.ycombinator.com/item?id=50154530",
+   "author": "hackermailman",
+   "created": "2026-10-19T16:38:00Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 4,
+   "matched": [
+    "personal website"
+   ],
+   "firstSeen": "2026-10-29T13:39:01.378Z"
+  }
+ ]
+}
