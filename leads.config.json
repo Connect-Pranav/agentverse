@@ -22,12 +22,12 @@
       "subreddits": ["Parenting", "toddlers", "Mommit", "daddit"]
     }
   ],
-  "intentWords": ["need", "looking for", "hiring", "recommend", "anyone know", "who can", "help me", "budget", "paid", "pay", "suggest", "where can i"],
+  "intentWords": ["need", "looking for", "hiring", "recommend", "anyone know", "who can", "help me", "budget", "suggest", "where can i"],
   "hiringTags": ["[hiring]", "[task]", "[paid]", "hiring:"],
-  "sellerTags": ["[for hire]", "for hire", "[offer]", "i will build", "my services"],
+  "sellerTags": ["[for hire]", "show hn", "for hire", "[offer]", "i will build", "my services"],
   "hackerNews": true,
   "rss": [],
   "maxAgeDays": 10,
-  "minScore": 4,
+  "minScore": 5,
   "maxLeads": 300
 }

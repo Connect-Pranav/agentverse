@@ -12,6 +12,8 @@ const NOW = Date.now();
 const MAX_AGE = (CFG.maxAgeDays || 10) * 864e5;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log("[leads]", ...a);
+const HEALTH = {};
+const hp = (src, k) => { HEALTH[src] = HEALTH[src] || { ok: 0, errors: 0, items: 0, lastError: null }; return HEALTH[src]; };
 
 async function getJSON(url, opts = {}) {
   const r = await fetch(url, { ...opts, headers: { "User-Agent": UA, ...(opts.headers || {}) } });
@@ -32,8 +34,14 @@ function score(lead, product) {
   let s = 0; const matched = [];
   for (const k of product.keywords) if (t.includes(k.toLowerCase())) { s += 3; matched.push(k); }
   if (!matched.length) return null;
-  for (const w of CFG.intentWords || []) if (t.includes(w)) { s += 1; }
-  for (const h of CFG.hiringTags || []) if (title.includes(h)) { s += 3; }
+  let intent = 0;
+  // intent words must sit near a matched keyword (same thought), not anywhere in a long comment
+  const near = matched.map((k) => { const i = t.indexOf(k.toLowerCase()); return t.slice(Math.max(0, i - 150), i + k.length + 150); }).join(" ");
+  const wb = (w) => new RegExp("(^|[^a-z])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z]|$)");
+  for (const w of CFG.intentWords || []) if (wb(w).test(near)) { s += 1; intent++; }
+  for (const h of CFG.hiringTags || []) if (title.includes(h)) { s += 3; intent++; }
+  if (/^ask hn/.test(title) && matched.some((k) => title.includes(k.toLowerCase()))) { s += 1; intent++; }
+  if (!intent) return null; // a keyword alone is not a lead
   for (const x of CFG.sellerTags || []) if (title.includes(x)) { s -= 6; }
   if (/[$₹€£]\s?\d|budget|\bpaid\b/.test(t)) s += 2;
   if (t.includes("?")) s += 1;
@@ -64,11 +72,12 @@ async function reddit(product) {
     const url = `${base}/r/${sub}/search${redditToken ? "" : ".json"}?q=${encodeURIComponent(q)}&restrict_sr=1&sort=new&t=week&limit=25&raw_json=1`;
     try {
       const j = await getJSON(url, redditToken ? { headers: { Authorization: "Bearer " + redditToken } } : {});
+      hp("reddit").ok++; hp("reddit").items += (j?.data?.children || []).length;
       for (const c of j?.data?.children || []) {
         const d = c.data; if (!d || d.over_18) continue;
         out.push({ id: "rd_" + d.id, source: "reddit r/" + d.subreddit, title: clean(d.title), text: clean(d.selftext).slice(0, 1200), url: "https://www.reddit.com" + d.permalink, author: d.author, created: new Date(d.created_utc * 1000).toISOString() });
       }
-    } catch (e) { log("reddit", sub, "→", e.message); }
+    } catch (e) { log("reddit", sub, "→", e.message); const h = hp("reddit"); h.errors++; h.lastError = e.message.slice(0, 80); }
     await sleep(1200);
   }
   return out;
@@ -78,14 +87,15 @@ async function reddit(product) {
 async function hn(product) {
   const out = []; const since = Math.floor((NOW - MAX_AGE) / 1000);
   for (const k of product.keywords.slice(0, 4)) {
-    const url = `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent('"' + k + '"')}&tags=(story,comment)&numericFilters=created_at_i>${since}&hitsPerPage=20`;
+    const url = `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent('"' + k + '"')}&tags=ask_hn&numericFilters=created_at_i>${since}&hitsPerPage=20`;
     try {
       const j = await getJSON(url);
+      hp("hackernews").ok++; hp("hackernews").items += (j.hits || []).length;
       for (const h of j.hits || []) {
         const title = clean(h.title || h.story_title || "HN comment");
         out.push({ id: "hn_" + h.objectID, source: "hacker news", title, text: clean(h.comment_text || h.story_text || "").slice(0, 1200), url: "https://news.ycombinator.com/item?id=" + h.objectID, author: h.author, created: h.created_at });
       }
-    } catch (e) { log("hn", k, "→", e.message); }
+    } catch (e) { log("hn", k, "→", e.message); const h = hp("hackernews"); h.errors++; h.lastError = e.message.slice(0, 80); }
     await sleep(400);
   }
   return out;
@@ -96,6 +106,7 @@ async function rss(feed) {
   const out = [];
   try {
     const x = await getText(feed);
+    hp("rss").ok++;
     const items = x.match(/<(item|entry)[\s\S]*?<\/(item|entry)>/g) || [];
     for (const it of items.slice(0, 50)) {
       const g = (tag) => (it.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`)) || [])[1] || "";
@@ -104,7 +115,7 @@ async function rss(feed) {
       const date = g("pubDate") || g("updated") || g("published");
       out.push({ id: "rs_" + Buffer.from(link || title).toString("base64").replace(/[^a-z0-9]/gi, "").slice(-16), source: "rss " + new URL(feed).hostname, title, text: clean((g("description") || g("summary") || g("content")).replace(/<!\[CDATA\[|\]\]>/g, "")).slice(0, 1200), url: clean(link), created: date ? new Date(date).toISOString() : new Date().toISOString() });
     }
-  } catch (e) { log("rss", feed, "→", e.message); }
+  } catch (e) { log("rss", feed, "→", e.message); const h = hp("rss"); h.errors++; h.lastError = e.message.slice(0, 80); }
   return out;
 }
 
@@ -157,12 +168,21 @@ async function main() {
 
   let old = [];
   try { old = JSON.parse(fs.readFileSync(OUT, "utf8")).leads || []; } catch {}
-  const all = new Map(old.filter((l) => NOW - Date.parse(l.created) <= MAX_AGE).map((l) => [l.id, l]));
+  const prodBy = new Map(CFG.products.map((p) => [p.name, p]));
+  const keep = old.filter((l) => {
+    if (NOW - Date.parse(l.created) > MAX_AGE) return false;
+    const p = prodBy.get(l.product); if (!p) return false;
+    if (l.id.startsWith("hn_") && !/^ask hn/i.test(l.title)) return false; // HN: only Ask HN questions
+    const sc = score(l, p); if (!sc || sc.score < (CFG.minScore || 4)) return false;
+    if (l.ai === undefined) l.score = sc.score;
+    return true;
+  });
+  const all = new Map(keep.map((l) => [l.id, l]));
   for (const l of fresh) all.set(l.id, { ...(all.get(l.id) || {}), ...l, firstSeen: all.get(l.id)?.firstSeen || new Date().toISOString() });
   const leads = [...all.values()].sort((a, b) => b.score - a.score || Date.parse(b.created) - Date.parse(a.created)).slice(0, CFG.maxLeads || 300);
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify({ updated: new Date().toISOString(), count: leads.length, leads }, null, 1));
+  fs.writeFileSync(OUT, JSON.stringify({ updated: new Date().toISOString(), count: leads.length, health: HEALTH, reddit: redditToken ? "oauth" : "public", leads }, null, 1));
   log(`saved ${leads.length} leads (${fresh.length} found this run)`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
