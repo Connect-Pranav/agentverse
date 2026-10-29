@@ -419,6 +419,23 @@ body.glass #boot .bl{color:#fff}
 body.glass .toast{right:auto;left:50%;bottom:auto;top:84px;transform:translate(-50%,-10px)}
 @media(max-width:760px){body.glass header{position:relative;top:0}body.glass .ticker{display:none}body.glass #vani.min{width:auto;right:10px}body.glass #vani.min .vt small{display:none}}
 
+/* ===== glass transitions ===== */
+body.glass.ready .dep,body.glass.ready .card,body.glass.ready .step,body.glass.ready .file,body.glass.ready .ctrl,body.glass.ready .msg{transition:transform .45s cubic-bezier(.22,1.2,.36,1),box-shadow .45s var(--ease),background .3s,border-color .3s}
+body.glass .dep:hover,body.glass .card:hover,body.glass .step:hover,body.glass .file:hover,body.glass .ctrl:hover{transform:translateY(-5px);box-shadow:0 18px 40px rgba(15,8,3,.35),inset 0 1px 0 rgba(255,255,255,.3);background:rgba(255,255,255,.18)}
+body.glass.ready .tool .ic{transition:transform .45s cubic-bezier(.22,1.2,.36,1),box-shadow .3s}
+body.glass .tool:hover .ic{transform:translateY(-4px) scale(1.06)}
+body.glass.ready .panel{transition:filter .5s var(--ease),opacity .5s var(--ease),transform .6s cubic-bezier(.22,1,.36,1)}
+body.glass.spot .panel{filter:blur(2px) saturate(.8);opacity:.55}
+body.glass.spot .panel.spotlit{filter:none;opacity:1;transform:scale(1.015)}
+.dock,.gnav{position:fixed}
+.navpill{position:absolute;border-radius:99px;background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.25);z-index:0;pointer-events:none}
+.gnav .navpill{background:rgba(255,255,255,.24);box-shadow:none}
+.dock button,.gnav button{position:relative;z-index:1}
+body.glass .dock button.on{background:transparent}
+body.glass .gnav button.on{background:transparent}
+body.glass .dock button.on{color:#1d1510}
+#settings{transition:none}
+
 </style>
 </head>
 <body>
@@ -1041,7 +1058,7 @@ function drainFeed(){
     bs[0].onclick=function(){approve(m.x.outId);};
     bs[1].onclick=function(){reject(m.x.outId,"");};
   }
-  if(HAS_GSAP&&!REDUCED){gsap.from(d,{y:18,opacity:0,filter:"blur(6px)",duration:.5,ease:"expo.out"});}
+  if(HAS_GSAP&&!REDUCED){gsap.from(d,{y:22,opacity:0,scale:.96,filter:"blur(10px)",duration:.65,ease:"expo.out",clearProps:"filter,transform"});}
   while(feedEl.children.length>9){feedEl.removeChild(feedEl.firstChild);}
   var di=depIndex(m.f); if(selDep<0)setFocus(di>=0?di:(depIndex(m.to)),false);
   pulse(m.f,m.to,wait?"#8b6cff":(m.x.loop?"#ff3d7f":"#f5a623"));
@@ -1217,6 +1234,7 @@ function renderBoard(){
     }
   }
   $("cards").innerHTML=h;
+  if(renderBoard._tab!==boardTab){renderBoard._tab=boardTab;cardsIn();}
 }
 $("cards").onclick=function(e){
   var t=e.target.closest?e.target.closest("button"):null;if(!t)return;
@@ -1261,7 +1279,7 @@ function openSettings(){
   $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
   $("sLang").value=SET.lang;$("sTheme").value=SET.theme;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
   renderBrands();$("sBrand").value=ST.brand;loadBrandForm(ST.brand);renderMem();updateBrain();
-  $("settings").className="open";$("setClose").focus();
+  $("settings").className="open";modalIn();$("setClose").focus();
 }
 function loadBrandForm(n){var b=ST.brands[n];$("bWhat").value=b.what;$("bAud").value=b.aud;$("bVoice").value=b.voice;$("bGoal").value=b.goal;$("bCh").value=b.ch;$("bTop").value=b.top;}
 $("sBrand").onchange=function(){loadBrandForm(this.value);};
@@ -1272,9 +1290,9 @@ function renderMem(){
 }
 $("memList").onclick=function(e){var m=e.target.getAttribute("data-m");if(m!==null){ST.memory.splice(+m,1);save();renderMem();}};
 $("memAdd").onkeydown=function(e){if(e.key==="Enter"&&this.value.trim()){ST.memory.push(this.value.trim());this.value="";save();renderMem();}};
-$("setClose").onclick=function(){$("settings").className="";};
-$("settings").onclick=function(e){if(e.target===this)this.className="";};
-document.addEventListener("keydown",function(e){if(e.key==="Escape")$("settings").className="";});
+$("setClose").onclick=function(){modalOut();};
+$("settings").onclick=function(e){if(e.target===this)modalOut();};
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("settings").className)modalOut();});
 $("sSave").onclick=function(){
   SET.provider=$("sProv").value;SET.gkey=$("sKey").value.trim();SET.gmodel=$("sModel").value.trim()||DEF_SET.gmodel;
   SET.interval=Math.max(2,+$("sInt").value||30);SET.maxHour=Math.min(20,Math.max(1,+$("sMax").value||4));
@@ -1282,7 +1300,7 @@ $("sSave").onclick=function(){
   var eb=$("sBrand").value;ST.brands[eb]={what:$("bWhat").value,aud:$("bAud").value,voice:$("bVoice").value,goal:$("bGoal").value,ch:$("bCh").value,top:$("bTop").value||"general update"};
   var nb=$("sNewBrand").value.trim();
   if(nb&&!ST.brands[nb]){ST.brands[nb]={what:"Describe "+nb,aud:"Describe the audience",voice:"Friendly, clear",goal:"Grow followers and leads",ch:"Instagram",top:"intro post|behind the scenes|how it works"};ST.brand=nb;}
-  saveSet();save();renderBrands();updateBrain();$("settings").className="";toast("Settings saved",true);
+  saveSet();save();renderBrands();updateBrain();modalOut();toast("Settings saved",true);
   if(nb)openSettings();
 };
 $("sExport").onclick=function(){copyText(JSON.stringify({state:ST,leads:LEADS.length},null,2));};
@@ -1387,18 +1405,60 @@ function doActions(acts){
 }
 $("vhead").onclick=function(e){
   if(e.target.closest&&e.target.closest("#vmin")&&vaniOpen()){$("vani").classList.add("min");return;}
-  if(!vaniOpen()){$("vani").classList.remove("min");$("vmin").innerHTML=icon("chevron-down");if(HAS_GSAP&&!REDUCED)gsap.from(".vbody",{height:0,opacity:0,duration:.4,ease:"expo.out"});$("vinput").focus();}
+  if(!vaniOpen()){$("vani").classList.remove("min");$("vmin").innerHTML=icon("chevron-down");if(HAS_GSAP&&!REDUCED){gsap.from(".vbody",{height:0,opacity:0,filter:"blur(8px)",duration:.55,ease:"expo.out",clearProps:"all"});gsap.fromTo("#vani",{scale:.97},{scale:1,duration:.6,ease:"elastic.out(1,.7)",clearProps:"transform"});}$("vinput").focus();}
   else if(!(e.target.closest&&e.target.closest("#vmin"))){}
 };
-$("vmin").onclick=function(e){e.stopPropagation();var v=$("vani");if(vaniOpen()){v.classList.add("min");this.innerHTML=icon("chevron-up");}else{v.classList.remove("min");this.innerHTML=icon("chevron-down");}};
+$("vmin").onclick=function(e){e.stopPropagation();var v=$("vani");if(vaniOpen()){v.classList.add("min");this.innerHTML=icon("chevron-up");}else{v.classList.remove("min");this.innerHTML=icon("chevron-down");if(HAS_GSAP&&!REDUCED){gsap.from(".vbody",{height:0,opacity:0,filter:"blur(8px)",duration:.55,ease:"expo.out",clearProps:"all"});gsap.fromTo("#vani",{scale:.97},{scale:1,duration:.6,ease:"elastic.out(1,.7)",clearProps:"transform"});}}};
 $("mic").onclick=listen;
 $("vsend").onclick=function(){var t=$("vinput").value.trim();if(t){$("vinput").value="";ask(t);}};
 $("vinput").onkeydown=function(e){if(e.key==="Enter"){$("vsend").onclick();}};
 if(window.speechSynthesis&&speechSynthesis.onvoiceschanged!==undefined){speechSynthesis.onvoiceschanged=function(){};}
 
 
+
+/* ---------------- glass motion system ---------------- */
+var MOTION = HAS_GSAP && !REDUCED;
+function navPills(){
+  var navs=document.querySelectorAll(".dock,.gnav");
+  for(var i=0;i<navs.length;i++){ if(!navs[i].querySelector(".navpill")){ var p=document.createElement("i"); p.className="navpill"; navs[i].insertBefore(p,navs[i].firstChild); } }
+  movePills(true);
+}
+function movePills(instant){
+  var navs=document.querySelectorAll(".dock,.gnav");
+  for(var i=0;i<navs.length;i++){
+    var nav=navs[i],pill=nav.querySelector(".navpill"),on=nav.querySelector("button.on");
+    if(!pill)continue;
+    if(!on||getComputedStyle(nav).display==="none"){pill.style.opacity=0;continue;}
+    var x=on.offsetLeft,y=on.offsetTop,w=on.offsetWidth,h=on.offsetHeight;
+    if(MOTION&&!instant){ gsap.to(pill,{x:x,y:y,width:w,height:h,opacity:1,duration:.55,ease:"elastic.out(1,.75)"}); }
+    else{ if(HAS_GSAP){gsap.set(pill,{x:x,y:y,width:w,height:h,opacity:1});}else{pill.style.cssText="opacity:1;transform:translate("+x+"px,"+y+"px);width:"+w+"px;height:"+h+"px";} }
+  }
+}
+function spotlight(id){
+  var el=$(id);if(!el||!document.body.classList.contains("glass"))return;
+  var p=el.classList.contains("panel")?el:(el.closest?el.closest(".panel"):null)||el;
+  var all=document.querySelectorAll(".panel.spotlit");for(var i=0;i<all.length;i++)all[i].classList.remove("spotlit");
+  p.classList.add("spotlit");document.body.classList.add("spot");
+  clearTimeout(spotlight._t);spotlight._t=setTimeout(function(){document.body.classList.remove("spot");p.classList.remove("spotlit");},1400);
+}
+function cardsIn(){
+  if(!MOTION)return;
+  var c=$("cards").children;if(!c.length)return;
+  gsap.fromTo(c,{opacity:0,y:18,scale:.97,filter:"blur(8px)"},{opacity:1,y:0,scale:1,filter:"blur(0px)",duration:.55,stagger:{each:.04,from:"start"},ease:"expo.out",clearProps:"transform,filter"});
+}
+function modalIn(){
+  if(!MOTION)return;
+  gsap.fromTo("#settings",{backgroundColor:"rgba(0,0,0,0)"},{backgroundColor:"rgba(0,0,0,.55)",duration:.35});
+  gsap.fromTo(".sbox",{opacity:0,y:24,scale:.96,filter:"blur(10px)"},{opacity:1,y:0,scale:1,filter:"blur(0px)",duration:.55,ease:"expo.out",clearProps:"filter"});
+}
+function modalOut(){
+  if(!MOTION){$("settings").className="";return;}
+  gsap.to(".sbox",{opacity:0,y:16,scale:.97,filter:"blur(8px)",duration:.25,ease:"power2.in"});
+  gsap.to("#settings",{backgroundColor:"rgba(0,0,0,0)",duration:.28,onComplete:function(){$("settings").className="";gsap.set(".sbox",{clearProps:"all"});}});
+}
+
 /* ---------------- theme + glass navigation ---------------- */
-function applyTheme(){ document.body.classList.toggle("glass",SET.theme!=="neon"); setTimeout(drawWires,60); }
+function applyTheme(){ document.body.classList.toggle("glass",SET.theme!=="neon"); setTimeout(function(){drawWires();movePills(true);},80); }
 applyTheme();
 function openVani(){ if(!vaniOpen()){ $("vmin").onclick({stopPropagation:function(){}}); } $("vinput").focus(); }
 function go(t){
@@ -1407,11 +1467,15 @@ function go(t){
   else if(t==="vani"){openVani();}
   else if(t==="settings"||t==="memory"||t==="queue"||t==="leads"){doCtrl(t);}
   else if(t==="board"){boardTab="all";renderBoard();$("board").scrollIntoView({behavior:"smooth"});}
-  else if($(t)){$(t).scrollIntoView({behavior:"smooth",block:"center"});}
+  else if($(t)){$(t).scrollIntoView({behavior:"smooth",block:"center"});setTimeout(function(){spotlight(t);},350);}
+  if(t==="board"||t==="queue"||t==="leads")setTimeout(function(){spotlight("board");},350);
+  if(t==="run"){return;}
   var all=document.querySelectorAll("[data-go]");
-  for(var i=0;i<all.length;i++){ if(all[i].getAttribute("data-go")!=="run") all[i].classList.toggle("on",all[i].getAttribute("data-go")===t); }
+  for(var i=0;i<all.length;i++){ all[i].classList.toggle("on",all[i].getAttribute("data-go")===t); }
+  movePills(false);
 }
 (function(){ var g=document.querySelectorAll("[data-go]"); for(var i=0;i<g.length;i++){ g[i].onclick=function(){go(this.getAttribute("data-go"));}; } })();
+navPills();window.addEventListener("resize",function(){movePills(true);});
 $("askIn").onkeydown=function(e){ if(e.key==="Enter"&&this.value.trim()){ var t=this.value.trim(); this.value=""; openVani(); ask(t); } };
 $("askMic").onclick=function(){ openVani(); listen(); };
 
@@ -1420,6 +1484,7 @@ function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();
 
 /* ---------------- boot / intro ---------------- */
 function startLoops(){
+  setTimeout(function(){document.body.classList.add("ready");},1200);
   drawWires(); renderAll(); loadLeads(); setInterval(loadLeads,10*60000);
   setInterval(glowIcons,1300);setInterval(stepCycle,1300);
   vsay("Namaste "+CONFIG.owner+"! Main VANI hoon, AGENTVERSE ki voice. Mic dabao aur bolo, jaise 'status batao', 'Foliocraft ke liye naya cycle chalao' ya 'pehla item approve karo'.",false);
@@ -1436,9 +1501,12 @@ function intro(){
   if(typeof SplitText!=="undefined"){var split=new SplitText("#title",{type:"chars"});tl.from(split.chars,{opacity:0,y:30,rotateX:-70,duration:.8,stagger:.04,ease:"expo.out"},"-=.15");}
   else{tl.from("#title",{opacity:0,y:20,duration:.6},"-=.15");}
   tl.from(".tag",{opacity:0,letterSpacing:"0.6em",duration:.8,ease:"expo.out"},"<.2")
-    .from(".live,.hr",{opacity:0,y:-10,duration:.5,stagger:.1},"<")
+    .from("header",{opacity:0,y:-24,scale:.98,filter:"blur(12px)",duration:.8,ease:"expo.out",clearProps:"filter"},"<")
+    .from(".live,.welcome,.askbar,.hr",{opacity:0,y:-10,duration:.5,stagger:.08},"<.2")
     .from(".ticker",{opacity:0,duration:.5},"<")
-    .from(".panel",{opacity:0,y:28,scale:.97,duration:.7,stagger:{each:.06},ease:"expo.out"},"<.15")
+    .from(".panel",document.body.classList.contains("glass")?{opacity:0,y:36,scale:.94,filter:"blur(18px)",duration:.95,stagger:{each:.07,from:"start"},ease:"expo.out",clearProps:"filter,transform,opacity"}:{opacity:0,y:28,scale:.97,duration:.7,stagger:{each:.06},ease:"expo.out"},"<.15")
+    .from(".dock",{opacity:0,x:-30,filter:"blur(10px)",duration:.7,ease:"expo.out",clearProps:"filter"},"<.1")
+    .from(".gnav",{opacity:0,y:30,filter:"blur(10px)",duration:.7,ease:"expo.out",clearProps:"filter"},"<.1")
     .from(".tool",{opacity:0,scale:.5,y:6,duration:.45,stagger:{each:.006,from:"random"},ease:"back.out(2)",clearProps:"transform"},"<.35")
     .from(".loop,.legend,#vani",{opacity:0,y:10,duration:.5,stagger:.08},"<.3")
     .add(function(){var a={v:0};gsap.to(a,{v:CONFIG.agents,duration:1.2,ease:"power2.out",onUpdate:function(){$("agentCount").innerHTML=Math.round(a.v);}});startLoops();},"-=.6");
