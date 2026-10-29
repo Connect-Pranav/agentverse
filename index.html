@@ -914,6 +914,14 @@ function parseJSON(t){
   if(a<0||b<a) throw new Error("Brain did not return JSON");
   return JSON.parse(t.slice(a,b+1));
 }
+function friendly(e){
+  var st=e&&e.status,m=String((e&&e.message)||e);
+  if(st===401||st===403||/invalid api key|api key not valid|unauthor/i.test(m))return "key galat hai — settings mein dobara copy-paste karo";
+  if(st===429||/quota|rate/i.test(m))return "free limit khatam — thodi der baad chalega";
+  if(st===404)return "model band ho gaya — naya model dhoondh raha hai";
+  if(/failed to fetch|network|cors/i.test(m))return "connect nahi hua (network/CORS)";
+  return m.slice(0,70);
+}
 function httpErr(name,r,t){ var e=new Error(name+" "+r.status+": "+String(t).slice(0,140)); e.status=r.status; e.code=r.status===429?"rate_limited":(r.status===401||r.status===403?"auth":(r.status===404?"model":"error")); return e; }
 /* model cache: rediscovered every 24h or when a model disappears */
 function mcGet(k){ var m=lsGet("agentverse_models")||{}; var v=m[k]; return v&&(Date.now()-v.t<864e5)?v.id:null; }
@@ -930,7 +938,8 @@ function geminiModel(){
       if(!ms.length) ms=(j.models||[]).filter(function(m){ return (m.supportedGenerationMethods||[]).indexOf("generateContent")>=0 && /gemini/.test(m.name) && !/image|tts|audio|live|embed/.test(m.name); });
       if(!ms.length) throw new Error("Gemini: no usable model on this key");
       ms.sort(function(a,b){ var pa=/preview|exp/.test(a.name)?1:0,pb=/preview|exp/.test(b.name)?1:0; if(pa!==pb)return pa-pb; var la=/lite/.test(a.name)?1:0,lb=/lite/.test(b.name)?1:0; if(la!==lb)return la-lb; return verScore(b.name.replace("models/gemini-",""))-verScore(a.name.replace("models/gemini-","")); });
-      var id=ms[0].name.replace(/^models\//,""); mcSet("gemini",id); return id;
+      var ids=ms.map(function(m){return m.name.replace(/^models\//,"");}); lsSet("agentverse_gemini_list",ids);
+      var id=ids[0]; mcSet("gemini",id); return id;
     });
 }
 function groqModel(){
@@ -977,7 +986,9 @@ function callBrain(p,system,user,opts){
       return fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(SET.gkey),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
           systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:user}]}],
           generationConfig:{responseMimeType:"application/json",temperature:opts.quick?0.6:0.85}})})
-        .then(function(r){ if(!r.ok)return r.text().then(function(t){ var e=httpErr("Gemini",r,t); if(r.status===404)mcDel("gemini"); throw e; }); return r.json(); })
+        .then(function(r){ if(!r.ok)return r.text().then(function(t){ var e=httpErr("Gemini",r,t); if(r.status===404)mcDel("gemini");
+            if(r.status===429&&!opts._g429&&(!SET.gmodel||SET.gmodel==="auto")){ var L=lsGet("agentverse_gemini_list")||[],ix=L.indexOf(model); if(ix>=0&&L[ix+1]){ opts._g429=1; mcSet("gemini",L[ix+1]); addTerm([["w","Gemini "+model+" limit → trying "+L[ix+1]]]); return callBrain("gemini",system,user,opts); } }
+            throw e; }); return r.json(); })
         .then(function(j){ var parts=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[],t="";for(var i=0;i<parts.length;i++){t+=parts[i].text||"";} return parseJSON(t); });
     });
   }
@@ -999,10 +1010,13 @@ function brain(system,user,opts){
   var c=chain(),i=0,errs=[];
   function next(){
     var p=c[i++];
-    if(!p){ var e=new Error(errs.join(" | ")||"No brain available"); e.code=errs.length?"all_failed":"none"; return Promise.reject(e); }
+    if(!p){
+      /* every AI brain failed: VANI still handles simple commands with the local rule brain */
+      if(opts.kind==="vani"&&c.indexOf("demo")<0){ var d=demoBrain("vani",opts); d.fallback=errs.join(" · "); return Promise.resolve(d); }
+      var e=new Error(errs.join(" · ")||"No brain available"); e.code=errs.rate?"rate_limited":(errs.length?"all_failed":"none"); return Promise.reject(e); }
     return callBrain(p,system,user,opts).then(function(r){ if(LAST_BRAIN!==p){LAST_BRAIN=p;updateBrain();} else updateBrain(); return r; },function(e){
-      var m=(e&&e.message)||String(e); errs.push(BRAIN_NAMES[p]+": "+m.slice(0,80));
-      addTerm([["p","✕ "+BRAIN_NAMES[p]+" failed → "+(c[i]?"trying "+BRAIN_NAMES[c[i]]:"no more brains")]]);
+      errs.push(BRAIN_NAMES[p]+": "+friendly(e)); if(e&&e.status===429)errs.rate=1;
+      addTerm([["p","✕ "+BRAIN_NAMES[p]+" ("+friendly(e).split(" — ")[0]+") → "+(c[i]?"trying "+BRAIN_NAMES[c[i]]:"no more brains")]]);
       /* a vanished model gets one rediscovery retry on the same brain */
       if(e&&(e.code==="model"||e.status===404)&&!opts["_re_"+p]&&(p==="gemini"||p==="groq"||p==="openrouter")){ opts["_re_"+p]=1; i--; errs.pop(); }
       return next();
@@ -1037,7 +1051,7 @@ function brandCtx(extraLead){
 }
 var ORCH_SYS = "You are the ORCHESTRATOR of AGENTVERSE, an autonomous AI social media and growth team working for the owner. Decide what the team works on next for ONE brand. Use the brand brain, follow the owner rules strictly, learn from owner feedback, and avoid repeating recent topics. Departments: "+DEPNAMES.join(", ")+". Respond with JSON: {\"topic\":\"max 8 words\",\"why\":\"max 20 words\",\"tasks\":[{\"dept\":\"exact department name\",\"task\":\"max 25 words\",\"lead_id\":\"id or null\"}]} with 3 to 5 tasks. If FRESH LEADS exist, add one 'Leads & Conversations' task per lead (max 2) with its lead_id.";
 var DEPT_SYS = "You are the department agents of AGENTVERSE. For every task in the PLAN, produce the finished deliverable the owner can use right away: e.g. a post caption with hashtags, a 30-second reel script in 3 scenes, a YouTube title + description + tags, a comment reply, a reply message to a lead, SEO keywords, or a short learning note. Write in the brand voice. Never invent facts, prices, numbers, results or testimonials; use [placeholders] instead. Replies to leads must answer the person's actual need first, be short, human and non-spammy, and mention the product only where it truly helps. Respond with JSON: {\"items\":[{\"dept\":\"department name\",\"title\":\"max 10 words\",\"body\":\"max 150 words\",\"needs_approval\":true or false,\"lead_id\":\"id or null\"}],\"summary\":\"max 20 words, what the team learned or did\"}. needs_approval must be true for anything that would be published or sent to a person.";
-var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice with the owner, "+CONFIG.owner+". Reply in natural spoken Hinglish (Hindi in Roman script mixed with English), 1 to 3 short sentences, no markdown, no emojis, no lists, no ids read aloud unless asked. You can control AGENTVERSE by adding actions: approve {id}, reject {id, reason}, run_cycle {value: optional focus text}, autopilot {value: true or false}, set_brand {value: brand name}, remember {value: a rule the team must follow}, draft_lead {id}, open_board {value: waiting|ready|all|leads}. Take an action only when the owner clearly asks for it; for 'approve all' add one approve per waiting id. Answer questions from STATE honestly; if something isn't in STATE say you don't know. Respond with JSON: {\"reply\":\"what you say\",\"actions\":[{\"type\":\"...\",\"id\":\"...\",\"value\":\"...\",\"reason\":\"...\"}]}";
+var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice with the owner, "+CONFIG.owner+". Reply in natural spoken Hinglish (Hindi in Roman script mixed with English), 1 to 3 short sentences, no markdown, no emojis, no lists, no ids read aloud unless asked. You can control AGENTVERSE by adding actions: approve {id}, reject {id, reason}, run_cycle {value: optional focus text}, autopilot {value: true or false}, set_brand {value: brand name}, remember {value: a rule the team must follow}, draft_lead {id}, open_board {value: waiting|ready|all|leads}, open_link {value: youtube|instagram|ganesha|github|gmail|alerts}. Take an action only when the owner clearly asks for it; for 'approve all' add one approve per waiting id. Answer questions from STATE honestly; if something isn't in STATE say you don't know. Respond with JSON: {\"reply\":\"what you say\",\"actions\":[{\"type\":\"...\",\"id\":\"...\",\"value\":\"...\",\"reason\":\"...\"}]}";
 
 /* ---------------- demo brain (no AI) ---------------- */
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
@@ -1069,6 +1083,9 @@ function demoBrain(kind,opts){
     if(/start|chalu|autopilot|on kar/.test(x))return {reply:"Autopilot chalu. Team khud kaam karegi.",actions:[{type:"autopilot",value:true}]};
     if(/cycle|naya|run|post bana|content/.test(x))return {reply:"Chalo, naya cycle chala rahi hoon "+ST.brand+" ke liye.",actions:[{type:"run_cycle"}]};
     for(var bn in ST.brands){ if(x.indexOf(bn.toLowerCase().split(" ")[0])>=0)return {reply:bn+" par switch kar diya.",actions:[{type:"set_brand",value:bn}]}; }
+    var lk=x.match(/youtube|sunverse|instagram|littleloop|little loop|ganesha|github|repo|gmail|alerts/);
+    if(lk&&/open|khol|dikha|chalao|jao/.test(x))return {reply:"Ye raha link, tap karke khol lo.",actions:[{type:"open_link",value:lk[0]}]};
+    if(/^(hi|hello|hey|namaste)/.test(x))return {reply:"Namaste "+CONFIG.owner+"! Bolo kya karna hai?",actions:[]};
     if(/lead/.test(x))return {reply:"Abhi "+freshCount()+" fresh leads hain. Leads tab khol diya.",actions:[{type:"open_board",value:"leads"}]};
     return {reply:"Abhi "+w.length+" cheezein aapke approval ka wait kar rahi hain aur "+readyCount()+" ready hain. Main demo mode mein hoon; asli baat-cheet ke liye settings mein brain on karo.",actions:[]};
   }
@@ -1480,7 +1497,13 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("settings
 $("sSave").onclick=function(){
   SET.provider=$("sProv").value;
   var mk=function(id,key){var v=$(id).value.trim()||"auto";if(v!==SET[key])mcDel(key==="gmodel"?"gemini":(key==="groqModel"?"groq":"openrouter"));SET[key]=v;};
-  SET.gkey=$("sKey").value.trim();SET.groqKey=$("sGroq").value.trim();SET.orKey=$("sOR").value.trim();
+  var ck=function(v){return String(v||"").replace(/^[\s"'`]+|[\s"'`]+$/g,"").replace(/\s+/g,"");};
+  SET.gkey=ck($("sKey").value);SET.groqKey=ck($("sGroq").value);SET.orKey=ck($("sOR").value);
+  var warn=[];
+  if(SET.groqKey&&!/^gsk_/.test(SET.groqKey))warn.push("Groq key 'gsk_' se shuru honi chahiye");
+  if(SET.gkey&&!/^AIza/.test(SET.gkey))warn.push("Gemini key 'AIza' se shuru hoti hai");
+  if(SET.orKey&&!/^sk-or-/.test(SET.orKey))warn.push("OpenRouter key 'sk-or-' se shuru hoti hai");
+  if(warn.length)setTimeout(function(){toast(warn.join(" · "),false);},400);
   mk("sModel","gmodel");mk("sGroqM","groqModel");mk("sORM","orModel");
   SET.interval=Math.max(2,+$("sInt").value||30);SET.maxHour=Math.min(20,Math.max(1,+$("sMax").value||4));
   SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.voice=$("sVoice").value||"auto";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
@@ -1492,12 +1515,12 @@ $("sSave").onclick=function(){
 };
 $("sTest").onclick=function(){
   var out=$("sTestOut"); out.innerHTML="testing…";
-  var keep={g:SET.gkey,q:SET.groqKey,o:SET.orKey}; SET.gkey=$("sKey").value.trim();SET.groqKey=$("sGroq").value.trim();SET.orKey=$("sOR").value.trim();
+  var keep={g:SET.gkey,q:SET.groqKey,o:SET.orKey}; var ck2=function(v){return String(v||"").replace(/^[\s"'`]+|[\s"'`]+$/g,"").replace(/\s+/g,"");}; SET.gkey=ck2($("sKey").value);SET.groqKey=ck2($("sGroq").value);SET.orKey=ck2($("sOR").value);
   var list=[]; if(SAMPLE)list.push("claude"); if(SET.groqKey)list.push("groq"); if(SET.gkey)list.push("gemini"); if(SET.orKey)list.push("openrouter");
   if(!list.length){out.innerHTML="Add at least one key first.";return;}
   var res=[],n=0;
   list.forEach(function(p){
-    callBrain(p,"You are a test.","Reply with JSON {\"ok\":true}",{quick:true}).then(function(){res.push("✓ "+BRAIN_NAMES[p]+" ("+LAST_MODEL+")");},function(e){res.push("✕ "+BRAIN_NAMES[p]+": "+((e&&e.message)||e).toString().slice(0,60));})
+    callBrain(p,"You are a test.","Reply with JSON {\"ok\":true}",{quick:true}).then(function(){res.push("✓ "+BRAIN_NAMES[p]+" ("+LAST_MODEL+")");},function(e){res.push("✕ "+BRAIN_NAMES[p]+": "+friendly(e));})
       .then(function(){ n++; out.innerHTML=esc(res.join(" · ")); if(n===list.length){SET.gkey=keep.g;SET.groqKey=keep.q;SET.orKey=keep.o;} });
   });
 };
@@ -1584,6 +1607,13 @@ function listen(){
   REC.onend=function(){listening=false;vmode("");var t=finalText||"";finalText="";if(t.trim()){$("vinput").value="";ask(t.trim());}else{resumeWake();}};
   setTimeout(function(){ try{REC.start();listening=true;vmode("listen");}catch(err){listening=false;vsys("Mic start nahi hua: "+err.message);resumeWake();} },waking?250:0);
 }
+var LINKS={youtube:["Sunverse on YouTube","https://www.youtube.com/@SURVERSE_09"],sunverse:["Sunverse on YouTube","https://www.youtube.com/@SURVERSE_09"],instagram:["LittleLoop on Instagram","https://www.instagram.com/little_loop09"],littleloop:["LittleLoop on Instagram","https://www.instagram.com/little_loop09"],ganesha:["Ganesha AI Studio","https://ganesha-studio.pravanigroup.workers.dev/"],github:["AGENTVERSE repo","https://github.com/Connect-Pranav/agentverse"],repo:["AGENTVERSE repo","https://github.com/Connect-Pranav/agentverse"],gmail:["Gmail","https://mail.google.com/"],alerts:["Google Alerts","https://www.google.com/alerts"]};
+function openLink(k){
+  k=String(k||"").toLowerCase().replace(/[^a-z]/g,""); var L=LINKS[k]; if(!L){for(var x in LINKS){if(k.indexOf(x)>=0){L=LINKS[x];break;}}}
+  if(!L){vsys("Ye link mere paas nahi hai.");return;}
+  var d=document.createElement("div");d.className="vm a";d.innerHTML='<a href="'+L[1]+'" target="_blank" rel="noopener" style="color:inherit;font-weight:600">'+icon("external-link")+' '+esc(L[0])+'</a>';
+  $("vlog").appendChild(d);$("vlog").scrollTop=$("vlog").scrollHeight;
+}
 function stateSummary(){
   var w=waiting(),i,s="Active brand: "+ST.brand+". Brands: "+Object.keys(ST.brands).join(", ")+". Autopilot: "+(autopilot?"on":"off")+". Brain: "+provider()+". Cycles done: "+ST.cycles+". Ready to post: "+readyCount()+".";
   s+="\nWAITING FOR OWNER ("+w.length+"):";for(i=0;i<w.length&&i<8;i++){s+="\n- id "+w[i].id+" | "+w[i].brand+" | "+w[i].dept+" | "+w[i].title+" | "+w[i].body.slice(0,140).replace(/\s+/g," ");}
@@ -1598,6 +1628,7 @@ function ask(text){
   brain(VANI_SYS,"STATE:\n"+stateSummary()+"\n\nCONVERSATION SO FAR:\n"+VH.slice(-8).join("\n")+"\n\nReply to the owner's last message.",{kind:"vani",quick:true,text:text})
     .then(function(r){
       vmode("");var reply=(r&&r.reply)||"Hmm, samajh nahi aaya. Dobara bolo?";
+      if(r&&r.fallback)vsys("AI brain abhi nahi chal raha ("+r.fallback+"). Simple commands main khud sambhal rahi hoon.");
       vsay(reply,true);
       doActions((r&&r.actions)||[]);
     }).catch(function(e){vmode("");vsys("Brain error: "+((e&&e.message)||e).toString().slice(0,120));resumeWake();});
@@ -1612,6 +1643,7 @@ function doActions(acts){
     else if(t==="set_brand"){var ok=setBrand(a.value);if(!ok){for(var b in ST.brands){if(b.toLowerCase().indexOf(String(a.value).toLowerCase())>=0){setBrand(b);break;}}}}
     else if(t==="remember"&&a.value){ST.memory.push(String(a.value).slice(0,200));save();addTerm([["","✓ memory.add(rule)"]]);}
     else if(t==="draft_lead")draftLead(a.id);
+    else if(t==="open_link")openLink(a.value||a.id);
     else if(t==="open_board"){var ov=a.value||"waiting"; if(ov==="leads")go("leads"); else {VIEWS.work.tab=ov; switchView("work"); if(VIEW==="work"){boardTab=ov;renderBoard();}}}
   }
 }
