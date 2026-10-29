@@ -25,7 +25,7 @@ async function getText(url) {
   if (!r.ok) throw new Error(`${r.status} ${url.slice(0, 90)}`);
   return r.text();
 }
-const clean = (s = "") => String(s).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+const clean = (s = "") => String(s).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
 // ---------- scoring ----------
 function score(lead, product) {
@@ -166,8 +166,10 @@ async function rss(feed) {
       const g = (tag) => (it.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`)) || [])[1] || "";
       const link = g("link") || (it.match(/<link[^>]*href="([^"]+)"/) || [])[1] || "";
       const title = clean(g("title").replace(/<!\[CDATA\[|\]\]>/g, ""));
+      let real = clean(link).replace(/&amp;/g, "&");
+      try { const u = new URL(real); if (u.hostname.endsWith("google.com") && u.searchParams.get("url")) real = u.searchParams.get("url"); } catch {}
       const date = g("pubDate") || g("updated") || g("published");
-      out.push({ id: "rs_" + Buffer.from(link || title).toString("base64").replace(/[^a-z0-9]/gi, "").slice(-16), source: "rss " + new URL(feed).hostname, title, text: clean((g("description") || g("summary") || g("content")).replace(/<!\[CDATA\[|\]\]>/g, "")).slice(0, 1200), url: clean(link), created: date ? new Date(date).toISOString() : new Date().toISOString() });
+      out.push({ id: "rs_" + Buffer.from(real || title).toString("base64").replace(/[^a-z0-9]/gi, "").slice(-16), source: /google\.com\/alerts/.test(feed) ? "google alert · " + (() => { try { return new URL(real).hostname.replace("www.", ""); } catch { return "web"; } })() : "rss " + new URL(feed).hostname, title, text: clean((g("description") || g("summary") || g("content")).replace(/<!\[CDATA\[|\]\]>/g, "")).slice(0, 1200), url: real, created: date ? new Date(date).toISOString() : new Date().toISOString() });
     }
   } catch (e) { log("rss", feed, "→", e.message); const h = hp("rss"); h.errors++; h.lastError = e.message.slice(0, 80); }
   return out;
