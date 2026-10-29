@@ -1653,33 +1653,45 @@ function fillVoices(){
   $("sVoice").innerHTML=h;$("sVoice").value=SET.voice||"auto";if(!$("sVoice").value)$("sVoice").value="auto";
 }
 function pickVoiceAutoName(){var keep=SET.voice;SET.voice="auto";var v=pickVoice();SET.voice=keep;return v?v.name:"";}
+var CUR_UTT=null, VOICE_UNLOCKED=false;
+function unlockVoice(){ if(VOICE_UNLOCKED||!window.speechSynthesis)return; VOICE_UNLOCKED=true; try{ var u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); speechSynthesis.getVoices(); }catch(e){} }
+document.addEventListener("pointerdown",unlockVoice,true); document.addEventListener("keydown",unlockVoice,true);
 function speak(t){
   if(!SET.speak||!window.speechSynthesis){ if(afterSpeak){var f0=afterSpeak;afterSpeak=null;setTimeout(f0,200);} else if(SET.convo)setTimeout(listen,300); else setTimeout(resumeWake,300); return; }
   try{
-    speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance(t);u.lang=SET.lang;u.rate=+SET.rate||1;var v=pickVoice();if(v)u.voice=v;
-    u.onstart=function(){speaking=true;stopWake();vmode("speak");immSpeak(t,u);};
+    var busyNow=speechSynthesis.speaking||speechSynthesis.pending; if(busyNow)speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(t);u.lang=SET.lang;u.rate=+SET.rate||1;u.pitch=1.05;var v=pickVoice();if(v){u.voice=v;u.lang=v.lang;}
+    CUR_UTT=u; /* keep a reference: Chrome drops callbacks of garbage-collected utterances */
+    var started=false;
+    u.onstart=function(){started=true;speaking=true;stopWake();vmode("speak");immSpeak(t,u);};
     u.onboundary=function(ev){ immWord(t,ev.charIndex); };
-    u.onend=function(){speaking=false;immCapEnd();vmode("");if(afterSpeak){var f=afterSpeak;afterSpeak=null;setTimeout(f,200);}else if(SET.convo&&vaniOpen())setTimeout(listen,250);else resumeWake();};
-    u.onerror=function(){speaking=false;vmode("");resumeWake();};
-    speechSynthesis.speak(u);
-  }catch(e){vmode("");}
+    u.onend=function(){speaking=false;CUR_UTT=null;immCapEnd();vmode("");if(afterSpeak){var f=afterSpeak;afterSpeak=null;setTimeout(f,200);}else if(SET.convo&&vaniOpen())setTimeout(listen,250);else resumeWake();};
+    u.onerror=function(ev){speaking=false;CUR_UTT=null;vmode("");if(ev&&ev.error&&ev.error!=="interrupted"&&ev.error!=="canceled"){vsys("Awaaz nahi chali ("+ev.error+"). Page par ek baar click karke dobara try karo.");if(IMM_ON)immShowText(t);}resumeWake();};
+    setTimeout(function(){ try{ speechSynthesis.resume(); speechSynthesis.speak(u); }catch(e){} },busyNow?120:30);
+    /* watchdog: if the browser never starts speaking, still show the reply visually */
+    setTimeout(function(){ if(!started&&CUR_UTT===u){ vsys("Browser ne awaaz block ki — page par ek baar click karo, phir VANI bolegi."); if(IMM_ON)immShowText(t); CUR_UTT=null; resumeWake(); } },2500);
+  }catch(e){vmode("");if(IMM_ON)immShowText(t);}
 }
 function vsay(t,spoken){vmsg("a",t);VH.push("VANI: "+t);if(IMM_ON&&!(spoken&&SET.speak&&window.speechSynthesis))immShowText(t);if(spoken)speak(t);}
 function listen(){
   if(!SR){vsys("Is browser mein voice input nahi hai. Chrome ya Edge mein kholo, tab tak type karo.");return;}
   if(listening){try{REC.stop();}catch(e){}return;}
-  stopWake();
-  if(window.speechSynthesis)speechSynthesis.cancel();
+  var wasWaking=!!WREC; stopWake(); unlockVoice();
+  if(window.speechSynthesis&&(speechSynthesis.speaking||speechSynthesis.pending))speechSynthesis.cancel();
   REC=new SR();REC.lang=SET.lang;REC.interimResults=true;REC.continuous=false;REC.maxAlternatives=1;finalText="";
   REC.onresult=function(e){var t="";for(var i=0;i<e.results.length;i++){t+=e.results[i][0].transcript;if(e.results[i].isFinal)finalText=t;}$("vinput").value=t;};
   REC.onerror=function(e){
     if(e.error==="not-allowed"||e.error==="service-not-allowed")vsys("Mic ki permission nahi mili. claude.ai ke andar mic block rehta hai — GitHub Pages wale link par voice chalegi. Yahan type karo, VANI bolkar jawab degi.");
     else if(e.error==="no-speech")vsys("Kuch sunai nahi diya. Dobara mic dabao.");
+    else if(e.error==="aborted"){}
+    else if(e.error==="audio-capture")vsys("Mic nahi mila — system mein mic on hai? Browser ke address bar mein mic icon check karo.");
+    else if(e.error==="network")vsys("Voice recognition ko internet chahiye (Chrome Google ke server use karta hai).");
     else vsys("Voice error: "+e.error);
   };
   REC.onend=function(){listening=false;vmode("");var t=finalText||"";finalText="";if(t.trim()){$("vinput").value="";ask(t.trim());}else{resumeWake();}};
-  setTimeout(function(){ try{REC.start();listening=true;vmode("listen");}catch(err){listening=false;vsys("Mic start nahi hua: "+err.message);resumeWake();} },waking?250:0);
+  REC.onstart=function(){listening=true;vmode("listen");};
+  setTimeout(function(){ try{REC.start();listening=true;vmode("listen");}catch(err){ /* previous session still closing: retry once */
+      setTimeout(function(){ try{REC.start();listening=true;vmode("listen");}catch(e2){listening=false;vsys("Mic start nahi hua: "+e2.message);resumeWake();} },400); } },wasWaking?450:0);
 }
 var LINKS={youtube:["Sunverse on YouTube","https://www.youtube.com/@SURVERSE_09"],sunverse:["Sunverse on YouTube","https://www.youtube.com/@SURVERSE_09"],instagram:["LittleLoop on Instagram","https://www.instagram.com/little_loop09"],littleloop:["LittleLoop on Instagram","https://www.instagram.com/little_loop09"],ganesha:["Ganesha AI Studio","https://ganesha-studio.pravanigroup.workers.dev/"],github:["AGENTVERSE repo","https://github.com/Connect-Pranav/agentverse"],repo:["AGENTVERSE repo","https://github.com/Connect-Pranav/agentverse"],gmail:["Gmail","https://mail.google.com/"],alerts:["Google Alerts","https://www.google.com/alerts"]};
 function openLink(k){
@@ -2197,37 +2209,47 @@ function immBuildHead(N){
   function headPt(th,ph){
     var ct=Math.cos(th),st=Math.sin(th),cp=Math.cos(ph),sp=Math.sin(ph);
     var yN=ct;                                   /* +1 top, -1 chin */
-    var w=0.13*(1-0.38*Math.pow(Math.max(0,-yN),1.6))*(1+0.05*Math.max(0,yN)); /* jaw taper */
-    var d=0.16*(1-0.18*Math.max(0,-yN));
+    var w=0.122*(1-0.42*Math.pow(Math.max(0,-yN),1.5))*(1+0.04*Math.max(0,yN)); /* softer, narrower jaw */
+    var d=0.152*(1-0.2*Math.max(0,-yN));
     var x=st*cp*w, z=st*sp*d, y=yN*0.19+0.06, f=0;
     if(sp>0.2){                                  /* front of face */
       var fx=x,fy=y;
-      z+=0.05*Math.exp(-(fx*fx)/0.0005-Math.pow(fy-0.03,2)/0.004)*sp;         /* nose */
+      z+=0.036*Math.exp(-(fx*fx)/0.00035-Math.pow(fy-0.035,2)/0.0035)*sp;     /* small nose */
       z+=0.014*Math.exp(-Math.pow(Math.abs(fx)-0.06,2)/0.0012-Math.pow(fy-0.0,2)/0.002); /* cheeks */
       z+=0.016*Math.exp(-Math.pow(fy-0.12,2)/0.0012)*sp;                       /* brow ridge */
       z+=0.012*Math.exp(-(fx*fx)/0.002-Math.pow(fy+0.1,2)/0.0012);             /* chin */
-      var ex=Math.abs(fx)-0.052,ey=fy-0.075; var e=ex*ex/0.0011+ey*ey/0.00035;
-      if(e<1){ z-=0.02*(1-e); f=e<0.25?3:1; }                                 /* eye sockets + iris */
-      if(Math.abs(fx)<0.045&&Math.abs(fy+0.035)<0.008){ f=2; z-=0.006; }     /* lips line */
-      else if(Math.abs(fx)<0.04&&fy<-0.043&&fy>-0.07){ f=4; }                 /* lower lip/jaw */
+      var ex=Math.abs(fx)-0.05,ey=fy-0.072-0.012*(Math.abs(fx)-0.05); var e=ex*ex/0.0013+ey*ey/0.00028;   /* almond eyes */
+      if(e<1){ z-=0.016*(1-e); f=e<0.22?3:1; }
+      var lx=fx/0.036,ly=(fy+0.034)/0.016; var lip=lx*lx+ly*ly;
+      if(lip<1){ z+=0.008*(1-lip); f=Math.abs(fy+0.034)<0.0035?2:6; }       /* full lips + lip line */
+      else if(Math.abs(fx)<0.04&&fy<-0.05&&fy>-0.075){ f=4; }                 /* chin/jaw that moves */
     }
     return [x,y,z,f];
   }
   while(H.length<N&&tries<N*30){ tries++;
     var r=Math.random();
-    if(r<0.5){
+    if(r<0.46){
       /* oversample the face front */
       var th=Math.acos(2*Math.random()-1),ph=Math.random()<0.55?(0.25+Math.random()*2.64):Math.random()*6.283;
       var p=headPt(th,ph),q=headPt(th+0.01,ph),q2=headPt(th,ph+0.01);
       var ax=q[0]-p[0],ay=q[1]-p[1],az=q[2]-p[2],bx=q2[0]-p[0],by=q2[1]-p[1],bz=q2[2]-p[2];
       var nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx; if(nx*p[0]+ny*(p[1]-0.06)+nz*p[2]<0){nx=-nx;ny=-ny;nz=-nz;}
       push(p[0],p[1],p[2],nx,ny,nz,p[3]);
-    } else if(r<0.58){ /* neck flaring into the shoulders */
-      var a=Math.random()*6.283,v=Math.random(),rad=0.062+0.05*Math.pow(v,3),yy=-0.11-v*0.15;
+    } else if(r<0.78){ /* long flowing hair: strands from the scalp falling behind the shoulders */
+      var ha=(Math.random()*2-1)*Math.PI, hh=Math.random();
+      if(Math.cos(ha)>0.45&&hh>0.25)continue;                          /* keep the face clear */
+      var th0=0.15+Math.random()*1.25, sx0=Math.sin(th0)*Math.sin(ha)*0.132, sz0=Math.sin(th0)*Math.cos(ha)*0.16, sy0=Math.cos(th0)*0.2+0.065;
+      var sv=Math.pow(Math.random(),0.85), len=0.42+0.18*Math.random();
+      var side=Math.abs(Math.sin(ha));
+      var vol=1.07+0.05*(1-sv); var hx=sx0*vol*(1+0.75*sv*side)+Math.sign(sx0)*0.02*sv, hy=sy0*(sv<0.15?1.03:1)-sv*len, hz=sz0*vol*(1-0.55*sv)-0.05*sv*(Math.cos(ha)<0?1:0.3);
+      if(hy<-0.48)continue;
+      push(hx,hy,hz,Math.sin(ha),0.3,Math.cos(ha),5); H[H.length-1].s=sv; H[H.length-1].k=ha*7.3;
+    } else if(r<0.84){ /* slender neck flaring into the shoulders */
+      var a=Math.random()*6.283,v=Math.random(),rad=0.05+0.05*Math.pow(v,3),yy=-0.11-v*0.15;
       push(Math.cos(a)*rad,yy,Math.sin(a)*rad*0.95,Math.cos(a),-0.2*v,Math.sin(a));
     } else { /* sloped shoulders + upper chest (front and back halves) */
-      var u=Math.random()*2-1,vv=Math.pow(Math.random(),0.8),top=-0.255-0.11*u*u-0.03*Math.pow(Math.abs(u),4);
-      var x=u*(0.43+vv*0.03),y=top-vv*0.24,dep=0.17*Math.sqrt(Math.max(0,1-u*u*0.92))*(0.6+0.4*(1-vv)),side=Math.random()<0.75?1:-1;
+      var u=Math.random()*2-1,vv=Math.pow(Math.random(),0.8),top=-0.255-0.13*u*u-0.03*Math.pow(Math.abs(u),4);
+      var x=u*(0.38+vv*0.03),y=top-vv*0.24,dep=0.17*Math.sqrt(Math.max(0,1-u*u*0.92))*(0.6+0.4*(1-vv)),side=Math.random()<0.75?1:-1;
       var z=dep*side*(0.85+0.15*Math.random());
       push(x,y,z,u*0.9,0.5-vv*0.4,side*0.9);
     }
@@ -2236,7 +2258,7 @@ function immBuildHead(N){
 }
 function immInit(){
   var cv=$("immC"); IMM.ctx=cv.getContext("2d");
-  var N=(window.innerWidth<700)?4000:9000;
+  var N=(window.innerWidth<700)?4500:10500;
   IMM.H=immBuildHead(N); IMM.P=[];
   for(var i=0;i<IMM.H.length;i++){ IMM.P.push({x:(Math.random()-.5)*2,y:(Math.random()-.5)*1.2,vx:0,vy:0,s:Math.random(),ph:Math.random()*6.283}); }
   immResize(); immCards();
@@ -2260,7 +2282,8 @@ function immFrame(){
   var BK=IMM.BK||(IMM.BK={});
   for(i=0;i<IMM.P.length;i++){
     var p=IMM.P[i],h=IMM.H[i],x=h.x,y=h.y,z=h.z;
-    if((h.f===4)&&IMM.st==="speak"){ y-=amp*0.026; z-=amp*0.006; }                  /* jaw opens with each word */
+    if(h.f===5){ var sw=(h.s||0); x+=Math.sin(t*1.1+(h.k||0)+y*7)*0.012*sw; z+=Math.cos(t*0.9+(h.k||0))*0.008*sw; }
+    if((h.f===4||(h.f===6&&h.y<-0.034))&&IMM.st==="speak"){ y-=amp*0.024; z-=amp*0.005; }                  /* jaw opens with each word */
     var x1=x*cyw+z*syw, z1=-x*syw+z*cyw, y1=y*cp-z1*sp, z2=y*sp+z1*cp;
     var per=2.4/(2.4-z2), tx=x1*per, ty=-y1*per;
     var dx=Math.sin(t*0.2+p.ph)*0.9+Math.cos(p.ph*3)*0.3, dy=Math.cos(t*0.17+p.ph*1.3)*0.45;
@@ -2272,15 +2295,17 @@ function immFrame(){
     if(nx>0.35&&h.y<-0.1){ var k=Math.min(1,(nx-0.35)*1.8); R=R*(1-k)+255*k; G=G*(1-k)+105*k; B=B*(1-k)+160*k; }   /* warm rim light */
     if(h.f===1||h.f===2){ b*=0.35; R*=0.5;G*=0.55; }                                   /* sockets / lip line darker */
     if(h.f===3){ R=150;G=225;B=255; b=1.1; }                                           /* iris glow */
+    if(h.f===5){ R=165+70*b;G=150+70*b;B=255; b=0.5+0.6*b; }                         /* lavender hair */
+    if(h.f===6){ R=255;G=120+60*b;B=200; b=0.6+0.4*b; }                                 /* rose lips */
     if(Math.abs(h.y-scan)<0.018){ R=210;G=245;B=255;b=1.2; }
     var back=nz<-0.1?0.3:1, fade=h.y<-0.33?Math.max(0,1-(-0.33-h.y)/0.13):1;
     var al=(m>0.05?(0.1+0.45*b)*back*fade:(0.15+0.35*p.s)), X=cx+p.x*sc*0.5, Y=cy+p.y*sc*0.5, sz=(m>0.5?2.1:1.2)*per;
     /* bucket by colour so we fill once per bucket (fast) */
-    var warm=(R>G+40)?1:0, lv=Math.max(0,Math.min(11,Math.round(Math.min(1.25,b*al*2.2)*8.8))), key=h.f===3?24:(warm?12+lv:lv);
+    var warm=(R>G+40)?1:0, lv=Math.max(0,Math.min(11,Math.round(Math.min(1.25,b*al*2.2)*8.8))), key=h.f===3?24:(h.f===5?30+lv:(h.f===6?26:(warm?12+lv:lv)));
     (BK[key]||(BK[key]=[])).push(X,Y,sz);
   }
   for(var bk in BK){ var arr=BK[bk],kk=+bk,lvl=(kk%12)/11; if(!arr.length)continue;
-    g.fillStyle=kk===24?"rgba(170,235,255,.95)":(kk>=12?"rgba(255,"+(110+80*lvl|0)+","+(170+40*lvl|0)+","+(0.08+0.5*lvl).toFixed(3)+")":"rgba("+(70+150*lvl|0)+","+(130+115*lvl|0)+",255,"+(0.06+0.55*lvl).toFixed(3)+")");
+    g.fillStyle=kk===24?"rgba(170,235,255,.95)":kk===26?"rgba(255,140,200,.75)":kk>=30?"rgba("+(150+70*((kk-30)/11)|0)+","+(140+70*((kk-30)/11)|0)+",255,"+(0.05+0.45*((kk-30)/11)).toFixed(3)+")":(kk>=12?"rgba(255,"+(110+80*lvl|0)+","+(170+40*lvl|0)+","+(0.08+0.5*lvl).toFixed(3)+")":"rgba("+(70+150*lvl|0)+","+(130+115*lvl|0)+",255,"+(0.06+0.55*lvl).toFixed(3)+")");
     g.beginPath(); for(var q=0;q<arr.length;q+=3){ g.rect(arr[q],arr[q+1],arr[q+2],arr[q+2]); } g.fill(); arr.length=0; }
   if(m>0.4){ var hg=g.createRadialGradient(cx,cy-sc*0.06,0,cx,cy-sc*0.06,sc*0.32); hg.addColorStop(0,"rgba(90,140,255,"+(0.09*m*(0.7+amp))+")"); hg.addColorStop(1,"rgba(0,0,0,0)"); g.fillStyle=hg; g.fillRect(0,0,W,H); }
   immCardsTick(t);
