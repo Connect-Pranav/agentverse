@@ -17,12 +17,22 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.tok.outputs.has == 'true'
         with: { ref: main }
-      - name: Deploy
+      - name: Deploy AGENTVERSE dashboard
         if: steps.tok.outputs.has == 'true'
         run: npx -y wrangler@4 deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy SUNVERSE MCP server
+        if: steps.tok.outputs.has == 'true'
+        working-directory: mcp
+        run: |
+          npx -y wrangler@4 deploy
+          if [ -n "$SV_MCP_TOKEN" ]; then printf '%s' "$SV_MCP_TOKEN" | npx -y wrangler@4 secret put MCP_TOKEN; else echo "SV_MCP_TOKEN secret not set — add it, then re-run"; fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
       - name: No token yet
         if: steps.tok.outputs.has != 'true'
-        run: echo "Add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets to auto-deploy."
+        run: echo "Add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets to auto-deploy (dashboard + sunverse-mcp)."

@@ -28,10 +28,10 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
-          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://sunverse-mcp.pravanigroup.workers.dev' }}
         run: |
-          if [ -z "$GEMINI_API_KEY" ] || [ -z "$SV_MCP_TOKEN" ] || [ -z "$SV_MCP_URL" ]; then
-            echo "GEMINI_API_KEY / SV_MCP_TOKEN secret or SV_MCP_URL variable missing — nothing to do."
+          if [ -z "$GEMINI_API_KEY" ] || [ -z "$SV_MCP_TOKEN" ]; then
+            echo "GEMINI_API_KEY or SV_MCP_TOKEN secret missing — nothing to do."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
@@ -45,7 +45,7 @@ jobs:
       - name: Process song jobs
         if: steps.cfg.outputs.ready == 'true'
         env:
-          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://sunverse-mcp.pravanigroup.workers.dev' }}
           SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
