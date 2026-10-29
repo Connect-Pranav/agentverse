@@ -40,6 +40,7 @@ function score(lead, product) {
   const wb = (w) => new RegExp("(^|[^a-z])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z]|$)");
   for (const w of CFG.intentWords || []) if (wb(w).test(near)) { s += 1; intent++; }
   for (const h of CFG.hiringTags || []) if (title.includes(h)) { s += 3; intent++; }
+  if (lead.hiring) { s += 3; intent++; }
   if (/^ask hn/.test(title) && matched.some((k) => title.includes(k.toLowerCase()))) { s += 1; intent++; }
   if (!intent) return null; // a keyword alone is not a lead
   for (const x of CFG.sellerTags || []) if (title.includes(x)) { s -= 6; }
@@ -101,6 +102,58 @@ async function hn(product) {
   return out;
 }
 
+
+// ---------- HN monthly "Freelancer? Seeking freelancer?" thread (clients post "SEEKING FREELANCER") ----------
+let hnFreelanceCache = null;
+async function hnFreelance(product) {
+  try {
+    if (!hnFreelanceCache) {
+      const s = await getJSON("https://hn.algolia.com/api/v1/search_by_date?query=%22Seeking%20freelancer%22&tags=story,author_whoishiring&hitsPerPage=2");
+      const story = (s.hits || [])[0];
+      hnFreelanceCache = [];
+      if (story) {
+        const c = await getJSON(`https://hn.algolia.com/api/v1/search?tags=comment,story_${story.objectID}&hitsPerPage=500`);
+        hnFreelanceCache = (c.hits || []).filter((h) => /seeking freelancer/i.test(h.comment_text || ""));
+      }
+      hp("hn-freelance").ok++; hp("hn-freelance").items = hnFreelanceCache.length;
+    }
+    return hnFreelanceCache.map((h) => ({ id: "hf_" + h.objectID, source: "hn seeking freelancer", title: clean(h.comment_text).slice(0, 110), text: clean(h.comment_text).slice(0, 1200), url: "https://news.ycombinator.com/item?id=" + h.objectID, author: h.author, created: h.created_at, hiring: true }));
+  } catch (e) { const h = hp("hn-freelance"); h.errors++; h.lastError = e.message.slice(0, 80); hnFreelanceCache = []; return []; }
+}
+
+// ---------- Bluesky public search (no login) ----------
+async function bluesky(product) {
+  const out = [];
+  for (const k of product.keywords.slice(0, 3)) {
+    try {
+      const j = await getJSON(`https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent('"' + k + '"')}&sort=latest&limit=25`);
+      hp("bluesky").ok++; hp("bluesky").items += (j.posts || []).length;
+      for (const p of j.posts || []) {
+        const txt = clean(p.record?.text || ""); const rk = (p.uri || "").split("/").pop();
+        out.push({ id: "bs_" + rk, source: "bluesky", title: txt.slice(0, 110), text: txt, url: `https://bsky.app/profile/${p.author?.handle}/post/${rk}`, author: p.author?.handle, created: p.record?.createdAt || p.indexedAt });
+      }
+    } catch (e) { const h = hp("bluesky"); h.errors++; h.lastError = e.message.slice(0, 80); }
+    await sleep(500);
+  }
+  return out;
+}
+
+// ---------- Mastodon hashtags (no login) ----------
+let mastoCache = null;
+async function mastodon() {
+  if (mastoCache) return mastoCache;
+  mastoCache = [];
+  for (const tag of CFG.mastodonTags || []) {
+    try {
+      const j = await getJSON(`https://${CFG.mastodonServer || "mastodon.social"}/api/v1/timelines/tag/${encodeURIComponent(tag)}?limit=40`);
+      hp("mastodon").ok++; hp("mastodon").items += j.length;
+      for (const p of j) { const txt = clean(p.content); mastoCache.push({ id: "md_" + p.id, source: "mastodon #" + tag, title: txt.slice(0, 110), text: txt, url: p.url, author: p.account?.acct, created: p.created_at }); }
+    } catch (e) { const h = hp("mastodon"); h.errors++; h.lastError = e.message.slice(0, 80); }
+    await sleep(400);
+  }
+  return mastoCache;
+}
+
 // ---------- RSS / Atom ----------
 async function rss(feed) {
   const out = [];
@@ -145,7 +198,7 @@ async function main() {
   log("reddit mode:", redditToken ? "oauth" : "public");
   const found = new Map();
   for (const p of CFG.products) {
-    const raw = [...(await reddit(p)), ...(CFG.hackerNews ? await hn(p) : [])];
+    const raw = [...(await reddit(p)), ...(CFG.hackerNews ? await hn(p) : []), ...(CFG.hackerNews ? await hnFreelance(p) : []), ...(CFG.bluesky ? await bluesky(p) : []), ...(await mastodon())];
     for (const l of raw) {
       if (!l.title || NOW - Date.parse(l.created) > MAX_AGE) continue;
       const sc = score(l, p); if (!sc || sc.score < (CFG.minScore || 4)) continue;

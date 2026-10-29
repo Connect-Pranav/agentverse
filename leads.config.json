@@ -3,31 +3,129 @@
   "products": [
     {
       "name": "Foliocraft",
-      "keywords": ["portfolio website", "personal website", "portfolio site", "build my portfolio", "resume website", "website for my resume", "online portfolio"],
-      "subreddits": ["forhire", "slavelabour", "freelance_forhire", "resumes", "careerguidance", "webdev", "jobsearchhacks"]
+      "keywords": [
+        "portfolio website",
+        "personal website",
+        "portfolio site",
+        "build my portfolio",
+        "resume website",
+        "website for my resume",
+        "online portfolio",
+        "landing page",
+        "website redesign",
+        "wordpress site",
+        "webflow"
+      ],
+      "subreddits": [
+        "forhire",
+        "slavelabour",
+        "freelance_forhire",
+        "resumes",
+        "careerguidance",
+        "webdev",
+        "jobsearchhacks"
+      ]
     },
     {
       "name": "NIKHILs TECH STUDIO",
-      "keywords": ["learn chatgpt", "learn claude", "ai course", "prompt engineering course", "resume writing", "rewrite my resume", "sql interview", "ai agent for my business", "build an ai agent", "automate my business"],
-      "subreddits": ["forhire", "resumes", "learnSQL", "ChatGPT", "ClaudeAI", "Entrepreneur", "smallbusiness", "automation"]
+      "keywords": [
+        "learn chatgpt",
+        "learn claude",
+        "ai course",
+        "prompt engineering course",
+        "resume writing",
+        "rewrite my resume",
+        "sql interview",
+        "ai agent for my business",
+        "build an ai agent",
+        "automate my business",
+        "ai automation",
+        "llm",
+        "chatbot",
+        "prompt engineer"
+      ],
+      "subreddits": [
+        "forhire",
+        "resumes",
+        "learnSQL",
+        "ChatGPT",
+        "ClaudeAI",
+        "Entrepreneur",
+        "smallbusiness",
+        "automation"
+      ]
     },
     {
       "name": "Sunverse",
-      "keywords": ["hindi song", "hindi lofi", "background music for my video", "bollywood lofi", "new hindi music", "romantic hindi song"],
-      "subreddits": ["bollywoodmusic", "IndianMusicLounge", "lofi", "NewMusicRecs"]
+      "keywords": [
+        "hindi song",
+        "hindi lofi",
+        "background music for my video",
+        "bollywood lofi",
+        "new hindi music",
+        "romantic hindi song"
+      ],
+      "subreddits": [
+        "bollywoodmusic",
+        "IndianMusicLounge",
+        "lofi",
+        "NewMusicRecs"
+      ]
     },
     {
       "name": "LittleLoop",
-      "keywords": ["bedtime story", "kids animation", "stories for toddlers", "educational videos for kids", "cartoons for kids"],
-      "subreddits": ["Parenting", "toddlers", "Mommit", "daddit"]
+      "keywords": [
+        "bedtime story",
+        "kids animation",
+        "stories for toddlers",
+        "educational videos for kids",
+        "cartoons for kids"
+      ],
+      "subreddits": [
+        "Parenting",
+        "toddlers",
+        "Mommit",
+        "daddit"
+      ]
     }
   ],
-  "intentWords": ["need", "looking for", "hiring", "recommend", "anyone know", "who can", "help me", "budget", "suggest", "where can i"],
-  "hiringTags": ["[hiring]", "[task]", "[paid]", "hiring:"],
-  "sellerTags": ["[for hire]", "show hn", "for hire", "[offer]", "i will build", "my services"],
+  "intentWords": [
+    "need",
+    "looking for",
+    "hiring",
+    "recommend",
+    "anyone know",
+    "who can",
+    "help me",
+    "budget",
+    "suggest",
+    "where can i"
+  ],
+  "hiringTags": [
+    "[hiring]",
+    "[task]",
+    "[paid]",
+    "hiring:"
+  ],
+  "sellerTags": [
+    "[for hire]",
+    "show hn",
+    "for hire",
+    "[offer]",
+    "i will build",
+    "my services"
+  ],
   "hackerNews": true,
   "rss": [],
   "maxAgeDays": 10,
   "minScore": 5,
-  "maxLeads": 300
+  "maxLeads": 300,
+  "bluesky": true,
+  "mastodonServer": "mastodon.social",
+  "mastodonTags": [
+    "hiring",
+    "freelance",
+    "forhire",
+    "getfedihired"
+  ]
 }
