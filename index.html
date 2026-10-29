@@ -443,13 +443,51 @@ body.glass .dock button.on{color:#1d1510}
 .panel>*{transition:opacity .5s cubic-bezier(.22,1,.36,1),filter .55s cubic-bezier(.22,1,.36,1)}
 .panel.skel>*{opacity:0;filter:blur(10px)}
 body.glass .panel.skel{background:linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.05))}
-.stage{transition:filter .35s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1)}
+.ready .stage{transition:filter .35s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1)}
 .stage.out{filter:blur(22px);opacity:.0}
 .vtitle{display:none;font:700 26px var(--fb);letter-spacing:-.02em;margin:18px 24px -4px 92px;position:relative;z-index:2}
 body.glass .vtitle{display:block}
 .vtitle small{display:block;font:400 12px var(--fb);color:var(--mut);margin-top:2px}
 @media(max-width:1350px){.vtitle{margin-left:84px}.wrap.v-agents{grid-template-columns:1fr}}
 @media(max-width:760px){.vtitle{margin-left:12px;font-size:22px}}
+
+/* ===== layout / overlap fixes ===== */
+.wrap>.col:nth-child(2){grid-area:a}.wrap>.col:nth-child(3){grid-area:b}.wrap>.col:nth-child(4){grid-area:c}.wrap>.col:nth-child(5){grid-area:d}
+.wrap{grid-template-areas:"a b c d"}
+.wrap.v-agents{grid-template-areas:"c d"}
+.ph{min-width:0}.ph h3{min-width:0;overflow-wrap:anywhere}.ph .badge{flex:none}
+.steps{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
+.step b{flex-wrap:wrap;font-size:13px;line-height:1.2}
+.step small{overflow-wrap:anywhere}
+.dep .tool{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;text-align:center}
+.dep .tool .ic{margin:0 auto 4px}
+.dep .ph h3{font-size:13px}
+body.glass .dep .ph h3{font-size:15px}
+.fk{flex-wrap:wrap;row-gap:4px}.topic{text-align:left;flex-basis:100%}
+.ctrl{overflow-wrap:anywhere}
+.files .file small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+body.glass{padding-bottom:96px}
+/* VANI collapses to a floating orb so it never covers content */
+#vani.min{width:auto;border-radius:99px}
+#vani.min .vhead{padding:7px}
+#vani.min .vt,#vani.min #vmin{display:none}
+#vani.min .orb{width:44px;height:44px}
+body.glass #vani.min{bottom:20px;right:20px}
+body.glass #vani:not(.min){bottom:84px}
+/* medium screens: 3 columns, Signals+Orchestrator stacked */
+@media(max-width:1800px) and (min-width:1351px){
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"a a d" "b c d";align-items:start}
+  .wrap>.col:nth-child(2){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+  .wrap>.col:nth-child(5){align-self:stretch}
+  #wires{display:none}
+  .wrap.v-agents{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);grid-template-areas:"c d"}
+  .col{gap:14px}
+}
+@media(max-width:1350px) and (min-width:761px){
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"a b" "c c" "d d"}
+  .wrap.v-agents{grid-template-areas:"c" "d";grid-template-columns:1fr}
+}
+@media(max-width:760px){.wrap{grid-template-columns:1fr;grid-template-areas:"a" "b" "c" "d"}.wrap.v-agents{grid-template-areas:"c" "d"}}
 
 </style>
 </head>
@@ -1590,7 +1628,7 @@ function intro(){
     .from(".dock",{opacity:0,x:-30,filter:"blur(10px)",duration:.7,ease:"expo.out",clearProps:"filter"},"<.1")
     .from(".gnav",{opacity:0,y:30,filter:"blur(10px)",duration:.7,ease:"expo.out",clearProps:"filter"},"<.1")
     .from(".tool",{opacity:0,scale:.5,y:6,duration:.45,stagger:{each:.006,from:"random"},ease:"back.out(2)",clearProps:"transform"},"<.35")
-    .from(".loop,.legend,#vani",{opacity:0,y:10,duration:.5,stagger:.08},"<.3")
+    .from(".loop,.legend,#vani",{opacity:0,y:10,duration:.5,stagger:.08,clearProps:"opacity,transform"},"<.3")
     .add(function(){var a={v:0};gsap.to(a,{v:CONFIG.agents,duration:1.2,ease:"power2.out",onUpdate:function(){$("agentCount").innerHTML=Math.round(a.v);}});startLoops();},"-=.6");
   gsap.to("#ticker",{xPercent:-50,duration:40,ease:"none",repeat:-1});
   gsap.fromTo("#ld1",{left:"100%"},{left:"0%",duration:5,ease:"none",repeat:-1});
