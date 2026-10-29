@@ -702,9 +702,15 @@ body.glass #vani:not(.min){bottom:20px}
 
     <h5>Brain</h5>
     <div class="fg">
-      <div class="f"><label for="sProv">AI brain</label><select id="sProv"><option value="auto">Auto (Claude → Gemini → Demo)</option><option value="claude">Claude (inside claude.ai)</option><option value="gemini">Gemini free API key</option><option value="demo">Demo (no AI)</option></select><small id="sProvNote"></small></div>
-      <div class="f"><label for="sModel">Gemini model</label><input id="sModel"><small>Free tier model name from Google AI Studio.</small></div>
-      <div class="f" style="grid-column:1/-1"><label for="sKey">Gemini API key (free, aistudio.google.com)</label><input id="sKey" type="password" autocomplete="off"><small>Used only on the GitHub Pages version. Stored in this browser's localStorage, never in the page or repo.</small></div>
+      <div class="f"><label for="sProv">AI brain</label><select id="sProv"><option value="auto">Auto chain (Claude → Groq → Gemini → OpenRouter)</option><option value="claude">Prefer Claude (inside claude.ai)</option><option value="groq">Prefer Groq</option><option value="gemini">Prefer Gemini</option><option value="openrouter">Prefer OpenRouter</option><option value="demo">Demo (no AI)</option></select><small id="sProvNote"></small></div>
+      <div class="f"><label>&nbsp;</label><button class="ibtn" id="sTest" type="button"><span data-i="zap"></span>Test brains</button><small id="sTestOut"></small></div>
+      <div class="f"><label for="sGroq">Groq API key — free, fastest (console.groq.com/keys)</label><input id="sGroq" type="password" autocomplete="off"></div>
+      <div class="f"><label for="sGroqM">Groq model</label><input id="sGroqM" placeholder="auto"></div>
+      <div class="f"><label for="sKey">Gemini API key — free (aistudio.google.com)</label><input id="sKey" type="password" autocomplete="off"></div>
+      <div class="f"><label for="sModel">Gemini model</label><input id="sModel" placeholder="auto"></div>
+      <div class="f"><label for="sOR">OpenRouter API key — free models (openrouter.ai/keys)</label><input id="sOR" type="password" autocomplete="off"></div>
+      <div class="f"><label for="sORM">OpenRouter model</label><input id="sORM" placeholder="auto (picks a :free model)"></div>
+      <div class="f" style="grid-column:1/-1"><small>Leave models on <b>auto</b>: AGENTVERSE reads each provider's live model list and picks a working free model, so retired models never break it. Keys stay in this browser only (localStorage), never in the page or repo.</small></div>
     </div>
 
     <h5>Autopilot</h5>
@@ -806,7 +812,7 @@ var DEFAULT_BRANDS = {
   "LittleLoop":{what:"Instagram channel @little_loop09 with short animated stories for kids.",aud:"Parents of young children.",voice:"Playful, gentle, wholesome.",goal:"Followers who share reels.",ch:"Instagram Reels",top:"bedtime story|good habits|sharing is caring|morning routine for kids"},
   "NIKHILs TECH STUDIO":{what:"AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",aud:"Students, job seekers and professionals learning AI.",voice:"Calm, authoritative, premium tech-documentary. Never hyped.",goal:"Followers and first paying learners.",ch:"Instagram Reels, YouTube",top:"SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"}
 };
-var DEF_SET = {provider:"auto",gkey:"",gmodel:"gemini-2.5-flash",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
+var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
 
 var SIGNALS = [["Lead scraper","LS","#ff3d7f"],["Reddit","R","#ff4500"],["Hacker News","Y","#ff6600"],["RSS feeds","RS","#f59e0b"],["Owner notes","ON","#8b6cff"],["Team memory","M","#4fd1e8"],["YouTube","▶","#e00000"],["Instagram","IG","#d62976"]];
 var RECORD = [["Work board","WB","#f5a623"],["Lead store","LD","#ff7a59"],["Approvals","AP","#8b6cff"],["Activity log","LG","#64748b"],["Brand brains","BB","#16a34a"],["Settings","ST","#3b7ae0"],["Memory","MM","#0ea5e9"]];
@@ -850,6 +856,7 @@ var HAS_GSAP = typeof gsap!=="undefined";
 
 /* ---------------- state ---------------- */
 var SET = lsGet("agentverse_settings")||{}; for (var k in DEF_SET){ if(SET[k]===undefined) SET[k]=DEF_SET[k]; }
+if(/^gemini-(1\.5|2\.0|2\.5)/.test(SET.gmodel||""))SET.gmodel="auto"; /* retired names → auto-discover */
 var ST = {brand:"Foliocraft",brands:clone(DEFAULT_BRANDS),memory:["Never invent prices, numbers or testimonials.","Lead replies must be helpful first; no spam, no hard sell."],feedback:[],outputs:[],leadState:{},stats:{topics:0,drafts:0},cycles:0,lastTopics:[]};
 function mergeState(v){ if(!v||typeof v!=="object")return; for(var k in v){ if(v.hasOwnProperty(k)) ST[k]=v[k]; } if(!ST.brands[ST.brand]){ for(var b in ST.brands){ST.brand=b;break;} } }
 mergeState(lsGet("agentverse_state"));
@@ -879,20 +886,27 @@ if (window.claude && typeof window.claude.use==="function"){
 }
 
 /* ---------------- brain ---------------- */
-function provider(){
-  var p=SET.provider;
-  if(p==="claude")return SAMPLE?"claude":"demo";
-  if(p==="gemini")return SET.gkey?"gemini":"demo";
-  if(p==="demo")return "demo";
-  if(SAMPLE)return "claude"; if(SET.gkey)return "gemini"; return "demo";
+/* ---------------- multi-brain with live model discovery + automatic fallback ---------------- */
+var BRAIN_NAMES={claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",demo:"demo"};
+var LAST_BRAIN="", LAST_MODEL="";
+function chain(){
+  var p=SET.provider,c=[];
+  function add(x){ if(c.indexOf(x)<0)c.push(x); }
+  var ok={claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey,demo:true};
+  if(p!=="auto"&&ok[p])add(p);
+  var order=["claude","groq","gemini","openrouter"];
+  for(var i=0;i<order.length;i++){ if(ok[order[i]])add(order[i]); }
+  if(p==="demo"||!c.length)add("demo");
+  return c;
 }
+function provider(){ return chain()[0]; }
 function updateBrain(){
-  var p=provider(),names={claude:"Claude",gemini:"Gemini",demo:"demo"};
-  $("brainName").innerHTML=names[p]; $("brainChip").className="brainchip"+(p==="demo"?" demo":"");
-  $("brainNote").innerHTML = p==="demo" ? "Demo brain is running (templates, no AI). Open settings to switch on Claude or a free Gemini key." :
-    (p==="claude" ? "Claude is the brain: it plans, writes and decides inside your claude.ai plan. Memory keeps every approve and reject." :
-    "Gemini (free key) is the brain: it plans, writes and decides. Memory keeps every approve and reject.");
-  var note=$("sProvNote"); if(note) note.innerHTML = "Now using: <b>"+names[p]+"</b>"+(SAMPLE?"":" · Claude is available only when opened inside claude.ai");
+  var c=chain(),p=c[0],name=BRAIN_NAMES[p];
+  $("brainName").innerHTML=esc(LAST_BRAIN?BRAIN_NAMES[LAST_BRAIN]:name); $("brainChip").className="brainchip"+(p==="demo"?" demo":"");
+  $("brainChip").title=LAST_MODEL?("Model: "+LAST_MODEL):"Which AI brain the agents use";
+  $("brainNote").innerHTML = p==="demo" ? "Demo brain is running (templates, no AI). Add a free Groq, Gemini or OpenRouter key in settings." :
+    "Brain chain: <b>"+c.filter(function(x){return x!=="demo";}).map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>. If one fails, the next takes over automatically."+(LAST_MODEL?" Now: "+esc(LAST_MODEL)+".":"");
+  var note=$("sProvNote"); if(note) note.innerHTML = "Order now: <b>"+c.map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>"+(SAMPLE?"":" · Claude works only inside claude.ai");
 }
 function parseJSON(t){
   t=String(t||"").replace(/```json/gi,"").replace(/```/g,"");
@@ -900,28 +914,101 @@ function parseJSON(t){
   if(a<0||b<a) throw new Error("Brain did not return JSON");
   return JSON.parse(t.slice(a,b+1));
 }
-function brain(system,user,opts){
-  opts=opts||{};
-  var p=provider();
+function httpErr(name,r,t){ var e=new Error(name+" "+r.status+": "+String(t).slice(0,140)); e.status=r.status; e.code=r.status===429?"rate_limited":(r.status===401||r.status===403?"auth":(r.status===404?"model":"error")); return e; }
+/* model cache: rediscovered every 24h or when a model disappears */
+function mcGet(k){ var m=lsGet("agentverse_models")||{}; var v=m[k]; return v&&(Date.now()-v.t<864e5)?v.id:null; }
+function mcSet(k,id){ var m=lsGet("agentverse_models")||{}; m[k]={id:id,t:Date.now()}; lsSet("agentverse_models",m); }
+function mcDel(k){ var m=lsGet("agentverse_models")||{}; delete m[k]; lsSet("agentverse_models",m); }
+function verScore(id){ var m=String(id).match(/(\d+(?:\.\d+)?)/); return m?parseFloat(m[1]):0; }
+function geminiModel(){
+  if(SET.gmodel&&SET.gmodel!=="auto")return Promise.resolve(SET.gmodel);
+  var c=mcGet("gemini"); if(c)return Promise.resolve(c);
+  return fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key="+encodeURIComponent(SET.gkey))
+    .then(function(r){ if(!r.ok)return r.text().then(function(t){throw httpErr("Gemini",r,t);}); return r.json(); })
+    .then(function(j){
+      var ms=(j.models||[]).filter(function(m){ return (m.supportedGenerationMethods||[]).indexOf("generateContent")>=0 && /gemini/.test(m.name) && /flash/.test(m.name) && !/image|tts|audio|live|embed|vision|thinking-exp|learnlm/.test(m.name); });
+      if(!ms.length) ms=(j.models||[]).filter(function(m){ return (m.supportedGenerationMethods||[]).indexOf("generateContent")>=0 && /gemini/.test(m.name) && !/image|tts|audio|live|embed/.test(m.name); });
+      if(!ms.length) throw new Error("Gemini: no usable model on this key");
+      ms.sort(function(a,b){ var pa=/preview|exp/.test(a.name)?1:0,pb=/preview|exp/.test(b.name)?1:0; if(pa!==pb)return pa-pb; var la=/lite/.test(a.name)?1:0,lb=/lite/.test(b.name)?1:0; if(la!==lb)return la-lb; return verScore(b.name.replace("models/gemini-",""))-verScore(a.name.replace("models/gemini-","")); });
+      var id=ms[0].name.replace(/^models\//,""); mcSet("gemini",id); return id;
+    });
+}
+function groqModel(){
+  if(SET.groqModel&&SET.groqModel!=="auto")return Promise.resolve(SET.groqModel);
+  var c=mcGet("groq"); if(c)return Promise.resolve(c);
+  return fetch("https://api.groq.com/openai/v1/models",{headers:{Authorization:"Bearer "+SET.groqKey}})
+    .then(function(r){ if(!r.ok)return r.text().then(function(t){throw httpErr("Groq",r,t);}); return r.json(); })
+    .then(function(j){
+      var ids=(j.data||[]).filter(function(m){ return m.active!==false && !/whisper|tts|guard|playai|distil|vision|embed|compound|orpheus|prompt/i.test(m.id); }).map(function(m){return m.id;});
+      var pref=[/gpt-oss-120b/,/llama-3\.3-70b/,/llama-4.*maverick/,/kimi/,/qwen.*32b/,/llama.*70b/,/gpt-oss/,/llama-4/,/llama/];
+      for(var i=0;i<pref.length;i++){ for(var k=0;k<ids.length;k++){ if(pref[i].test(ids[k])){ mcSet("groq",ids[k]); return ids[k]; } } }
+      if(ids.length){ mcSet("groq",ids[0]); return ids[0]; }
+      throw new Error("Groq: no chat model available");
+    });
+}
+function orModel(){
+  if(SET.orModel&&SET.orModel!=="auto")return Promise.resolve(SET.orModel);
+  var c=mcGet("openrouter"); if(c)return Promise.resolve(c);
+  return fetch("https://openrouter.ai/api/v1/models").then(function(r){ if(!r.ok)return r.text().then(function(t){throw httpErr("OpenRouter",r,t);}); return r.json(); })
+    .then(function(j){
+      var fr=(j.data||[]).filter(function(m){ return /:free$/.test(m.id) && !/vision|image|audio|embed/i.test(m.id); });
+      var pref=[/llama-3\.3-70b/,/deepseek.*(chat|v3)/,/qwen.*(72b|235b|32b)/,/gpt-oss/,/gemma-3-27b/,/mistral.*small/,/llama/];
+      for(var i=0;i<pref.length;i++){ for(var k=0;k<fr.length;k++){ if(pref[i].test(fr[k].id)){ mcSet("openrouter",fr[k].id); return fr[k].id; } } }
+      if(fr.length){ fr.sort(function(a,b){return (b.context_length||0)-(a.context_length||0);}); mcSet("openrouter",fr[0].id); return fr[0].id; }
+      throw new Error("OpenRouter: no free model listed");
+    });
+}
+function oaiChat(url,key,model,system,user,opts,extra,json){
+  var body={model:model,messages:[{role:"system",content:system+"\nReturn ONLY one valid JSON object."},{role:"user",content:user}],temperature:opts.quick?0.6:0.85,max_tokens:1800};
+  if(json)body.response_format={type:"json_object"};
+  var h={"Content-Type":"application/json",Authorization:"Bearer "+key}; for(var k in (extra||{}))h[k]=extra[k];
+  return fetch(url,{method:"POST",headers:h,body:JSON.stringify(body)}).then(function(r){
+    if(!r.ok)return r.text().then(function(t){ if(json&&r.status===400&&/response_format|json/i.test(t)) return oaiChat(url,key,model,system,user,opts,extra,false); throw httpErr(url.indexOf("groq")>=0?"Groq":"OpenRouter",r,t); });
+    return r.json().then(function(j){ var t=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content; return parseJSON(t); });
+  });
+}
+function callBrain(p,system,user,opts){
   if(p==="claude"){
     return SAMPLE([{role:"user",content:system+"\n\n"+user+"\n\nReturn ONLY one valid JSON object, nothing else."}],{cache:false,modelTier:opts.quick?"quick":"default"})
-      .then(function(r){return parseJSON(r&&r.text);});
+      .then(function(r){LAST_MODEL="Claude";return parseJSON(r&&r.text);});
   }
   if(p==="gemini"){
-    var url="https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(SET.gmodel)+":generateContent?key="+encodeURIComponent(SET.gkey);
-    return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        systemInstruction:{parts:[{text:system}]},
-        contents:[{role:"user",parts:[{text:user}]}],
-        generationConfig:{responseMimeType:"application/json",temperature:opts.quick?0.6:0.85}
-      })})
-      .then(function(r){ if(!r.ok){ return r.text().then(function(t){ var e=new Error("Gemini "+r.status+": "+t.slice(0,160)); e.code=r.status===429?"rate_limited":"error"; throw e; }); } return r.json(); })
-      .then(function(j){
-        var parts=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[],t="";
-        for(var i=0;i<parts.length;i++){t+=parts[i].text||"";}
-        return parseJSON(t);
-      });
+    return geminiModel().then(function(model){ LAST_MODEL=model;
+      return fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(SET.gkey),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:user}]}],
+          generationConfig:{responseMimeType:"application/json",temperature:opts.quick?0.6:0.85}})})
+        .then(function(r){ if(!r.ok)return r.text().then(function(t){ var e=httpErr("Gemini",r,t); if(r.status===404)mcDel("gemini"); throw e; }); return r.json(); })
+        .then(function(j){ var parts=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[],t="";for(var i=0;i<parts.length;i++){t+=parts[i].text||"";} return parseJSON(t); });
+    });
   }
+  if(p==="groq"){
+    return groqModel().then(function(model){ LAST_MODEL=model;
+      return oaiChat("https://api.groq.com/openai/v1/chat/completions",SET.groqKey,model,system,user,opts,{},true).catch(function(e){ if(e.code==="model")mcDel("groq"); throw e; });
+    });
+  }
+  if(p==="openrouter"){
+    return orModel().then(function(model){ LAST_MODEL=model;
+      return oaiChat("https://openrouter.ai/api/v1/chat/completions",SET.orKey,model,system,user,opts,{"HTTP-Referer":location.origin||"https://connect-pranav.github.io","X-Title":"AGENTVERSE"},false).catch(function(e){ if(e.code==="model"||e.status===404)mcDel("openrouter"); throw e; });
+    });
+  }
+  LAST_MODEL="templates";
   return new Promise(function(res){ setTimeout(function(){ res(demoBrain(opts.kind,opts)); },opts.quick?400:900); });
+}
+function brain(system,user,opts){
+  opts=opts||{};
+  var c=chain(),i=0,errs=[];
+  function next(){
+    var p=c[i++];
+    if(!p){ var e=new Error(errs.join(" | ")||"No brain available"); e.code=errs.length?"all_failed":"none"; return Promise.reject(e); }
+    return callBrain(p,system,user,opts).then(function(r){ if(LAST_BRAIN!==p){LAST_BRAIN=p;updateBrain();} else updateBrain(); return r; },function(e){
+      var m=(e&&e.message)||String(e); errs.push(BRAIN_NAMES[p]+": "+m.slice(0,80));
+      addTerm([["p","✕ "+BRAIN_NAMES[p]+" failed → "+(c[i]?"trying "+BRAIN_NAMES[c[i]]:"no more brains")]]);
+      /* a vanished model gets one rediscovery retry on the same brain */
+      if(e&&(e.code==="model"||e.status===404)&&!opts["_re_"+p]&&(p==="gemini"||p==="groq"||p==="openrouter")){ opts["_re_"+p]=1; i--; errs.pop(); }
+      return next();
+    });
+  }
+  return next();
 }
 
 /* ---------------- prompts ---------------- */
@@ -1373,7 +1460,7 @@ $("brandSel").onchange=function(){setBrand(this.value);};
 
 /* ---------------- settings modal ---------------- */
 function openSettings(){
-  $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
+  $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sGroq").value=SET.groqKey;$("sGroqM").value=SET.groqModel;$("sOR").value=SET.orKey;$("sORM").value=SET.orModel;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
   $("sLang").value=SET.lang;$("sTheme").value=SET.theme;fillVoices();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
   renderBrands();$("sBrand").value=ST.brand;loadBrandForm(ST.brand);renderMem();updateBrain();
   $("settings").className="open";modalIn();$("setClose").focus();
@@ -1391,7 +1478,10 @@ $("setClose").onclick=function(){modalOut();};
 $("settings").onclick=function(e){if(e.target===this)modalOut();};
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("settings").className)modalOut();});
 $("sSave").onclick=function(){
-  SET.provider=$("sProv").value;SET.gkey=$("sKey").value.trim();SET.gmodel=$("sModel").value.trim()||DEF_SET.gmodel;
+  SET.provider=$("sProv").value;
+  var mk=function(id,key){var v=$(id).value.trim()||"auto";if(v!==SET[key])mcDel(key==="gmodel"?"gemini":(key==="groqModel"?"groq":"openrouter"));SET[key]=v;};
+  SET.gkey=$("sKey").value.trim();SET.groqKey=$("sGroq").value.trim();SET.orKey=$("sOR").value.trim();
+  mk("sModel","gmodel");mk("sGroqM","groqModel");mk("sORM","orModel");
   SET.interval=Math.max(2,+$("sInt").value||30);SET.maxHour=Math.min(20,Math.max(1,+$("sMax").value||4));
   SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.voice=$("sVoice").value||"auto";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
   var eb=$("sBrand").value;ST.brands[eb]={what:$("bWhat").value,aud:$("bAud").value,voice:$("bVoice").value,goal:$("bGoal").value,ch:$("bCh").value,top:$("bTop").value||"general update"};
@@ -1399,6 +1489,17 @@ $("sSave").onclick=function(){
   if(nb&&!ST.brands[nb]){ST.brands[nb]={what:"Describe "+nb,aud:"Describe the audience",voice:"Friendly, clear",goal:"Grow followers and leads",ch:"Instagram",top:"intro post|behind the scenes|how it works"};ST.brand=nb;}
   saveSet();save();renderBrands();updateBrain();modalOut();toast("Settings saved",true);
   if(nb)openSettings();
+};
+$("sTest").onclick=function(){
+  var out=$("sTestOut"); out.innerHTML="testing…";
+  var keep={g:SET.gkey,q:SET.groqKey,o:SET.orKey}; SET.gkey=$("sKey").value.trim();SET.groqKey=$("sGroq").value.trim();SET.orKey=$("sOR").value.trim();
+  var list=[]; if(SAMPLE)list.push("claude"); if(SET.groqKey)list.push("groq"); if(SET.gkey)list.push("gemini"); if(SET.orKey)list.push("openrouter");
+  if(!list.length){out.innerHTML="Add at least one key first.";return;}
+  var res=[],n=0;
+  list.forEach(function(p){
+    callBrain(p,"You are a test.","Reply with JSON {\"ok\":true}",{quick:true}).then(function(){res.push("✓ "+BRAIN_NAMES[p]+" ("+LAST_MODEL+")");},function(e){res.push("✕ "+BRAIN_NAMES[p]+": "+((e&&e.message)||e).toString().slice(0,60));})
+      .then(function(){ n++; out.innerHTML=esc(res.join(" · ")); if(n===list.length){SET.gkey=keep.g;SET.groqKey=keep.q;SET.orKey=keep.o;} });
+  });
 };
 $("sExport").onclick=function(){copyText(JSON.stringify({state:ST,leads:LEADS.length},null,2));};
 $("sReset").onclick=function(){
