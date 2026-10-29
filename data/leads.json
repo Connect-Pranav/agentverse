@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-29T13:45:22.854Z",
+ "updated": "2026-10-29T13:48:12.323Z",
  "count": 0,
  "health": {
   "reddit": {
@@ -12,6 +12,24 @@
    "ok": 16,
    "errors": 0,
    "items": 0,
+   "lastError": null
+  },
+  "hn-freelance": {
+   "ok": 1,
+   "errors": 0,
+   "items": 0,
+   "lastError": null
+  },
+  "bluesky": {
+   "ok": 0,
+   "errors": 12,
+   "items": 0,
+   "lastError": "403 https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%22stories%20fo"
+  },
+  "mastodon": {
+   "ok": 4,
+   "errors": 0,
+   "items": 160,
    "lastError": null
   }
  },
