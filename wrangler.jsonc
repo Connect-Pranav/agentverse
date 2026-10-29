@@ -1,6 +1,19 @@
 {
-  // Cloudflare Workers static site for AGENTVERSE → https://agentverse.<your-subdomain>.workers.dev
+  // AGENTVERSE on Cloudflare: one Worker = dashboard (index.html) + SUNVERSE MCP server (/mcp) + Song Studio API.
+  // Deploy: Cloudflare → Workers & Pages → Import repository → agentverse (root), deploy command `npx wrangler deploy`.
+  // Then add the secret MCP_TOKEN (Settings → Variables and Secrets).
   "name": "agentverse",
+  "main": "mcp/src/index.mjs",
   "compatibility_date": "2026-10-01",
-  "assets": { "directory": "./", "not_found_handling": "single-page-application" }
+  "keep_vars": true,
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/mcp", "/mcp/*", "/api/*", "/u/*", "/sv/*", "/health"]
+  },
+  // No id: Wrangler creates the KV namespace on the first deploy and keeps the binding afterwards.
+  "kv_namespaces": [{ "binding": "MEDIA" }],
+  "vars": { "SONGVIDEO_IMAGE_USD": "0.067" },
+  "observability": { "enabled": true }
 }

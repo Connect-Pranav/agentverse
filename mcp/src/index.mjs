@@ -1,4 +1,4 @@
-// SUNVERSE MCP server — song → music video agent (Cloudflare Worker, standalone; not part of Ganesha).
+// AGENTVERSE Worker: dashboard (static assets) + SUNVERSE MCP server (song → music video). Not part of Ganesha.
 //
 //   POST /mcp  (or /mcp/<MCP_TOKEN> for clients that cannot send headers)   MCP Streamable HTTP, JSON-RPC 2.0
 //   GET  /u/<upload-ticket>                     simple page to upload the MP3 from a phone/laptop
@@ -263,7 +263,7 @@ async function mcp(request, env) {
     try {
       if (m.method === 'initialize') {
         const want = m.params?.protocolVersion;
-        ok({ protocolVersion: PROTOCOLS.includes(want) ? want : PROTOCOLS[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'sunverse-mcp', title: 'SUNVERSE Song → Video', version: VERSION },
+        ok({ protocolVersion: PROTOCOLS.includes(want) ? want : PROTOCOLS[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'agentverse-sunverse', title: 'AGENTVERSE · SUNVERSE Song → Video', version: VERSION },
           instructions: 'Turns a Sunverse song into a finished music video. Always ask the owner before calling approve_song_job (it spends money on images). Videos are not published automatically; give the owner the MP4 link and the YouTube title/description.' });
       } else if (m.method === 'ping') ok({});
       else if (m.method === 'tools/list') ok({ tools: TOOLS });
@@ -347,8 +347,7 @@ async function route(request, env) {
   const method = request.method;
   const len = Number(request.headers.get('content-length') ?? 0);
 
-  if (path === '/') return json({ name: 'sunverse-mcp', version: VERSION, mcp: '/mcp', ok: true });
-  if (path === '/health') return json({ ok: true, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN) });
+  if (path === '/health') return json({ ok: true, app: 'agentverse', songStudio: true, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN) });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1]);
   if (seg[0] === 'u' && seg[1]) {
@@ -357,6 +356,20 @@ async function route(request, env) {
     if (method === 'GET') return new Response(uploadPage(j), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
     if (method === 'PUT') return json(view(env, request, await storeAudio(env, j, request.body, len, request.headers.get('content-type'))));
     throw new HttpError(405, 'Use GET or PUT');
+  }
+  // Owner REST (AGENTVERSE dashboard → Song Studio), same token as MCP
+  if (seg[0] === 'api' && seg[1] === 'songvideo' && seg[2] !== 'runner') {
+    owner(request, env);
+    const v = (j) => view(env, request, j);
+    if (!seg[2] && method === 'GET') return json(await callTool(env, request, 'list_song_jobs'));
+    if (!seg[2] && method === 'POST') return json({ job: v(await createJob(env, await readJson(request))) }, 201);
+    const j = await jobOf(env, seg[2]);
+    if (!seg[3] && method === 'GET') return json({ job: v(j) });
+    if (!seg[3] && method === 'DELETE') { await removeJob(env, j); return json({ deleted: j.id }); }
+    if (seg[3] === 'audio' && method === 'PUT') return json({ job: v(await storeAudio(env, j, request.body, len, request.headers.get('content-type'))) });
+    if (seg[3] === 'import' && method === 'POST') return json({ job: v(await importFromUrl(env, j, (await readJson(request)).url)) });
+    if ((seg[3] === 'approve' || seg[3] === 'reject') && method === 'POST') return json({ job: v(await decide(env, j, seg[3])) });
+    throw new HttpError(404, 'Not found');
   }
   if (seg[0] === 'api' && seg[1] === 'songvideo' && seg[2] === 'runner') {
     owner(request, env);
@@ -383,6 +396,9 @@ async function route(request, env) {
     }
     if (seg[4] === 'fail' && method === 'POST') { const r = await failJob(env, j, (await readJson(request)).error); return json({ job: { id: r.id, status: r.status } }); }
   }
+  // everything else: the AGENTVERSE dashboard (static assets)
+  if (env.ASSETS && (method === 'GET' || method === 'HEAD')) return env.ASSETS.fetch(request);
+  if (path === '/') return json({ name: 'agentverse', version: VERSION, mcp: '/mcp', ok: true });
   throw new HttpError(404, 'Not found');
 }
 

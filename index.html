@@ -608,6 +608,7 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
   <button data-go="board"><span data-i="list-checks"></span><span>Work</span></button>
   <button data-go="leads"><span data-i="crosshair"></span><span>Leads</span></button>
   <button data-go="pFocus"><span data-i="activity"></span><span>Live feed</span></button>
+  <button data-go="studio"><span data-i="music"></span><span>Song Studio</span></button>
   <div class="sep"></div>
   <button data-go="vani"><span data-i="mic"></span><span>VANI</span></button>
   <button data-go="memory"><span data-i="brain"></span><span>Memory</span></button>
@@ -738,6 +739,26 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
   </div>
 </section>
 
+<section class="board stage view-hide" id="studio">
+  <div class="panel">
+    <div class="bhead"><div class="ph"><h3>Song Studio · Sunverse</h3></div><span class="sub" id="stuNote" style="margin:0"></span></div>
+    <div class="stu-grid">
+      <div class="stu-up">
+        <h5>1 · Upload a song</h5>
+        <div class="f"><label for="stuFile">MP3 / M4A / WAV (max 24 MB)</label><input id="stuFile" type="file" accept="audio/*,.mp3,.m4a,.wav"></div>
+        <div class="f"><label for="stuTitle">Song title</label><input id="stuTitle" placeholder="e.g. Shaam Ki Laali"></div>
+        <div class="f"><label for="stuLyrics">Lyrics (optional, English letters — better timing)</label><textarea id="stuLyrics" placeholder="Paste lyrics line by line…"></textarea></div>
+        <div class="f"><label for="stuStyle">Visual style</label><input id="stuStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text"></div>
+        <div class="fg"><div class="f"><label for="stuLyr">Lyrics by</label><input id="stuLyr" value="COCO"></div><div class="f"><label for="stuSing">Singer</label><input id="stuSing" value="KoBhit"></div></div>
+        <div class="sacts"><button class="btnp" id="stuGo">Upload &amp; start</button><span class="sub" id="stuProg"></span></div>
+        <div class="stu-bar"><i id="stuBar"></i></div>
+        <div class="sub">Gemini listens (free) → you approve the image cost → Gemini images → MP4 with Sunverse logo intro, credits and English lyric captions → YouTube title, description and tags. Same jobs are available to Claude through the AGENTVERSE MCP connector.</div>
+      </div>
+      <div class="stu-jobs"><h5>2 · Your songs</h5><div id="stuJobs" class="slist"></div></div>
+    </div>
+  </div>
+</section>
+
 <!-- VANI voice agent -->
 <aside id="vani" class="min" aria-label="VANI voice agent">
   <div class="vhead" id="vhead">
@@ -786,6 +807,9 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
       <div class="f"><label for="sInt">Minutes between cycles</label><input id="sInt" type="number" min="2" max="720"></div>
       <div class="f"><label for="sMax">Max cycles per hour</label><input id="sMax" type="number" min="1" max="20"><small>Each cycle = 2 brain calls. Keeps you inside free limits.</small></div>
     </div>
+
+    <h5>Song Studio / MCP</h5>
+    <div class="fg"><div class="f" style="grid-column:1/-1"><label for="sMcp">AGENTVERSE token (the MCP_TOKEN secret on Cloudflare)</label><input id="sMcp" type="password" autocomplete="off"><small>Needed for Song Studio on the Cloudflare link. Stays in this browser.</small></div></div>
 
     <h5>Look</h5>
     <div class="fg"><div class="f"><label for="sTheme">Theme</label><select id="sTheme"><option value="glass">Glass (default)</option><option value="neon">Neon</option></select></div></div>
@@ -897,7 +921,7 @@ var DEFAULT_BRANDS = {
   "LittleLoop":{what:"Instagram channel @little_loop09 with short animated stories for kids.",aud:"Parents of young children.",voice:"Playful, gentle, wholesome.",goal:"Followers who share reels.",ch:"Instagram Reels",top:"bedtime story|good habits|sharing is caring|morning routine for kids"},
   "NIKHILs TECH STUDIO":{what:"AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",aud:"Students, job seekers and professionals learning AI.",voice:"Calm, authoritative, premium tech-documentary. Never hyped.",goal:"Followers and first paying learners.",ch:"Instagram Reels, YouTube",top:"SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"}
 };
-var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",freeAI:false,immWake:true,ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
+var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",mcpToken:"",freeAI:false,immWake:true,ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
 
 var SIGNALS = [["Lead scraper","LS","#ff3d7f"],["Reddit","R","#ff4500"],["Hacker News","Y","#ff6600"],["RSS feeds","RS","#f59e0b"],["Owner notes","ON","#8b6cff"],["Team memory","M","#4fd1e8"],["YouTube","▶","#e00000"],["Instagram","IG","#d62976"]];
 var RECORD = [["Work board","WB","#f5a623"],["Lead store","LD","#ff7a59"],["Approvals","AP","#8b6cff"],["Activity log","LG","#64748b"],["Brand brains","BB","#16a34a"],["Settings","ST","#3b7ae0"],["Memory","MM","#0ea5e9"]];
@@ -1591,7 +1615,7 @@ $("brandSel").onchange=function(){setBrand(this.value);};
 /* ---------------- settings modal ---------------- */
 function openSettings(){
   $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sGroq").value=SET.groqKey;$("sGroqM").value=SET.groqModel;$("sOR").value=SET.orKey;$("sORM").value=SET.orModel;$("sFree").checked=SET.freeAI!==false;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
-  $("sLang").value=SET.lang;$("sTheme").value=SET.theme;fillVoices();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
+  $("sLang").value=SET.lang;$("sTheme").value=SET.theme;$("sMcp").value=SET.mcpToken||"";fillVoices();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
   renderBrands();$("sBrand").value=ST.brand;loadBrandForm(ST.brand);renderMem();updateBrain();
   $("settings").className="open";modalIn();$("setClose").focus();
 }
@@ -1619,7 +1643,7 @@ $("sSave").onclick=function(){
   if(warn.length)setTimeout(function(){toast(warn.join(" · "),false);},400);
   mk("sModel","gmodel");mk("sGroqM","groqModel");mk("sORM","orModel");
   SET.interval=Math.max(2,+$("sInt").value||30);SET.maxHour=Math.min(20,Math.max(1,+$("sMax").value||4));
-  SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.voice=$("sVoice").value||"auto";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
+  SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.mcpToken=$("sMcp").value.replace(/\s+/g,"");SET.voice=$("sVoice").value||"auto";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
   var eb=$("sBrand").value;ST.brands[eb]={what:$("bWhat").value,aud:$("bAud").value,voice:$("bVoice").value,goal:$("bGoal").value,ch:$("bCh").value,top:$("bTop").value||"general update"};
   var nb=$("sNewBrand").value.trim();
   if(nb&&!ST.brands[nb]){ST.brands[nb]={what:"Describe "+nb,aud:"Describe the audience",voice:"Friendly, clear",goal:"Grow followers and leads",ch:"Instagram",top:"intro post|behind the scenes|how it works"};ST.brand=nb;}
@@ -1839,15 +1863,17 @@ var VIEWS={
   overview:{t:"Overview",s:"Your agent team at a glance",show:["wrap","loop","legend"]},
   agents:{t:"Agents",s:"Eight departments and the live feed",show:["wrap"],cls:"v-agents"},
   work:{t:"Work",s:"Everything the team made — approve, reject, copy",show:["board"],tab:"waiting"},
-  leads:{t:"Leads",s:"People who need what you sell",show:["board"],tab:"leads"}
+  leads:{t:"Leads",s:"People who need what you sell",show:["board"],tab:"leads"},
+  studio:{t:"Song Studio",s:"Upload a song — get a finished Sunverse video",show:["studio"]}
 };
 function greet(){var h=new Date().getHours();return h<12?"Good morning":(h<17?"Good afternoon":"Good evening");}
 function setTitle(v){ $("vtitle").firstChild.nodeValue=(v==="overview"?greet()+", "+CONFIG.owner:VIEWS[v].t); $("vsub").innerHTML=VIEWS[v].s; }
 function applyView(v){
-  var V=VIEWS[v],ids=["wrap","loop","legend","board"];
+  var V=VIEWS[v],ids=["wrap","loop","legend","board","studio"];
   for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
   $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
   /* each page has its own panel: Work = work board only, Leads = lead radar only */
+  if(v==="studio")stuLoad();
   if(v==="work"){ $("boardTitle").innerHTML="Work Board"; $("tabs").style.display=""; $("tabLeads").style.display="none"; if(boardTab==="leads")boardTab="waiting"; }
   else if(v==="leads"){ $("boardTitle").innerHTML="Lead Radar"; $("tabs").style.display="none"; }
   if(V.tab){boardTab=V.tab;renderBoard._tab=null;renderBoard();}
@@ -1873,7 +1899,7 @@ function switchView(v){
   if(!VIEWS[v])return;
   if(v===VIEW){ if(v==="work"||v==="leads"){applyView(v);} return; }
   VIEW=v;
-  var stages=[$("wrap"),$("loop"),$("legend"),$("board")];
+  var stages=[$("wrap"),$("loop"),$("legend"),$("board"),$("studio")];
   if(!MOTION){ applyView(v); drawWires(); revealPanels(); return; }
   for(var i=0;i<stages.length;i++)stages[i].classList.add("out");
   gsap.to("#vtitle",{opacity:0,y:-6,filter:"blur(8px)",duration:.25});
@@ -1899,7 +1925,7 @@ function markNav(t,nv){
   }
   movePills(false);
 }
-var GOVIEW={top:"overview",pDeps:"agents",pFocus:"agents",board:"work",queue:"work",leads:"leads"};
+var GOVIEW={studio:"studio",top:"overview",pDeps:"agents",pFocus:"agents",board:"work",queue:"work",leads:"leads"};
 function go(t){
   if(GOVIEW[t]){
     var nv=GOVIEW[t];
@@ -2378,12 +2404,84 @@ function openUrl(u){ var a=document.createElement("a"); a.href=u; a.target="_bla
 })();
 
 
+
+/* =====================================================================
+   SONG STUDIO — AGENTVERSE's own backend (Cloudflare Worker: /api/songvideo, same jobs as the MCP tools)
+   ===================================================================== */
+var STU={jobs:[],seen:{},backend:null};
+var STU_LABEL={uploading:"waiting for upload",queued:"queued — Gemini will listen soon",analyzing:"Gemini is listening…",needs_approval:"needs your approval",approved:"approved — making images",rendering:"rendering video…",ready:"ready",failed:"failed",rejected:"rejected"};
+function stuProbe(cb){
+  if(STU.backend!==null){cb(STU.backend);return;}
+  fetch("/health",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){STU.backend=!!(j&&j.songStudio);cb(STU.backend);}).catch(function(){STU.backend=false;cb(false);});
+}
+function stuApi(method,path,body){
+  return fetch(path,{method:method,headers:{"Content-Type":"application/json",Authorization:"Bearer "+SET.mcpToken},body:body?JSON.stringify(body):undefined})
+    .then(function(r){return r.text().then(function(t){var j={};try{j=JSON.parse(t);}catch(e){} if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status)); return j;});});
+}
+function stuLoad(){
+  stuProbe(function(ok){
+    if(!ok){ $("stuNote").innerHTML="Song Studio Cloudflare wale AGENTVERSE par chalta hai: <a style=\"color:#fff;text-decoration:underline\" href=\"https://agentverse.pravanigroup.workers.dev/#studio\">agentverse.pravanigroup.workers.dev</a>"; $("stuGo").disabled=true; $("stuJobs").innerHTML=""; return; }
+    if(!SET.mcpToken){ $("stuNote").innerHTML="Settings → Song Studio / MCP mein apna token daalo."; $("stuGo").disabled=true; return; }
+    $("stuGo").disabled=false;
+    stuApi("GET","/api/songvideo").then(function(j){
+      var ids=(j.jobs||[]).map(function(x){return x.job_id;}),done=0,full=[];
+      if(!ids.length){STU.jobs=[];stuRender();return;}
+      ids.slice(0,12).forEach(function(id,ix){ stuApi("GET","/api/songvideo/"+id).then(function(r){full[ix]=r.job;},function(){}).then(function(){ if(++done===Math.min(12,ids.length)){ STU.jobs=full.filter(Boolean); stuRender(); stuNotify(); } }); });
+    }).catch(function(e){ $("stuNote").textContent="Song Studio: "+e.message; });
+  });
+}
+function stuNotify(){
+  for(var i=0;i<STU.jobs.length;i++){ var j=STU.jobs[i],k=j.job_id+":"+j.status; if(STU.seen[k])continue; STU.seen[k]=1;
+    if(j.status==="needs_approval")feed("Creative Studio","Owner","music",'"'+(j.title||"song")+'" planned: '+j.image_count+" images, est. "+(j.est_cost_inr?"₹"+j.est_cost_inr:"$"+j.est_cost_usd)+". Approve in Song Studio.");
+    if(j.status==="ready"){feed("Publishing & Social","Owner","music",'Video ready: "'+((j.youtube&&j.youtube.title)||j.title)+'". Download and post on YouTube.');toast("Song video ready",true);} }
+}
+function stuRender(){
+  var h="",i;
+  if(!STU.jobs.length)h='<div class="empty"><b>No songs yet.</b><br>Upload an MP3 to begin.</div>';
+  for(i=0;i<STU.jobs.length;i++){ var j=STU.jobs[i],pc=j.status==="ready"?"r":(j.status==="needs_approval"?"w":(j.status==="failed"||j.status==="rejected"?"x":"b")),cost=j.est_cost_inr?"₹"+j.est_cost_inr:"$"+j.est_cost_usd;
+    h+='<div class="sitem"><div class="ct"><span class="pill '+pc+'">'+esc(STU_LABEL[j.status]||j.status)+'</span><span>'+ago(Date.parse(j.updated_at||j.created_at))+' ago</span>'+(j.duration_s?'<span>'+Math.round(j.duration_s)+' s</span>':'')+'</div><h4>'+esc(j.title||"Untitled song")+'</h4>';
+    if(j.plan&&j.status==="needs_approval")h+='<p><b>Mood:</b> '+esc(j.plan.mood||"")+'<br><b>Theme:</b> '+esc(j.plan.theme||"")+'</p><p>'+j.image_count+' images · est. <b>'+cost+'</b> (Gemini images, paid)</p><div class="acts"><button data-sa="approve" data-id="'+j.job_id+'"><span data-i="check"></span>Approve &amp; make video</button><button data-sa="reject" data-id="'+j.job_id+'"><span data-i="x"></span>Reject</button></div>';
+    if(j.status==="ready")h+=(j.video_url?'<video controls preload="metadata" playsinline style="width:100%;border-radius:12px;margin:6px 0" '+(j.thumbnail_url?'poster="'+esc(j.thumbnail_url)+'"':'')+' src="'+esc(j.video_url)+'"></video>':'')+
+      '<p>'+(j.video_mb?j.video_mb+" MB":"")+(j.cost_usd!=null?" · cost ~$"+j.cost_usd:"")+'</p><div class="acts"><a href="'+esc(j.video_url)+'" download><span data-i="download"></span>Download MP4</a>'+(j.thumbnail_url?'<a href="'+esc(j.thumbnail_url)+'" download><span data-i="image"></span>Thumbnail</a>':'')+
+      '<button data-sc="title" data-id="'+j.job_id+'"><span data-i="copy"></span>Title</button><button data-sc="desc" data-id="'+j.job_id+'"><span data-i="copy"></span>Description</button><button data-sc="tags" data-id="'+j.job_id+'"><span data-i="copy"></span>Tags</button><a href="https://www.youtube.com/upload" target="_blank" rel="noopener"><span data-i="external-link"></span>Upload on YouTube</a></div>'+
+      (j.youtube?'<p style="white-space:pre-wrap;opacity:.85;margin-top:6px"><b>'+esc(j.youtube.title)+'</b>\n'+esc(String(j.youtube.description||"").slice(0,400))+'</p>':'');
+    if(j.error&&j.status!=="ready")h+='<p class="r">'+esc(String(j.error).slice(0,220))+'</p>';
+    h+='<div class="acts"><button data-sa="delete" data-id="'+j.job_id+'"><span data-i="x"></span>Delete</button></div></div>'; }
+  $("stuJobs").innerHTML=h;
+  var els=$("stuJobs").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
+  var live=STU.jobs.some(function(j){return ["queued","analyzing","approved","rendering"].indexOf(j.status)>=0;});
+  $("stuNote").textContent=live?"Working… updates every 30 s; the renderer runs every 15 min.":"";
+}
+$("stuJobs").onclick=function(e){
+  var b=e.target.closest?e.target.closest("button"):null;if(!b)return;
+  var id=b.getAttribute("data-id"),a=b.getAttribute("data-sa"),c=b.getAttribute("data-sc"),j=null;
+  for(var i=0;i<STU.jobs.length;i++)if(STU.jobs[i].job_id===id)j=STU.jobs[i];
+  if(c&&j&&j.youtube){copyText(c==="title"?j.youtube.title:(c==="desc"?j.youtube.description:(j.youtube.tags||[]).join(", ")));return;}
+  if(a==="delete"){ if(b.getAttribute("data-c")!=="1"){b.setAttribute("data-c","1");b.lastChild.nodeValue="Tap again to delete";return;} stuApi("DELETE","/api/songvideo/"+id).then(stuLoad); return; }
+  if(a==="approve"||a==="reject"){ b.disabled=true; stuApi("POST","/api/songvideo/"+id+"/"+a,{}).then(function(){toast(a==="approve"?"Approved — images and video coming":"Rejected",a==="approve");stuLoad();}).catch(function(e2){toast(e2.message,false);b.disabled=false;}); }
+};
+$("stuGo").onclick=function(){
+  var f=$("stuFile").files&&$("stuFile").files[0]; if(!f){toast("Choose an MP3 first",false);return;}
+  if(f.size>24*1024*1024){toast("File is over 24 MB — export a 192 kbps MP3",false);return;}
+  var btn=this; btn.disabled=true; $("stuProg").textContent="creating job…";
+  stuApi("POST","/api/songvideo",{title:$("stuTitle").value,lyrics:$("stuLyrics").value,style:$("stuStyle").value,lyricist:$("stuLyr").value,singer:$("stuSing").value}).then(function(r){
+    var x=new XMLHttpRequest(); x.open("PUT","/api/songvideo/"+r.job.job_id+"/audio"); x.setRequestHeader("Authorization","Bearer "+SET.mcpToken); x.setRequestHeader("Content-Type",f.type||"audio/mpeg");
+    x.upload.onprogress=function(ev){ if(ev.lengthComputable){ var p=Math.round(ev.loaded/ev.total*100); $("stuBar").style.width=p+"%"; $("stuProg").textContent="uploading "+p+"%"; } };
+    x.onload=function(){ btn.disabled=false; if(x.status>=200&&x.status<300){ $("stuProg").textContent="uploaded ✓ — Gemini will listen within ~15 min"; $("stuFile").value=""; toast("Song uploaded",true); stuLoad(); } else { var m="upload failed"; try{m=JSON.parse(x.responseText).error;}catch(e){} $("stuProg").textContent=m; toast(m,false);} };
+    x.onerror=function(){ btn.disabled=false; $("stuProg").textContent="network error"; };
+    x.send(f);
+  }).catch(function(e){ btn.disabled=false; $("stuProg").textContent=e.message; toast(e.message,false); });
+};
+setInterval(function(){ if(SET.mcpToken&&STU.backend&&(VIEW==="studio"||STU.jobs.some(function(j){return ["queued","analyzing","approved","rendering"].indexOf(j.status)>=0;})))stuLoad(); },30000);
+setTimeout(function(){ stuProbe(function(ok){ if(ok&&SET.mcpToken)stuLoad(); }); },3000);
+
 /* ---------------- render all ---------------- */
 function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();updateBrain();}
 
 /* ---------------- boot / intro ---------------- */
 function startLoops(){
   setTitle("overview");
+  if(location.hash==="#studio")setTimeout(function(){go("studio");},600);
   setTimeout(function(){document.body.classList.add("ready");},1200);
   drawWires(); renderAll(); loadLeads(); setInterval(loadLeads,10*60000); loadWork(); setInterval(loadWork,10*60000);
   setInterval(glowIcons,1300);setInterval(stepCycle,1300);

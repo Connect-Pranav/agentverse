@@ -23,7 +23,7 @@ test('MCP handshake, auth and tool list', async () => {
   assert.equal((await rpc(e, 'initialize', {}, 1, '/mcp', null)).status, 401);
   const init = await (await rpc(e, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } })).json();
   assert.equal(init.result.protocolVersion, '2025-06-18');
-  assert.equal(init.result.serverInfo.name, 'sunverse-mcp');
+  assert.equal(init.result.serverInfo.name, 'agentverse-sunverse');
   const viaPath = await (await rpc(e, 'tools/list', {}, 2, '/mcp/tok', null)).json();
   assert.ok(viaPath.result.tools.some((t) => t.name === 'approve_song_job'));
   const note = await worker.fetch(new Request(B + '/mcp', { method: 'POST', headers: { authorization: 'Bearer tok', 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) }), e);

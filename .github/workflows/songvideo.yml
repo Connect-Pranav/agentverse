@@ -3,7 +3,7 @@ name: SUNVERSE song → video (MCP renderer)
 # Renders songs queued through the sunverse-mcp server (mcp/). Stage 1 (free): Gemini listens and plans.
 # Stage 2 (paid images) runs only after the owner approves in chat (approve_song_job).
 # Repo secrets: GEMINI_API_KEY (billing on, for images), SV_MCP_TOKEN (= the Worker's MCP_TOKEN).
-# Repo variable: SV_MCP_URL (e.g. https://sunverse-mcp.pravanigroup.workers.dev). Nothing is published from here.
+# Repo variable: SV_MCP_URL (e.g. https://agentverse.pravanigroup.workers.dev). Nothing is published from here.
 
 on:
   schedule:
@@ -28,7 +28,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
-          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://sunverse-mcp.pravanigroup.workers.dev' }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
         run: |
           if [ -z "$GEMINI_API_KEY" ] || [ -z "$SV_MCP_TOKEN" ]; then
             echo "GEMINI_API_KEY or SV_MCP_TOKEN secret missing — nothing to do."
@@ -45,7 +45,7 @@ jobs:
       - name: Process song jobs
         if: steps.cfg.outputs.ready == 'true'
         env:
-          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://sunverse-mcp.pravanigroup.workers.dev' }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
           SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
