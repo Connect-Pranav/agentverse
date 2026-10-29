@@ -1,0 +1,28 @@
+name: Deploy to Cloudflare
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: ["AGENTVERSE lead scraper", "AGENTVERSE 24/7 agents"]
+    types: [completed]
+  workflow_dispatch: {}
+concurrency: cloudflare
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check token
+        id: tok
+        run: echo "has=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.tok.outputs.has == 'true'
+        with: { ref: main }
+      - name: Deploy
+        if: steps.tok.outputs.has == 'true'
+        run: npx -y wrangler@4 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: No token yet
+        if: steps.tok.outputs.has != 'true'
+        run: echo "Add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets to auto-deploy."
