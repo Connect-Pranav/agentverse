@@ -5,7 +5,7 @@ on:
   workflow_dispatch: {}       # run by hand from the Actions tab
 permissions:
   contents: write
-concurrency: leads
+concurrency: agentverse-data
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -26,4 +26,4 @@ jobs:
           git config user.name "agentverse-bot"
           git config user.email "agentverse-bot@users.noreply.github.com"
           git add data/leads.json
-          git diff --staged --quiet || (git commit -m "leads: update $(date -u +%F' '%H:%M)" && git push)
+          git diff --staged --quiet || (git commit -m "leads: update $(date -u +%F' '%H:%M)" && git pull --rebase -q && git push)

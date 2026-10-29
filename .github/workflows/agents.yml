@@ -1,0 +1,34 @@
+name: AGENTVERSE 24/7 agents
+on:
+  schedule:
+    - cron: "41 */3 * * *"   # every 3 hours, one brand per run (rotates)
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: "Brand (empty = rotate)"
+        required: false
+permissions:
+  contents: write
+concurrency: agentverse-data
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Agent cycle
+        run: node scripts/agent.mjs
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          BRAND: ${{ github.event.inputs.brand }}
+      - name: Save work
+        run: |
+          git config user.name "agentverse-bot"
+          git config user.email "agentverse-bot@users.noreply.github.com"
+          git add data/work.json || true
+          git diff --staged --quiet || (git commit -m "agents: cycle $(date -u +%F' '%H:%M)" && git pull --rebase -q && git push)

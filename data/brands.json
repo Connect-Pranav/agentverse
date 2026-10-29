@@ -1,0 +1,42 @@
+{
+  "_help": "Brand brains used by the 24/7 server agent. Edit freely.",
+  "owner": "Pranav",
+  "rules": [
+    "Never invent prices, numbers or testimonials.",
+    "Lead replies must be helpful first; no spam, no hard sell."
+  ],
+  "brands": {
+    "Foliocraft": {
+      "what": "Premium portfolio website themes and done-for-you portfolio builds for professionals in every industry.",
+      "aud": "Job seekers, freelancers, creators and professionals who need a personal website.",
+      "voice": "Confident, premium, helpful. No hype.",
+      "goal": "Get customers who buy portfolios.",
+      "ch": "Instagram, LinkedIn, Reddit",
+      "top": "portfolio vs resume|portfolio for designers|get hired faster with a portfolio|3 portfolio mistakes"
+    },
+    "Sunverse": {
+      "what": "YouTube music channel @SURVERSE_09 with original Hindi songs (singer KoBhit, lyrics COCO) and watercolor anime cover art.",
+      "aud": "Hindi music lovers, lofi and romantic song listeners.",
+      "voice": "Soulful, warm, poetic Hinglish.",
+      "goal": "Grow YouTube subscribers.",
+      "ch": "YouTube, YouTube Shorts, Instagram",
+      "top": "new song release|story behind the lyrics|evening lofi mood|chorus hook for Shorts"
+    },
+    "LittleLoop": {
+      "what": "Instagram channel @little_loop09 with short animated stories for kids.",
+      "aud": "Parents of young children.",
+      "voice": "Playful, gentle, wholesome.",
+      "goal": "Followers who share reels.",
+      "ch": "Instagram Reels",
+      "top": "bedtime story|good habits|sharing is caring|morning routine for kids"
+    },
+    "NIKHILs TECH STUDIO": {
+      "what": "AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",
+      "aud": "Students, job seekers and professionals learning AI.",
+      "voice": "Calm, authoritative, premium tech-documentary. Never hyped.",
+      "goal": "Followers and first paying learners.",
+      "ch": "Instagram Reels, YouTube",
+      "top": "SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"
+    }
+  }
+}

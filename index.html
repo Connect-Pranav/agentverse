@@ -531,6 +531,26 @@ body.glass #vani:not(.min){bottom:20px}
   body.glass #vani:not(.min){bottom:10px}
 }
 
+/* ===== signal panels ===== */
+.modal{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;overflow-y:auto}
+.modal.open{display:flex}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:10px 0}
+.srow{display:flex;justify-content:space-between;gap:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 11px;font-size:12.5px}
+.srow span{color:var(--mut)}.srow b{font-weight:600;text-align:right}
+.g{color:#9ff5c6}.r{color:#ffb3c6}
+.sacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.sacts a.ibtn{text-decoration:none}
+.slist{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}
+.sitem{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:10px 12px}
+.sitem h4{font-size:13.5px;margin:4px 0}.sitem p{font-size:12px;color:#e9e3dc}
+.sitem .ct{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:10.5px;color:var(--mut)}
+.sitem .acts{display:flex;gap:6px;margin-top:6px}
+.sitem .acts a,.sitem .acts button{display:inline-flex;align-items:center;gap:5px;font:600 11.5px var(--fb);border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.14);color:#fff;border-radius:99px;padding:5px 11px;text-decoration:none}
+.sdot{position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;border:2px solid rgba(40,30,22,.9);background:#888;z-index:2}
+.sdot.green{background:#5ef0a0;box-shadow:0 0 8px #5ef0a0}.sdot.amber{background:#ffc861}.sdot.red{background:#ff6b8b;box-shadow:0 0 8px #ff6b8b}.sdot.grey{background:#9a9aa3}
+#signals .tool.cl{cursor:pointer}
+body.glass #sig .sbox{border-radius:28px}
+
 </style>
 </head>
 <body>
@@ -573,7 +593,7 @@ body.glass #vani:not(.min){bottom:20px}
   <div class="col">
     <section class="panel" id="pSignals">
       <div class="ph"><h3><i>01</i>Signals</h3><span class="badge run">RUNNING</span></div>
-      <div class="sub">leads, owner notes, memory and channel data</div>
+      <div class="sub">leads, owner notes, memory and channel data · tap a source</div>
       <div class="tools" id="signals"></div>
     </section>
     <section class="panel" id="pRecord">
@@ -702,7 +722,7 @@ body.glass #vani:not(.min){bottom:20px}
 
     <h5>Brain</h5>
     <div class="fg">
-      <div class="f"><label for="sProv">AI brain</label><select id="sProv"><option value="auto">Auto chain (Claude → Groq → Gemini → OpenRouter)</option><option value="claude">Prefer Claude (inside claude.ai)</option><option value="groq">Prefer Groq</option><option value="gemini">Prefer Gemini</option><option value="openrouter">Prefer OpenRouter</option><option value="demo">Demo (no AI)</option></select><small id="sProvNote"></small></div>
+      <div class="f"><label for="sProv">AI brain</label><select id="sProv"><option value="auto">Auto chain (Claude → Groq → Gemini → OpenRouter)</option><option value="claude">Prefer Claude (inside claude.ai)</option><option value="groq">Prefer Groq</option><option value="gemini">Prefer Gemini</option><option value="openrouter">Prefer OpenRouter</option></select><small id="sProvNote"></small></div>
       <div class="f"><label>&nbsp;</label><button class="ibtn" id="sTest" type="button"><span data-i="zap"></span>Test brains</button><small id="sTestOut"></small></div>
       <div class="f"><label for="sGroq">Groq API key — free, fastest (console.groq.com/keys)</label><input id="sGroq" type="password" autocomplete="off"></div>
       <div class="f"><label for="sGroqM">Groq model</label><input id="sGroqM" placeholder="auto"></div>
@@ -761,6 +781,13 @@ body.glass #vani:not(.min){bottom:20px}
   </div>
 </div>
 
+<div id="sig" class="modal" role="dialog" aria-modal="true" aria-labelledby="sigT">
+  <div class="sbox">
+    <div class="ph"><h2 id="sigT">Signal</h2><button class="ibtn" id="sigX" aria-label="Close"><span data-i="x"></span></button></div>
+    <div class="sub" id="sigS"></div>
+    <div id="sigB"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>/*!
@@ -812,7 +839,7 @@ var DEFAULT_BRANDS = {
   "LittleLoop":{what:"Instagram channel @little_loop09 with short animated stories for kids.",aud:"Parents of young children.",voice:"Playful, gentle, wholesome.",goal:"Followers who share reels.",ch:"Instagram Reels",top:"bedtime story|good habits|sharing is caring|morning routine for kids"},
   "NIKHILs TECH STUDIO":{what:"AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",aud:"Students, job seekers and professionals learning AI.",voice:"Calm, authoritative, premium tech-documentary. Never hyped.",goal:"Followers and first paying learners.",ch:"Instagram Reels, YouTube",top:"SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"}
 };
-var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
+var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
 
 var SIGNALS = [["Lead scraper","LS","#ff3d7f"],["Reddit","R","#ff4500"],["Hacker News","Y","#ff6600"],["RSS feeds","RS","#f59e0b"],["Owner notes","ON","#8b6cff"],["Team memory","M","#4fd1e8"],["YouTube","▶","#e00000"],["Instagram","IG","#d62976"]];
 var RECORD = [["Work board","WB","#f5a623"],["Lead store","LD","#ff7a59"],["Approvals","AP","#8b6cff"],["Activity log","LG","#64748b"],["Brand brains","BB","#16a34a"],["Settings","ST","#3b7ae0"],["Memory","MM","#0ea5e9"]];
@@ -857,10 +884,16 @@ var HAS_GSAP = typeof gsap!=="undefined";
 /* ---------------- state ---------------- */
 var SET = lsGet("agentverse_settings")||{}; for (var k in DEF_SET){ if(SET[k]===undefined) SET[k]=DEF_SET[k]; }
 if(/^gemini-(1\.5|2\.0|2\.5)/.test(SET.gmodel||""))SET.gmodel="auto"; /* retired names → auto-discover */
-var ST = {brand:"Foliocraft",brands:clone(DEFAULT_BRANDS),memory:["Never invent prices, numbers or testimonials.","Lead replies must be helpful first; no spam, no hard sell."],feedback:[],outputs:[],leadState:{},stats:{topics:0,drafts:0},cycles:0,lastTopics:[]};
+var ST = {notes:[],yt:null,ig:{},localLeads:[],brand:"Foliocraft",brands:clone(DEFAULT_BRANDS),memory:["Never invent prices, numbers or testimonials.","Lead replies must be helpful first; no spam, no hard sell."],feedback:[],outputs:[],leadState:{},stats:{topics:0,drafts:0},cycles:0,lastTopics:[]};
 function mergeState(v){ if(!v||typeof v!=="object")return; for(var k in v){ if(v.hasOwnProperty(k)) ST[k]=v[k]; } if(!ST.brands[ST.brand]){ for(var b in ST.brands){ST.brand=b;break;} } }
 mergeState(lsGet("agentverse_state"));
-var DB=null, SAMPLE=null, LEADS=[], LEADS_INFO="", autopilot=false, busy=false, paused=false, selDep=-1, cycleTimes=[], lastCycle=0, errCount=0, boardTab="waiting";
+function purgeDemo(){
+  var re=/Demo note for|Switch on a real brain|\[2-line value point|Hook on screen — |\[niche keyword\], \[local keyword\]|Answer their exact question in 2 lines|Demo cycle done/;
+  var before=ST.outputs.length; ST.outputs=ST.outputs.filter(function(o){return !re.test(o.body||"");});
+  if(before!==ST.outputs.length){ ST.stats={topics:0,drafts:ST.outputs.length}; ST.lastTopics=[]; ST.feedback=ST.feedback.filter(function(f){return !re.test(f);}); }
+}
+purgeDemo();
+var DB=null, SAMPLE=null, LEADS=[], LEADS_META=null, LEADS_CFG=null, LEADS_INFO="", autopilot=false, busy=false, paused=false, selDep=-1, cycleTimes=[], lastCycle=0, errCount=0, boardTab="waiting";
 
 function save(){
   clearTimeout(save._t);
@@ -879,7 +912,7 @@ if (window.claude && typeof window.claude.use==="function"){
     try{
       DB.doc("agentverse/state").get().then(function(r){
         var v=r&&typeof r.data==="function"?r.data():(r&&r.value!==undefined?r.value:r);
-        if(v&&v.json){ try{ mergeState(JSON.parse(v.json)); renderAll(); }catch(e){} }
+        if(v&&v.json){ try{ mergeState(JSON.parse(v.json)); purgeDemo(); renderAll(); }catch(e){} }
       }).catch(function(){});
     }catch(e){}
   }).catch(function(){});
@@ -887,26 +920,26 @@ if (window.claude && typeof window.claude.use==="function"){
 
 /* ---------------- brain ---------------- */
 /* ---------------- multi-brain with live model discovery + automatic fallback ---------------- */
-var BRAIN_NAMES={claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",demo:"demo"};
+var BRAIN_NAMES={claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",none:"not connected",rules:"rules"};
 var LAST_BRAIN="", LAST_MODEL="";
 function chain(){
   var p=SET.provider,c=[];
   function add(x){ if(c.indexOf(x)<0)c.push(x); }
-  var ok={claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey,demo:true};
+  var ok={claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey};
   if(p!=="auto"&&ok[p])add(p);
   var order=["claude","groq","gemini","openrouter"];
   for(var i=0;i<order.length;i++){ if(ok[order[i]])add(order[i]); }
-  if(p==="demo"||!c.length)add("demo");
   return c;
 }
-function provider(){ return chain()[0]; }
+function provider(){ return chain()[0]||"none"; }
 function updateBrain(){
-  var c=chain(),p=c[0],name=BRAIN_NAMES[p];
-  $("brainName").innerHTML=esc(LAST_BRAIN?BRAIN_NAMES[LAST_BRAIN]:name); $("brainChip").className="brainchip"+(p==="demo"?" demo":"");
+  var c=chain(),p=c[0]||"none",name=BRAIN_NAMES[p];
+  $("brainName").innerHTML=esc(LAST_BRAIN&&c.indexOf(LAST_BRAIN)>=0?BRAIN_NAMES[LAST_BRAIN]:name); $("brainChip").className="brainchip"+(p==="none"?" demo":"");
   $("brainChip").title=LAST_MODEL?("Model: "+LAST_MODEL):"Which AI brain the agents use";
-  $("brainNote").innerHTML = p==="demo" ? "Demo brain is running (templates, no AI). Add a free Groq, Gemini or OpenRouter key in settings." :
-    "Brain chain: <b>"+c.filter(function(x){return x!=="demo";}).map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>. If one fails, the next takes over automatically."+(LAST_MODEL?" Now: "+esc(LAST_MODEL)+".":"");
-  var note=$("sProvNote"); if(note) note.innerHTML = "Order now: <b>"+c.map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>"+(SAMPLE?"":" · Claude works only inside claude.ai");
+  $("brainNote").innerHTML = p==="none" ? "<b>No AI brain connected.</b> Add a free Groq key (console.groq.com/keys) in settings — agents start working right away." :
+    "Brain chain: <b>"+c.map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>. If one fails, the next takes over automatically."+(LAST_MODEL?" Now: "+esc(LAST_MODEL)+".":"");
+  if(SERVER&&SERVER.updated) $("brainNote").innerHTML+=" · 24/7 agent last ran "+ago(Date.parse(SERVER.updated))+" ago ("+esc((SERVER.last&&SERVER.last.brain)||"")+").";
+  var note=$("sProvNote"); if(note) note.innerHTML = "Order now: <b>"+(c.length?c.map(function(x){return BRAIN_NAMES[x];}).join(" → "):"none — add a key")+"</b>"+(SAMPLE?"":" · Claude works only inside claude.ai");
 }
 function parseJSON(t){
   t=String(t||"").replace(/```json/gi,"").replace(/```/g,"");
@@ -1002,8 +1035,7 @@ function callBrain(p,system,user,opts){
       return oaiChat("https://openrouter.ai/api/v1/chat/completions",SET.orKey,model,system,user,opts,{"HTTP-Referer":location.origin||"https://connect-pranav.github.io","X-Title":"AGENTVERSE"},false).catch(function(e){ if(e.code==="model"||e.status===404)mcDel("openrouter"); throw e; });
     });
   }
-  LAST_MODEL="templates";
-  return new Promise(function(res){ setTimeout(function(){ res(demoBrain(opts.kind,opts)); },opts.quick?400:900); });
+  return Promise.reject(new Error("no brain"));
 }
 function brain(system,user,opts){
   opts=opts||{};
@@ -1012,8 +1044,8 @@ function brain(system,user,opts){
     var p=c[i++];
     if(!p){
       /* every AI brain failed: VANI still handles simple commands with the local rule brain */
-      if(opts.kind==="vani"&&c.indexOf("demo")<0){ var d=demoBrain("vani",opts); d.fallback=errs.join(" · "); return Promise.resolve(d); }
-      var e=new Error(errs.join(" · ")||"No brain available"); e.code=errs.rate?"rate_limited":(errs.length?"all_failed":"none"); return Promise.reject(e); }
+      if(opts.kind==="vani"){ var d=ruleBrain(opts); d.fallback=errs.length?errs.join(" · "):"koi AI key nahi lagi"; return Promise.resolve(d); }
+      var e=new Error(errs.join(" · ")||"No brain available"); e.code=errs.rate?"rate_limited":(errs.length?"all_failed":"no_brain"); return Promise.reject(e); }
     return callBrain(p,system,user,opts).then(function(r){ if(LAST_BRAIN!==p){LAST_BRAIN=p;updateBrain();} else updateBrain(); return r; },function(e){
       errs.push(BRAIN_NAMES[p]+": "+friendly(e)); if(e&&e.status===429)errs.rate=1;
       addTerm([["p","✕ "+BRAIN_NAMES[p]+" ("+friendly(e).split(" — ")[0]+") → "+(c[i]?"trying "+BRAIN_NAMES[c[i]]:"no more brains")]]);
@@ -1041,6 +1073,10 @@ function brandLeads(){
 function brandCtx(extraLead){
   var b=brand(),i,s="BRAND: "+ST.brand+"\nWhat it is: "+b.what+"\nAudience: "+b.aud+"\nVoice: "+b.voice+"\nGoal: "+b.goal+"\nChannels: "+b.ch+"\nTopic ideas: "+b.top.split("|").join(", ");
   s+="\n\nOWNER RULES (must follow):\n- "+ST.memory.join("\n- ");
+  var nt=(ST.notes||[]).filter(function(n){return !n.brand||n.brand===ST.brand;}).slice(0,8).map(function(n){return n.text;});
+  if(nt.length) s+="\n\nOWNER NOTES / SIGNALS (fresh context from the owner):\n- "+nt.join("\n- ");
+  if(ST.yt&&ST.yt.brand===ST.brand){ s+="\n\nYOUTUBE (live, "+ago(ST.yt.t)+" ago): "+ST.yt.subs+" subscribers, "+ST.yt.views+" total views, "+ST.yt.count+" videos. Latest: "+ST.yt.videos.slice(0,5).map(function(v){return '"'+v.title+'" ('+v.views+" views)";}).join("; "); }
+  var ig=ST.ig&&ST.ig[ST.brand]; if(ig&&(ig.followers||ig.note)){ s+="\n\nINSTAGRAM (owner-entered "+ago(ig.t)+" ago): "+(ig.followers?ig.followers+" followers. ":"")+(ig.avg?"avg reel views "+ig.avg+". ":"")+(ig.note||""); }
   if(ST.feedback.length){ s+="\n\nRECENT OWNER FEEDBACK (learn from it):\n- "+ST.feedback.slice(0,10).join("\n- "); }
   var rec=[];for(i=0;i<ST.outputs.length&&rec.length<8;i++){ if(ST.outputs[i].brand===ST.brand) rec.push(ST.outputs[i].title); }
   if(rec.length) s+="\n\nRECENT OUTPUTS (don't repeat):\n- "+rec.join("\n- ");
@@ -1055,26 +1091,8 @@ var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice wi
 
 /* ---------------- demo brain (no AI) ---------------- */
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
-function demoBrain(kind,opts){
-  var b=brand(),tops=b.top.split("|"),i;
-  if(kind==="plan"){
-    var t=pick(tops),L=brandLeads().slice(0,1);
-    var tasks=[{dept:"Market Radar",task:"Check why \""+t+"\" fits the audience right now."},{dept:"Content Engine",task:"Write a hook and caption for \""+t+"\"."},{dept:"Creative Studio",task:"Draft a 3-scene 30s reel script for \""+t+"\"."},{dept:"Search Visibility",task:"Pick 8 keywords and hashtags."}];
-    if(L.length)tasks.push({dept:"Leads & Conversations",task:"Reply helpfully to lead "+L[0].id+".",lead_id:L[0].id});
-    return {topic:t,why:"Fits the goal: "+b.goal,tasks:tasks};
-  }
-  if(kind==="work"){
-    var plan=opts.plan,items=[];
-    for(i=0;i<plan.tasks.length;i++){
-      var tk=plan.tasks[i],d=tk.dept;
-      if(d==="Content Engine")items.push({dept:d,title:"Caption: "+plan.topic,body:"Hook: Stop scrolling if you care about "+plan.topic+".\n\n[2-line value point in "+ST.brand+" voice]\n\nSave this for later.\n#"+ST.brand.replace(/\s/g,"")+" #tips #learn",needs_approval:true});
-      else if(d==="Creative Studio")items.push({dept:d,title:"Reel script: "+plan.topic,body:"Scene 1 (0-10s): Hook on screen — \""+plan.topic+"\".\nScene 2 (10-20s): Show the one key idea.\nScene 3 (20-30s): Payoff + CTA \"Follow for more\".",needs_approval:true});
-      else if(d==="Search Visibility")items.push({dept:d,title:"Keywords for "+plan.topic,body:plan.topic+", "+ST.brand+", how to, tips, beginners, 2026, [niche keyword], [local keyword]",needs_approval:false});
-      else if(d==="Leads & Conversations")items.push({dept:d,title:"Reply to lead",body:"Hey! Saw your post. [Answer their exact question in 2 lines.] If it helps, "+ST.brand+" does exactly this — happy to share a sample, no pressure.",needs_approval:true,lead_id:tk.lead_id||null});
-      else items.push({dept:d,title:d+" note",body:"Demo note for \""+plan.topic+"\". Switch on a real brain in settings to get real thinking here.",needs_approval:false});
-    }
-    return {items:items,summary:"Demo cycle done for "+plan.topic+"."};
-  }
+function ruleBrain(opts){
+  var kind="vani";
   if(kind==="vani"){
     var x=(opts.text||"").toLowerCase(),w=waiting();
     if(/approve|ok kar|haan/.test(x)&&w.length)return {reply:"Done, maine \""+w[0].title+"\" approve kar diya.",actions:[{type:"approve",id:w[0].id}]};
@@ -1087,7 +1105,7 @@ function demoBrain(kind,opts){
     if(lk&&/open|khol|dikha|chalao|jao/.test(x))return {reply:"Ye raha link, tap karke khol lo.",actions:[{type:"open_link",value:lk[0]}]};
     if(/^(hi|hello|hey|namaste)/.test(x))return {reply:"Namaste "+CONFIG.owner+"! Bolo kya karna hai?",actions:[]};
     if(/lead/.test(x))return {reply:"Abhi "+freshCount()+" fresh leads hain. Leads tab khol diya.",actions:[{type:"open_board",value:"leads"}]};
-    return {reply:"Abhi "+w.length+" cheezein aapke approval ka wait kar rahi hain aur "+readyCount()+" ready hain. Main demo mode mein hoon; asli baat-cheet ke liye settings mein brain on karo.",actions:[]};
+    return {reply:"Abhi "+w.length+" cheezein aapke approval ka wait kar rahi hain aur "+readyCount()+" ready hain. Poori baat-cheet ke liye settings mein Groq key daalo.",actions:[]};
   }
   return {};
 }
@@ -1305,6 +1323,7 @@ function setBusy(on){
 }
 function runCycle(focus){
   if(busy){toast("Team is already working",false);return;}
+  if(provider()==="none"){ toast("No AI brain — add a free Groq key in settings",false); vsys("Cycle ke liye AI brain chahiye: Settings → Groq API key."); return; }
   setBusy(true);cycleTimes.push(Date.now());lastCycle=Date.now();
   var b=ST.brand, fl=brandLeads().length;
   $("topic").innerHTML='TOPIC · thinking…';
@@ -1356,14 +1375,16 @@ function learnSummary(s){ addTerm([["w","learned: "+String(s).slice(0,70)]]); }
 
 /* autopilot scheduler */
 function setAutopilot(on){
-  autopilot=on;$("autoBtn").setAttribute("aria-pressed",on?"true":"false");
+  if(on&&provider()==="none"){ toast("Pehle AI brain connect karo (Settings → Groq key)",false); vsys("Autopilot ke liye AI brain chahiye. Settings mein free Groq key daalo."); openSettings(); on=false; }
+  autopilot=on; SET.autopilot=on; saveSet();$("autoBtn").setAttribute("aria-pressed",on?"true":"false");
   if(on){ toast("Autopilot on · "+provider()+" brain",true); if(!busy&&Date.now()-lastCycle>15000)runCycle(); }
 }
 setInterval(function(){
   if(!autopilot||busy||paused)return;
   var hourAgo=Date.now()-3600000; cycleTimes=cycleTimes.filter(function(t){return t>hourAgo;});
-  var gap=(provider()==="demo"?0.5:Math.max(2,+SET.interval||30))*60000;
-  var max=provider()==="demo"?60:Math.max(1,+SET.maxHour||4);
+  if(provider()==="none")return;
+  var gap=Math.max(2,+SET.interval||30)*60000;
+  var max=Math.max(1,+SET.maxHour||4);
   if(Date.now()-lastCycle>=gap&&cycleTimes.length<max)runCycle();
 },5000);
 
@@ -1371,7 +1392,11 @@ setInterval(function(){
 function leadById(id){for(var i=0;i<LEADS.length;i++){if(LEADS[i].id===id)return LEADS[i];}return null;}
 function setLeads(data,src){
   var arr=data&&data.leads?data.leads:(data&&data.length?data:[]);
+  LEADS_META=data&&data.leads?data:null;
   LEADS=[];for(var i=0;i<arr.length;i++){ if(arr[i]&&arr[i].id&&arr[i].title) LEADS.push(arr[i]); }
+  var seen={};for(i=0;i<LEADS.length;i++)seen[LEADS[i].id]=1;
+  for(i=0;i<(ST.localLeads||[]).length;i++){ if(!seen[ST.localLeads[i].id])LEADS.push(ST.localLeads[i]); }
+  sigDots();
   LEADS_INFO=(data&&data.updated?"Last scrape "+ago(Date.parse(data.updated))+" ago":"")+(src?" · "+src:"");
   addTerm([["c","leads.load()"],["","✓ "+LEADS.length+" leads · "+freshCount()+" fresh"]]);
   renderBoard();refreshStats();updateTicker();
@@ -1384,6 +1409,7 @@ function loadLeads(){
 }
 function draftLead(id){
   var L=leadById(id);if(!L){toast("Lead not found",false);return;}
+  if(provider()==="none"){ toast("No AI brain — add a free Groq key in settings",false); return; }
   if(busy){toast("Team is busy, try in a moment",false);return;}
   setBusy(true);var b=ST.brand;
   var plan={topic:"Reply to a lead",tasks:[{dept:"Leads & Conversations",task:"Write a short, helpful reply to lead "+id+" that answers their need.",lead_id:id}]};
@@ -1427,7 +1453,7 @@ function renderBoard(){
     }
     for(i=0;i<list.length;i++){
       var c=list[i],pc=c.status==="waiting"?"w":(c.status==="ready"?"r":"x");
-      h+='<div class="card'+(c.status==="waiting"?" wait":"")+'"><div class="ct"><span class="pill '+pc+'">'+esc(c.status)+'</span><span class="pill b">'+esc(c.brand)+'</span><span>'+esc(c.dept)+'</span><span>· '+ago(c.ts)+' ago</span></div>'+
+      h+='<div class="card'+(c.status==="waiting"?" wait":"")+'"><div class="ct"><span class="pill '+pc+'">'+esc(c.status)+'</span><span class="pill b">'+esc(c.brand)+'</span><span>'+esc(c.dept)+'</span><span>· '+ago(c.ts)+' ago</span>'+(c.server?'<span class="pill r" title="'+esc(c.brain||"")+'">24/7 agent</span>':'')+'</div>'+
         '<h4>'+esc(c.title)+'</h4><div class="bd">'+esc(c.body)+'</div><div class="acts">'+
         (c.status==="waiting"?'<button class="ap" data-out="'+c.id+'" data-a="approve">'+icon("check")+'Approve</button><button data-out="'+c.id+'" data-a="reject">'+icon("x")+'Reject</button>':'')+
         '<button data-out="'+c.id+'" data-a="copy">'+icon("copy")+'Copy</button>'+
@@ -1834,6 +1860,214 @@ $("sPreview").onclick=function(){ var keep=SET.voice; SET.voice=$("sVoice").valu
 if(window.speechSynthesis){ try{ speechSynthesis.onvoiceschanged=function(){ if($("settings").className)fillVoices(); }; }catch(e){} }
 if(SET.wake){ setTimeout(resumeWake,3000); }
 
+
+/* =====================================================================
+   SIGNALS — every tile opens a working panel with live data
+   ===================================================================== */
+var SIGKEYS={"Lead scraper":"scraper","Reddit":"reddit","Hacker News":"hn","RSS feeds":"rss","Owner notes":"notes","Team memory":"memory","YouTube":"youtube","Instagram":"instagram"};
+var DEFAULT_KW={"Foliocraft":["portfolio website","personal website","build my portfolio","resume website"],"NIKHILs TECH STUDIO":["learn chatgpt","resume writing","sql interview","build an ai agent"],"Sunverse":["hindi song","hindi lofi","background music for my video"],"LittleLoop":["bedtime story","kids animation","stories for toddlers"]};
+var DEFAULT_SUBS={"Foliocraft":["forhire","freelance_forhire","resumes","careerguidance"],"NIKHILs TECH STUDIO":["forhire","resumes","ChatGPT","smallbusiness"],"Sunverse":["bollywoodmusic","IndianMusicLounge","NewMusicRecs"],"LittleLoop":["Parenting","toddlers","Mommit"]};
+var INTENT=["need","looking for","hiring","recommend","anyone know","who can","help me","budget","suggest","where can i"];
+function loadCfg(){ if(LEADS_CFG)return Promise.resolve(LEADS_CFG); return fetch("leads.config.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){LEADS_CFG=j;return j;}).catch(function(){return null;}); }
+function brandProd(cfg){ var b=ST.brand,p=null; if(cfg&&cfg.products){for(var i=0;i<cfg.products.length;i++){if(cfg.products[i].name===b)p=cfg.products[i];}} return p||{name:b,keywords:DEFAULT_KW[b]||[b.toLowerCase()],subreddits:DEFAULT_SUBS[b]||["forhire"]}; }
+function liveScore(title,text,kws){
+  var t=(title+" "+text).toLowerCase(),sc=0,m=[],i;
+  for(i=0;i<kws.length;i++){ if(t.indexOf(kws[i].toLowerCase())>=0){sc+=3;m.push(kws[i]);} }
+  if(!m.length)return 0;
+  var k=t.indexOf(m[0].toLowerCase()),near=t.slice(Math.max(0,k-150),k+m[0].length+150),intent=0;
+  for(i=0;i<INTENT.length;i++){ if(new RegExp("(^|[^a-z])"+INTENT[i]).test(near)){sc++;intent++;} }
+  if(/^ask hn/.test(title.toLowerCase())&&title.toLowerCase().indexOf(m[0].toLowerCase())>=0){sc++;intent++;}
+  if(t.indexOf("?")>=0)sc++;
+  if(/\[hiring\]|\[task\]|hiring:/.test(title.toLowerCase())){sc+=3;intent++;}
+  if(/\[for hire\]|for hire|show hn|i will build/.test(title.toLowerCase()))sc-=6;
+  if(/[$₹€£]\s?\d|budget/.test(t))sc+=2;
+  return intent?sc:0;
+}
+function stripHtml(h){var d=document.createElement("div");d.innerHTML=String(h||"");return (d.textContent||"").replace(/\s+/g," ").trim();}
+function healthOf(k){ return LEADS_META&&LEADS_META.health&&LEADS_META.health[k]; }
+function sigState(key){
+  var h;
+  if(key==="scraper"){ if(!LEADS_META||!LEADS_META.updated)return ["grey","no scrape yet"]; var age=Date.now()-Date.parse(LEADS_META.updated); return age<12*3600e3?["green","scraped "+ago(Date.parse(LEADS_META.updated))+" ago"]:["amber","last scrape "+ago(Date.parse(LEADS_META.updated))+" ago"]; }
+  if(key==="reddit"){ h=healthOf("reddit"); if(!h)return ["grey","not checked"]; if(h.ok)return ["green",h.items+" posts scanned"]; return ["red","blocked on GitHub (needs Reddit app)"]; }
+  if(key==="hn"){ h=healthOf("hackernews"); return h&&h.ok?["green",h.items+" posts scanned"]:["grey","live search ready"]; }
+  if(key==="rss"){ var n=LEADS_CFG&&LEADS_CFG.rss?LEADS_CFG.rss.length:0; return n?["green",n+" feeds"]:["grey","no feeds yet"]; }
+  if(key==="notes"){ return (ST.notes||[]).length?["green",ST.notes.length+" notes"]:["grey","add a note"]; }
+  if(key==="memory"){ return ["green",ST.memory.length+" rules · "+ST.feedback.length+" learned"]; }
+  if(key==="youtube"){ if(ST.yt&&Date.now()-ST.yt.t<24*3600e3)return ["green",ST.yt.subs+" subs"]; return SET.ytKey?["amber","refresh stats"]:["grey","add free API key"]; }
+  if(key==="instagram"){ var ig=ST.ig&&ST.ig[ST.brand]; return ig&&ig.followers?["green",ig.followers+" followers"]:["grey","add stats"]; }
+  return ["grey",""];
+}
+function sigDots(){
+  var tools=document.querySelectorAll("#signals .tool");
+  for(var i=0;i<tools.length;i++){
+    var lbl=tools[i].textContent.trim(),key=SIGKEYS[lbl]; if(!key)continue;
+    var st=sigState(key),ic=tools[i].querySelector(".ic"),d=ic.querySelector(".sdot");
+    if(!d){d=document.createElement("i");d.className="sdot";ic.appendChild(d);}
+    d.className="sdot "+st[0]; tools[i].title=lbl+": "+st[1];
+  }
+}
+function sigOpen(title,sub,html){
+  $("sigT").innerHTML=esc(title);$("sigS").innerHTML=sub;$("sigB").innerHTML=html;
+  var els=$("sigB").querySelectorAll("[data-i]");for(var i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
+  $("sig").className="modal open";
+  if(MOTION){gsap.fromTo("#sig .sbox",{opacity:0,y:24,scale:.96,filter:"blur(10px)"},{opacity:1,y:0,scale:1,filter:"blur(0px)",duration:.5,ease:"expo.out",clearProps:"filter"});}
+}
+function sigClose(){ if(MOTION){gsap.to("#sig .sbox",{opacity:0,y:14,scale:.97,duration:.22,onComplete:function(){$("sig").className="modal";gsap.set("#sig .sbox",{clearProps:"all"});}});} else $("sig").className="modal"; sigDots(); }
+$("sigX").onclick=sigClose; $("sig").onclick=function(e){if(e.target===this)sigClose();};
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("sig").className.indexOf("open")>=0)sigClose();});
+function row(k,v,cls){return '<div class="srow"><span>'+esc(k)+'</span><b class="'+(cls||"")+'">'+v+'</b></div>';}
+function leadCards(list){
+  if(!list.length)return '<div class="empty">Kuch nahi mila is baar. Thodi der baad dobara try karo ya keywords badlo.</div>';
+  var h='<div class="slist">';
+  for(var i=0;i<list.length&&i<20;i++){var L=list[i];
+    h+='<div class="sitem"><div class="ct"><span class="score">'+L.score+'</span><span class="pill b">'+esc(L.source)+'</span><span>'+(L.created?ago(Date.parse(L.created))+" ago":"")+'</span></div><h4>'+esc(L.title)+'</h4><p>'+esc(String(L.text||"").slice(0,220))+'</p>'+
+       '<div class="acts"><a href="'+esc(L.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Open</a><button data-addlead="'+i+'"><span data-i="plus"></span>Add to leads</button></div></div>';}
+  return h+'</div>';
+}
+var LIVE=[];
+function bindAdd(){
+  var b=$("sigB").querySelectorAll("[data-addlead]");
+  for(var i=0;i<b.length;i++){ b[i].onclick=function(){ var L=LIVE[+this.getAttribute("data-addlead")]; if(!L)return;
+    L.product=ST.brand;L.products=[ST.brand]; ST.localLeads=(ST.localLeads||[]).filter(function(x){return x.id!==L.id;}); ST.localLeads.unshift(L); if(ST.localLeads.length>80)ST.localLeads.length=80;
+    if(!leadById(L.id))LEADS.unshift(L); save(); renderBoard(); refreshStats(); updateTicker();
+    this.outerHTML='<span class="pill r">added ✓</span>'; toast("Lead added · "+ST.brand,true); }; }
+}
+function liveSearch(src){
+  var out=$("liveOut"); out.innerHTML='<div class="empty">Searching '+esc(src)+' live…</div>';
+  loadCfg().then(function(cfg){
+    var p=brandProd(cfg),kws=p.keywords.slice(0,6),q,url;
+    if(src==="hn"){
+      var since=Math.floor((Date.now()-30*864e5)/1000), reqs=kws.slice(0,4).map(function(k){
+        return fetch("https://hn.algolia.com/api/v1/search_by_date?query="+encodeURIComponent('"'+k+'"')+"&tags=(story,comment)&numericFilters=created_at_i>"+since+"&hitsPerPage=20").then(function(r){return r.json();}).catch(function(){return {hits:[]};});
+      });
+      return Promise.all(reqs).then(function(rs){
+        var all=[],seen={};
+        rs.forEach(function(j){(j.hits||[]).forEach(function(h){ if(seen[h.objectID])return; seen[h.objectID]=1;
+          var title=stripHtml(h.title||h.story_title||"HN comment"),text=stripHtml(h.comment_text||h.story_text||"");
+          var sc=liveScore(title,text,kws); if(sc>=5)all.push({id:"hn_"+h.objectID,source:"hacker news",title:title,text:text.slice(0,800),url:"https://news.ycombinator.com/item?id="+h.objectID,created:h.created_at,score:sc});});});
+        all.sort(function(a,b){return b.score-a.score;}); return all;
+      });
+    }
+    q=kws.map(function(k){return '"'+k+'"';}).join(" OR ");
+    url="https://www.reddit.com/r/"+(p.subreddits||["forhire"]).join("+")+"/search.json?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=new&t=month&limit=50&raw_json=1";
+    return fetch(url).then(function(r){ if(!r.ok)throw new Error("Reddit "+r.status); return r.json(); }).then(function(j){
+      var all=[];((j.data&&j.data.children)||[]).forEach(function(c){var d=c.data;if(!d||d.over_18)return;var sc=liveScore(d.title||"",d.selftext||"",kws);
+        if(sc>=5)all.push({id:"rd_"+d.id,source:"reddit r/"+d.subreddit,title:d.title,text:String(d.selftext||"").slice(0,800),url:"https://www.reddit.com"+d.permalink,created:new Date(d.created_utc*1000).toISOString(),score:sc});});
+      all.sort(function(a,b){return b.score-a.score;}); return all;
+    });
+  }).then(function(list){ LIVE=list; out.innerHTML='<div class="sub" style="margin:6px 0">'+list.length+' real leads for <b>'+esc(ST.brand)+'</b></div>'+leadCards(list); var els=out.querySelectorAll("[data-i]");for(var i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);} bindAdd(); addTerm([["c",src+".live_search()"],["",list.length+" leads"]]); })
+    .catch(function(e){ out.innerHTML='<div class="empty"><b>'+esc(src==="hn"?"Hacker News":"Reddit")+' ne block kiya</b><br>'+esc(friendly(e))+'. '+(src==="reddit"?"Reddit kabhi-kabhi browser se bhi rok deta hai — Lead Radar ke scraped leads aur Google Alerts use karo.":"")+'</div>'; });
+}
+function openSignal(key){
+  var st=sigState(key),h="",i;
+  if(key==="scraper"){
+    var M=LEADS_META||{};h+='<div class="sgrid">'+row("Last scrape",M.updated?ago(Date.parse(M.updated))+" ago":"never")+row("Leads saved",String(M.count||0))+row("Runs","every 6 hours on GitHub Actions")+'</div>';
+    h+='<h5>Source health</h5><div class="sgrid">';
+    var H=M.health||{};for(var k in H){var x=H[k];h+=row(k,(x.ok?'<span class="g">✓ '+x.ok+' ok</span>':'')+(x.errors?' <span class="r">✕ '+x.errors+' failed</span>':'')+' · '+(x.items||0)+' scanned',"");}
+    if(!Object.keys(H).length)h+='<div class="sub">No health data yet.</div>';
+    h+='</div><div class="sacts"><button class="btnp" id="sReload">Reload leads now</button><a class="ibtn" target="_blank" rel="noopener" href="https://github.com/Connect-Pranav/agentverse/actions/workflows/leads.yml"><span data-i="external-link"></span>Run scraper on GitHub</a><button class="ibtn" id="sToLeads"><span data-i="crosshair"></span>Open Lead Radar</button></div>';
+    sigOpen("Lead scraper",esc(st[1]),h);
+    $("sReload").onclick=function(){loadLeads();toast("Reloading leads…",true);setTimeout(function(){openSignal("scraper");},1500);};
+    $("sToLeads").onclick=function(){sigClose();go("leads");};
+  }
+  else if(key==="reddit"||key==="hn"){
+    var hh=healthOf(key==="hn"?"hackernews":"reddit"),src=key==="hn"?"hn":"reddit";
+    h+='<div class="sgrid">'+row("Scraper status",hh?(hh.ok?'<span class="g">working</span>':'<span class="r">blocked ('+esc(hh.lastError||"")+')</span>'):"not checked yet")+row("Brand",esc(ST.brand))+'</div>';
+    if(key==="reddit"&&hh&&!hh.ok)h+='<div class="sub">Reddit GitHub ke server ko block karta hai. Yahan se <b>aapke browser</b> se live search hota hai — ye aksar chal jaata hai.</div>';
+    h+='<div class="sacts"><button class="btnp" id="sLive">Search '+(key==="hn"?"Hacker News":"Reddit")+' live now</button></div><div id="liveOut"></div>';
+    sigOpen(key==="hn"?"Hacker News":"Reddit",esc(st[1]),h); $("sLive").onclick=function(){liveSearch(src);}; liveSearch(src);
+  }
+  else if(key==="rss"){
+    loadCfg().then(function(cfg){
+      var feeds=(cfg&&cfg.rss)||[],rl=LEADS.filter(function(L){return /^google alert|^rss/.test(L.source||"");}).length;
+      var hx='<div class="sgrid">'+row("Feeds connected",String(feeds.length))+row("Leads from feeds",String(rl))+'</div>';
+      hx+='<h5>Feeds</h5>'+(feeds.length?'<div class="mem">'+feeds.map(function(f){return '<div><span>'+esc(f)+'</span></div>';}).join("")+'</div>':'<div class="sub">Abhi koi feed nahi. Google Alerts (google.com/alerts) mein alert banao → Deliver to: <b>RSS feed</b> → RSS icon ka link copy karke yahan paste karo.</div>');
+      hx+='<h5>Add feeds</h5><div class="f"><textarea id="rssIn" placeholder="https://www.google.com/alerts/feeds/…  (one per line)"></textarea></div><div class="sacts"><button class="btnp" id="rssCopy">Copy for VANI / Claude</button></div><div class="sub">Feeds repo ki <b>leads.config.json</b> mein jaate hain. Links copy karke Claude ko bhejo — wo jod dega.</div>';
+      sigOpen("RSS feeds",esc(sigState("rss")[1]),hx);
+      $("rssCopy").onclick=function(){var v=$("rssIn").value.trim();if(!v){toast("Paste feed links first",false);return;}copyText("Add these RSS feeds to agentverse leads.config.json:\n"+v);};
+    });
+  }
+  else if(key==="notes"){
+    var nh='<div class="sub">Jo bhi aap yahan likhoge, agents har cycle mein padhenge — jaise "Diwali offer 20% off this week" ya "naya song Friday ko aa raha hai".</div><div class="fg one"><div class="f"><textarea id="noteIn" placeholder="New note for '+esc(ST.brand)+'…"></textarea></div></div><div class="sacts"><button class="btnp" id="noteAdd">Add note</button><label class="sub"><input type="checkbox" id="noteAll"> all brands</label></div><h5>Notes</h5><div class="mem" id="noteList"></div>';
+    sigOpen("Owner notes",esc(st[1]),nh);
+    var rn=function(){var L=$("noteList"),x="";(ST.notes||[]).forEach(function(n,ix){x+='<div><span>'+esc(n.text)+' <small style="opacity:.6">· '+esc(n.brand||"all")+' · '+ago(n.t)+' ago</small></span><button data-n="'+ix+'">✕</button></div>';});L.innerHTML=x||'<div><span>No notes yet.</span></div>';
+      var bs=L.querySelectorAll("[data-n]");for(var q=0;q<bs.length;q++)bs[q].onclick=function(){ST.notes.splice(+this.getAttribute("data-n"),1);save();rn();};};
+    rn(); $("noteAdd").onclick=function(){var v=$("noteIn").value.trim();if(!v)return;ST.notes=ST.notes||[];ST.notes.unshift({text:v.slice(0,400),brand:$("noteAll").checked?"":ST.brand,t:Date.now()});if(ST.notes.length>40)ST.notes.length=40;$("noteIn").value="";save();rn();toast("Note saved — agents will use it",true);};
+  }
+  else if(key==="memory"){
+    var mh='<div class="sub">Rules team hamesha follow karti hai, aur jo approve/reject se seekha.</div><div class="fg one"><div class="f"><input id="ruleIn" placeholder="New rule, e.g. Never use the word cheap"></div></div><div class="sacts"><button class="btnp" id="ruleAdd">Add rule</button></div><h5>Rules</h5><div class="mem" id="ruleList"></div><h5>Learned</h5><div class="mem" id="learnList"></div>';
+    sigOpen("Team memory",esc(st[1]),mh);
+    var rr=function(){var x="";ST.memory.forEach(function(m,ix){x+='<div><span>'+esc(m)+'</span><button data-r="'+ix+'">✕</button></div>';});$("ruleList").innerHTML=x||'<div><span>No rules.</span></div>';
+      var y="";ST.feedback.forEach(function(f){y+='<div><span>'+esc(f)+'</span></div>';});$("learnList").innerHTML=y||'<div><span>Nothing learned yet — approve or reject some work.</span></div>';
+      var bs=$("ruleList").querySelectorAll("[data-r]");for(var q=0;q<bs.length;q++)bs[q].onclick=function(){ST.memory.splice(+this.getAttribute("data-r"),1);save();rr();};};
+    rr(); $("ruleAdd").onclick=function(){var v=$("ruleIn").value.trim();if(!v)return;ST.memory.push(v.slice(0,200));$("ruleIn").value="";save();rr();};
+  }
+  else if(key==="youtube"){
+    var yh='<div class="fg"><div class="f"><label for="ytKey">YouTube Data API key (free)</label><input id="ytKey" type="password" autocomplete="off" value="'+esc(SET.ytKey||"")+'"><small>console.cloud.google.com → APIs → enable "YouTube Data API v3" → Credentials → API key. Stays in this browser.</small></div><div class="f"><label for="ytH">Channel handle</label><input id="ytH" value="'+esc(SET.ytHandle||"@SURVERSE_09")+'"></div></div><div class="sacts"><button class="btnp" id="ytGo">Fetch live stats</button><a class="ibtn" target="_blank" rel="noopener" href="https://www.youtube.com/'+esc(SET.ytHandle||"@SURVERSE_09")+'"><span data-i="external-link"></span>Open channel</a></div><div id="ytOut"></div>';
+    sigOpen("YouTube",esc(st[1]),yh); $("ytGo").onclick=ytFetch; if(ST.yt)ytRender(); else if(SET.ytKey)ytFetch();
+  }
+  else if(key==="instagram"){
+    var ig=(ST.ig&&ST.ig[ST.brand])||{};
+    var ih='<div class="sub">Instagram ki API ke liye Business account + Facebook app chahiye. Tab tak stats yahan daalo — agents inhe use karenge.</div><div class="fg"><div class="f"><label for="igF">Followers</label><input id="igF" type="number" value="'+esc(ig.followers||"")+'"></div><div class="f"><label for="igA">Avg reel views</label><input id="igA" type="number" value="'+esc(ig.avg||"")+'"></div><div class="f" style="grid-column:1/-1"><label for="igN">What worked recently</label><textarea id="igN" placeholder="e.g. Bedtime story reel got 3x shares">'+esc(ig.note||"")+'</textarea></div></div><div class="sacts"><button class="btnp" id="igSave">Save for '+esc(ST.brand)+'</button><a class="ibtn" target="_blank" rel="noopener" href="https://www.instagram.com/little_loop09"><span data-i="external-link"></span>Open LittleLoop</a></div>';
+    sigOpen("Instagram",esc(st[1]),ih);
+    $("igSave").onclick=function(){ST.ig=ST.ig||{};ST.ig[ST.brand]={followers:$("igF").value,avg:$("igA").value,note:$("igN").value.trim(),t:Date.now()};save();sigDots();toast("Instagram stats saved",true);};
+  }
+}
+function fmtN(n){n=+n||0;return n>=1e6?(n/1e6).toFixed(1)+"M":(n>=1e3?(n/1e3).toFixed(1)+"K":String(n));}
+function ytFetch(){
+  var key=($("ytKey")?$("ytKey").value:SET.ytKey||"").replace(/\s+/g,""),hd=($("ytH")?$("ytH").value:SET.ytHandle||"@SURVERSE_09").trim().replace(/^@?/,"@");
+  if(!key){toast("Add the free YouTube API key first",false);return;}
+  SET.ytKey=key;SET.ytHandle=hd;saveSet();
+  var out=$("ytOut"); if(out)out.innerHTML='<div class="empty">Fetching '+esc(hd)+'…</div>';
+  var base="https://www.googleapis.com/youtube/v3/",ch;
+  fetch(base+"channels?part=statistics,snippet,contentDetails&forHandle="+encodeURIComponent(hd.slice(1))+"&key="+encodeURIComponent(key))
+    .then(function(r){if(!r.ok)return r.text().then(function(t){throw httpErr("YouTube",r,t);});return r.json();})
+    .then(function(j){ ch=j.items&&j.items[0]; if(!ch)throw new Error("Channel "+hd+" not found");
+      return fetch(base+"playlistItems?part=contentDetails,snippet&maxResults=8&playlistId="+ch.contentDetails.relatedPlaylists.uploads+"&key="+encodeURIComponent(key)).then(function(r){return r.json();}); })
+    .then(function(pl){ var ids=(pl.items||[]).map(function(i){return i.contentDetails.videoId;});
+      return ids.length?fetch(base+"videos?part=statistics,snippet&id="+ids.join(",")+"&key="+encodeURIComponent(key)).then(function(r){return r.json();}):{items:[]}; })
+    .then(function(v){
+      ST.yt={brand:"Sunverse",t:Date.now(),title:ch.snippet.title,subs:fmtN(ch.statistics.subscriberCount),views:fmtN(ch.statistics.viewCount),count:ch.statistics.videoCount,
+        videos:(v.items||[]).map(function(x){return {id:x.id,title:x.snippet.title,views:fmtN(x.statistics.viewCount),likes:fmtN(x.statistics.likeCount),date:x.snippet.publishedAt};})};
+      save(); sigDots(); ytRender(); addTerm([["c","youtube.stats()"],["","✓ "+ST.yt.subs+" subs · "+ST.yt.views+" views"]]);
+    })
+    .catch(function(e){ if(out)out.innerHTML='<div class="empty"><b>YouTube error</b><br>'+esc(friendly(e))+'</div>'; });
+}
+function ytRender(){
+  var y=ST.yt,out=$("ytOut");if(!y||!out)return;
+  var h='<div class="sgrid">'+row("Channel",esc(y.title))+row("Subscribers",y.subs,"g")+row("Total views",y.views)+row("Videos",String(y.count))+row("Updated",ago(y.t)+" ago")+'</div><h5>Latest videos</h5><div class="slist">';
+  y.videos.forEach(function(v){h+='<div class="sitem"><h4>'+esc(v.title)+'</h4><div class="ct"><span class="pill r">'+v.views+' views</span><span class="pill">'+v.likes+' likes</span><span>'+ago(Date.parse(v.date))+' ago</span></div><div class="acts"><a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v='+esc(v.id)+'">Open</a></div></div>';});
+  out.innerHTML=h+'</div><div class="sub">Ye stats Sunverse ke har agent cycle mein brain ko milte hain.</div>';
+}
+(function(){
+  var tools=document.querySelectorAll("#signals .tool");
+  for(var i=0;i<tools.length;i++){ var k=SIGKEYS[tools[i].textContent.trim()]; if(!k)continue;
+    tools[i].classList.add("cl"); tools[i].setAttribute("role","button"); tools[i].setAttribute("tabindex","0"); tools[i].setAttribute("data-sig",k);
+    tools[i].onclick=function(){openSignal(this.getAttribute("data-sig"));};
+    tools[i].onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();openSignal(this.getAttribute("data-sig"));}};
+  }
+  loadCfg().then(sigDots); sigDots();
+})();
+
+
+/* ---------------- 24/7 server agent results (GitHub Actions → data/work.json) ---------------- */
+var SERVER=null;
+function loadWork(){
+  if(!window.fetch)return;
+  fetch("data/work.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(w){
+    SERVER=w; var have={},i,n=0; for(i=0;i<ST.outputs.length;i++)have[ST.outputs[i].id]=1;
+    ST.serverSeen=ST.serverSeen||{};
+    for(i=(w.items||[]).length-1;i>=0;i--){ var it=w.items[i]; if(have[it.id]||ST.serverSeen[it.id])continue; ST.serverSeen[it.id]=1; ST.outputs.unshift(it); n++;
+      if(it.lead_id)ST.leadState[it.lead_id]="drafted"; }
+    var ks=Object.keys(ST.serverSeen); if(ks.length>400){ var keep={}; ks.slice(-300).forEach(function(k){keep[k]=1;}); ST.serverSeen=keep; }
+    if(ST.outputs.length>80)ST.outputs.length=80;
+    if(n){ ST.stats.drafts+=n; save(); renderBoard(); refreshStats(); updateTicker();
+      feed("Results & Reporting","Owner","sparkles","24/7 agent made "+n+" new item"+(n>1?"s":"")+(w.last?" for "+w.last.brand+": "+w.last.topic:"")+" (while you were away).");
+      addTerm([["c","server_agent.sync()"],["","✓ "+n+" new from GitHub · cycle "+(w.cycles||0)]]); }
+    sigDots();
+  }).catch(function(){});
+}
+
 /* ---------------- render all ---------------- */
 function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();updateBrain();}
 
@@ -1841,10 +2075,10 @@ function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();
 function startLoops(){
   setTitle("overview");
   setTimeout(function(){document.body.classList.add("ready");},1200);
-  drawWires(); renderAll(); loadLeads(); setInterval(loadLeads,10*60000);
+  drawWires(); renderAll(); loadLeads(); setInterval(loadLeads,10*60000); loadWork(); setInterval(loadWork,10*60000);
   setInterval(glowIcons,1300);setInterval(stepCycle,1300);
   vsay("Namaste "+CONFIG.owner+"! Main VANI hoon, AGENTVERSE ki voice. Mic dabao aur bolo, jaise 'status batao', 'Foliocraft ke liye naya cycle chalao' ya 'pehla item approve karo'.",false);
-  setTimeout(function(){ if(provider()==="demo"&&!autopilot)setAutopilot(true); },11000);
+  if(SET.autopilot&&provider()!=="none")setTimeout(function(){setAutopilot(true);},4000);
 }
 function intro(){
   var boot=$("boot");
