@@ -551,6 +551,10 @@ body.glass #vani:not(.min){bottom:20px}
 #signals .tool.cl{cursor:pointer}
 body.glass #sig .sbox{border-radius:28px}
 
+.tool.cl,.file.cl,.step.cl{cursor:pointer}
+.tool.cl:active .ic,.file.cl:active,.step.cl:active{transform:scale(.96)}
+.tool.cl:focus-visible{outline:2px solid #fff;outline-offset:4px;border-radius:12px}
+
 </style>
 </head>
 <body>
@@ -2067,6 +2071,74 @@ function loadWork(){
     sigDots();
   }).catch(function(){});
 }
+
+
+/* =====================================================================
+   EVERY TILE WORKS — System of Record, Brain, Departments, Knowledge files
+   ===================================================================== */
+var LOGALL=[];
+(function(){ var _add=addTerm; addTerm=function(arr){ for(var i=0;i<arr.length;i++){LOGALL.push([Date.now(),arr[i][1]]);} if(LOGALL.length>300)LOGALL=LOGALL.slice(-300); _add(arr); }; })();
+function workList(filter,title,sub){
+  var list=ST.outputs.filter(filter),h='<div class="sacts">'+(sub||"")+'</div>';
+  if(!list.length)h+='<div class="empty">Abhi kuch nahi bana. '+(provider()==="none"?"AI brain connect karo (Settings → Groq key), phir Run dabao.":"Run dabao ya Autopilot on karo.")+'</div>';
+  else{ h+='<div class="slist">'; for(var i=0;i<list.length&&i<15;i++){var o=list[i],pc=o.status==="waiting"?"w":(o.status==="ready"?"r":"x");
+    h+='<div class="sitem"><div class="ct"><span class="pill '+pc+'">'+esc(o.status)+'</span><span class="pill b">'+esc(o.brand)+'</span><span>'+esc(o.dept)+' · '+ago(o.ts)+' ago</span></div><h4>'+esc(o.title)+'</h4><p style="white-space:pre-wrap">'+esc(String(o.body).slice(0,500))+'</p><div class="acts">'+
+      (o.status==="waiting"?'<button data-wa="'+o.id+'"><span data-i="check"></span>Approve</button><button data-wr="'+o.id+'"><span data-i="x"></span>Reject</button>':'')+'<button data-wc="'+o.id+'"><span data-i="copy"></span>Copy</button></div></div>';}
+    h+='</div>'; }
+  return h;
+}
+function bindWork(reopen){
+  var b=$("sigB"),q,i;
+  q=b.querySelectorAll("[data-wa]");for(i=0;i<q.length;i++)q[i].onclick=function(){approve(this.getAttribute("data-wa"));reopen();};
+  q=b.querySelectorAll("[data-wr]");for(i=0;i<q.length;i++)q[i].onclick=function(){reject(this.getAttribute("data-wr"),"");reopen();};
+  q=b.querySelectorAll("[data-wc]");for(i=0;i<q.length;i++)q[i].onclick=function(){var o=findOut(this.getAttribute("data-wc"));if(o)copyText(o.title+"\n\n"+o.body);};
+}
+function openDept(i){
+  var D=DEPS[i],n=D.n;
+  var h=workList(function(o){return o.dept===n;},n,'<button class="btnp" id="dRun">Run '+esc(n)+' now</button><span class="sub">'+esc(D.d)+'</span>');
+  sigOpen(n,esc(ST.brand)+" · "+ST.outputs.filter(function(o){return o.dept===n;}).length+" items made",h);
+  $("dRun").onclick=function(){sigClose();runCycle("Give "+n+" the main task this cycle.");};
+  bindWork(function(){openDept(i);});
+}
+function openLog(){
+  var h='<div class="term" style="margin:0"><pre style="height:auto;max-height:60vh;overflow:auto">'+(LOGALL.length?LOGALL.slice().reverse().map(function(l){var d=new Date(l[0]);return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())+"  "+esc(l[1]);}).join("\n"):"No activity yet.")+'</pre></div>';
+  sigOpen("Activity log",LOGALL.length+" events this session",h);
+}
+function openBrain(which){
+  var c=chain(),h='<div class="sgrid">'+row("Chain",c.length?c.map(function(x){return BRAIN_NAMES[x];}).join(" → "):'<span class="r">not connected</span>')+row("Now using",esc(LAST_MODEL||"—"))+row("24/7 agent",SERVER&&SERVER.updated?ago(Date.parse(SERVER.updated))+" ago":"waiting for GROQ_API_KEY secret")+'</div>';
+  if(which==="planner")h+='<div class="sub">Planner = Orchestrator. Har cycle mein ek topic chunta hai aur departments ko brief deta hai.</div><div class="sacts"><button class="btnp" id="bRun">Run a cycle now</button></div>';
+  h+='<div class="sacts"><button class="ibtn" id="bSet"><span data-i="settings"></span>Brain settings</button><a class="ibtn" target="_blank" rel="noopener" href="https://console.groq.com/keys"><span data-i="external-link"></span>Get free Groq key</a></div>';
+  sigOpen(which==="planner"?"Planner":"The Brain",c.length?"connected":"no AI key yet",h);
+  if($("bRun"))$("bRun").onclick=function(){sigClose();runCycle();};
+  $("bSet").onclick=function(){sigClose();openSettings();};
+}
+var TILE_ACT={
+  "Work board":function(){go("board");},"Lead store":function(){go("leads");},"Approvals":function(){go("queue");},
+  "Activity log":openLog,"Brand brains":function(){openSettings();setTimeout(function(){$("sBrand").focus();},60);},"Settings":openSettings,"Memory":function(){openSignal("memory");},
+  "Claude":function(){openBrain("claude");},"Gemini":function(){openBrain("gemini");},"Planner":function(){openBrain("planner");},"Voice (VANI)":function(){openVani();}
+};
+var FILE_ACT={"/brand-brain":function(){openSettings();},"/leads":function(){go("leads");},"/memory":function(){openSignal("memory");},
+  "/content":function(){openDept(2);},"/creative":function(){openDept(3);},"/social":function(){openDept(5);},"/conversation":function(){openDept(6);},"/reporting":function(){openDept(7);}};
+(function(){
+  var groups=["#record .tool","#brain .tool"],i,j;
+  for(j=0;j<groups.length;j++){ var t=document.querySelectorAll(groups[j]);
+    for(i=0;i<t.length;i++){ var lbl=t[i].textContent.trim(); if(!TILE_ACT[lbl])continue;
+      if(groups[j]==="#brain .tool"&&lbl==="Memory"){ t[i].setAttribute("data-tact","Memory"); }
+      t[i].classList.add("cl");t[i].setAttribute("role","button");t[i].setAttribute("tabindex","0");t[i].setAttribute("data-tact",lbl);
+      t[i].onclick=function(){TILE_ACT[this.getAttribute("data-tact")]();};
+      t[i].onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();this.onclick();}}; } }
+  var f=document.querySelectorAll("#files .file");
+  for(i=0;i<f.length;i++){ var nm=f[i].querySelector("b").textContent.trim(); if(!FILE_ACT[nm])continue;
+    f[i].classList.add("cl");f[i].setAttribute("role","button");f[i].setAttribute("tabindex","0");f[i].setAttribute("data-f",nm);
+    f[i].onclick=function(){FILE_ACT[this.getAttribute("data-f")]();};
+    f[i].onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();this.onclick();}}; }
+  /* department cards: focus + open their own panel */
+  var d=document.querySelectorAll(".dep");
+  for(i=0;i<d.length;i++){ d[i].onclick=function(){var ix=parseInt(this.getAttribute("data-d"),10);setFocus(ix,true);openDept(ix);}; }
+  /* orchestrator steps → explain + run */
+  var st=document.querySelectorAll("#steps .step");
+  for(i=0;i<st.length;i++){ st[i].classList.add("cl");st[i].setAttribute("role","button");st[i].setAttribute("tabindex","0");st[i].onclick=function(){openBrain("planner");}; }
+})();
 
 /* ---------------- render all ---------------- */
 function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();updateBrain();}
