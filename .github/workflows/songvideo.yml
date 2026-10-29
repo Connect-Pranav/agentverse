@@ -1,0 +1,56 @@
+name: SUNVERSE song → video (MCP renderer)
+
+# Renders songs queued through the sunverse-mcp server (mcp/). Stage 1 (free): Gemini listens and plans.
+# Stage 2 (paid images) runs only after the owner approves in chat (approve_song_job).
+# Repo secrets: GEMINI_API_KEY (billing on, for images), SV_MCP_TOKEN (= the Worker's MCP_TOKEN).
+# Repo variable: SV_MCP_URL (e.g. https://sunverse-mcp.pravanigroup.workers.dev). Nothing is published from here.
+
+on:
+  schedule:
+    - cron: '3,18,33,48 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: songvideo
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check configuration
+        id: cfg
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ] || [ -z "$SV_MCP_TOKEN" ] || [ -z "$SV_MCP_URL" ]; then
+            echo "GEMINI_API_KEY / SV_MCP_TOKEN secret or SV_MCP_URL variable missing — nothing to do."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install ffmpeg, fonts, Pillow
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-dejavu-core >/dev/null
+          python3 -m pip install --quiet pillow
+      - name: Process song jobs
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_TEXT_MODEL: ${{ vars.GEMINI_TEXT_MODEL }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
+          SONGVIDEO_IMAGE_ENGINE: ${{ vars.SONGVIDEO_IMAGE_ENGINE }}
+          SONGVIDEO_IMAGE_USD: ${{ vars.SONGVIDEO_IMAGE_USD }}
+        run: python3 scripts/songvideo-runner.py

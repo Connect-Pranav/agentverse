@@ -578,7 +578,7 @@ body.glass #sig .sbox{border-radius:28px}
 #immCards{position:absolute;left:50%;top:44%;transform-style:preserve-3d;transition:opacity .2s}
 .hcard{position:absolute;left:0;top:0;width:230px;height:300px;padding:20px;border-radius:18px;text-align:left;color:#e8eeff;pointer-events:auto;cursor:pointer;
   background:linear-gradient(160deg,rgba(190,215,255,.22),rgba(120,150,255,.06) 55%,rgba(255,255,255,.04));border:1px solid rgba(190,215,255,.45);
-  box-shadow:0 0 40px rgba(100,150,255,.25),inset 0 0 30px rgba(150,190,255,.12);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:10px;overflow:hidden;font-family:var(--fb);backface-visibility:visible}
+  box-shadow:0 0 40px rgba(100,150,255,.25),inset 0 0 30px rgba(150,190,255,.12);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:10px;overflow:hidden;font-family:var(--fb);backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .hcard .ht{display:flex;align-items:center;gap:8px;font:600 12px var(--fm);letter-spacing:.2em;color:#cfe0ff}
 .hcard b{font:700 46px/1 "Space Grotesk",var(--fb);margin-top:auto;text-shadow:0 0 24px rgba(140,180,255,.8)}
 .hcard small{font-size:12px;color:#b9c8f0;line-height:1.35}
@@ -1673,7 +1673,7 @@ function vmode(m){if(window.immMode)immMode(m);var v=$("vani");v.classList.remov
 function vmsg(cls,t){var d=document.createElement("div");d.className="vm "+cls;d.textContent=t;$("vlog").appendChild(d);$("vlog").scrollTop=$("vlog").scrollHeight;
   if(HAS_GSAP&&!REDUCED)gsap.from(d,{y:10,opacity:0,duration:.35,ease:"expo.out"});}
 function vsys(t){vmsg("s",t);}
-var VOICE_PREF=[/neerja.*natural/i,/swara.*natural/i,/aarti|ananya.*natural/i,/heera/i,/neerja/i,/swara/i,/kalpana/i,/veena/i,/lekha/i,/google\s*हिन्दी|google hindi/i,/india.*female|female.*india/i];
+var VOICE_PREF=[/neerja.*natural/i,/^lekha|^veena|^isha|^rishi/i,/swara.*natural/i,/aarti|ananya.*natural/i,/heera/i,/neerja/i,/swara/i,/kalpana/i,/veena/i,/lekha/i,/google\s*हिन्दी|google hindi/i,/india.*female|female.*india/i];
 function allVoices(){try{return window.speechSynthesis?speechSynthesis.getVoices():[];}catch(e){return [];}}
 function pickVoice(){
   var vs=allVoices(),i,j;
@@ -1693,9 +1693,13 @@ function fillVoices(){
   $("sVoice").innerHTML=h;$("sVoice").value=SET.voice||"auto";if(!$("sVoice").value)$("sVoice").value="auto";
 }
 function pickVoiceAutoName(){var keep=SET.voice;SET.voice="auto";var v=pickVoice();SET.voice=keep;return v?v.name:"";}
-var CUR_UTT=null, VOICE_UNLOCKED=false;
-function unlockVoice(){ if(VOICE_UNLOCKED||!window.speechSynthesis)return; VOICE_UNLOCKED=true; try{ var u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); speechSynthesis.getVoices(); }catch(e){} }
-document.addEventListener("pointerdown",unlockVoice,true); document.addEventListener("keydown",unlockVoice,true);
+var CUR_UTT=null, VOICE_UNLOCKED=false, IS_IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+/* iOS Safari only lets speech start from inside a real tap (touchend/click), so speak once there to unlock it */
+function unlockVoice(){
+  if(VOICE_UNLOCKED||!window.speechSynthesis)return;
+  try{ var u=new SpeechSynthesisUtterance(IS_IOS?"\u00a0":" "); u.volume=IS_IOS?0.01:0; u.rate=2; speechSynthesis.speak(u); speechSynthesis.getVoices(); VOICE_UNLOCKED=true; }catch(e){}
+}
+["touchend","click","keydown"].forEach(function(ev){ document.addEventListener(ev,unlockVoice,true); });
 function speak(t){
   if(!SET.speak||!window.speechSynthesis){ if(afterSpeak){var f0=afterSpeak;afterSpeak=null;setTimeout(f0,200);} else if(SET.convo)setTimeout(listen,300); else setTimeout(resumeWake,300); return; }
   try{
@@ -1707,9 +1711,10 @@ function speak(t){
     u.onboundary=function(ev){ immWord(t,ev.charIndex); };
     u.onend=function(){speaking=false;CUR_UTT=null;immCapEnd();vmode("");if(afterSpeak){var f=afterSpeak;afterSpeak=null;setTimeout(f,200);}else if(SET.convo&&vaniOpen())setTimeout(listen,250);else resumeWake();};
     u.onerror=function(ev){speaking=false;CUR_UTT=null;vmode("");if(ev&&ev.error&&ev.error!=="interrupted"&&ev.error!=="canceled"){vsys("Awaaz nahi chali ("+ev.error+"). Page par ek baar click karke dobara try karo.");if(IMM_ON)immShowText(t);}resumeWake();};
-    setTimeout(function(){ try{ speechSynthesis.resume(); speechSynthesis.speak(u); }catch(e){} },busyNow?120:30);
+    if(busyNow){ setTimeout(function(){ try{ speechSynthesis.resume(); speechSynthesis.speak(u); }catch(e){} },120); }
+    else { try{ speechSynthesis.resume(); speechSynthesis.speak(u); }catch(e){} }
     /* watchdog: if the browser never starts speaking, still show the reply visually */
-    setTimeout(function(){ if(!started&&CUR_UTT===u){ vsys("Browser ne awaaz block ki — page par ek baar click karo, phir VANI bolegi."); if(IMM_ON)immShowText(t); CUR_UTT=null; resumeWake(); } },2500);
+    setTimeout(function(){ if(!started&&CUR_UTT===u){ vsys(IS_IOS?"iPhone ne awaaz rok di. Silent switch off karo, volume badhao, aur ek baar mic ya Send button tap karo — phir VANI bolegi.":"Browser ne awaaz block ki — page par ek baar click karo, phir VANI bolegi."); if(IMM_ON)immShowText(t); CUR_UTT=null; VOICE_UNLOCKED=false; resumeWake(); } },IS_IOS?4000:2500);
   }catch(e){vmode("");if(IMM_ON)immShowText(t);}
 }
 function vsay(t,spoken){vmsg("a",t);VH.push("VANI: "+t);if(IMM_ON&&!(spoken&&SET.speak&&window.speechSynthesis))immShowText(t);if(spoken)speak(t);}
@@ -2317,7 +2322,8 @@ function immCardsTick(t){
   for(var i=0;i<n;i++){
     var a=(i/n)*6.283+t*0.18, R=mobile?150:Math.min(520,IMM.w*0.33), x=Math.sin(a)*R, z=Math.cos(a)*R, sc=0.62+0.38*((z/R)+1)/2;
     var blur=m*14+(1-((z/R)+1)/2)*1.5;
-    cs[i].style.transform="translate(-50%,-50%) translate3d("+x.toFixed(1)+"px,"+(Math.sin(t*0.8+i)*8-m*40).toFixed(1)+"px,"+z.toFixed(1)+"px) rotateY("+(a*57.3).toFixed(1)+"deg) scale("+(sc*(1-m*0.25)).toFixed(3)+")";
+    cs[i].style.transform="translate(-50%,-50%) translate3d("+x.toFixed(1)+"px,"+(Math.sin(t*0.8+i)*8-m*40).toFixed(1)+"px,"+z.toFixed(1)+"px) rotateY("+(Math.sin(a)*28).toFixed(1)+"deg) scale("+(sc*(1-m*0.25)).toFixed(3)+")";
+    cs[i].style.opacity=String(0.35+0.65*((z/R)+1)/2);
     cs[i].style.zIndex=String(1000+Math.round(z)); cs[i].style.filter="blur("+blur.toFixed(1)+"px)";
   }
 }

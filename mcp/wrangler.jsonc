@@ -1,0 +1,12 @@
+{
+  // SUNVERSE song → video MCP server. Deploy: Cloudflare → Workers → Import repository → agentverse,
+  // Root directory: mcp, Deploy command: npx wrangler deploy. Then add secret MCP_TOKEN in the dashboard.
+  "name": "sunverse-mcp",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "keep_vars": true,
+  // No id: Wrangler creates the KV namespace on the first deploy and keeps the binding afterwards.
+  "kv_namespaces": [{ "binding": "MEDIA" }],
+  "vars": { "SONGVIDEO_IMAGE_USD": "0.067" },
+  "observability": { "enabled": true }
+}
