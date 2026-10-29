@@ -6,11 +6,12 @@ const CFG = R("data/brands.json", null);
 if (!CFG) { console.log("no data/brands.json"); process.exit(0); }
 const LEADS = R("data/leads.json", { leads: [] }).leads || [];
 const WORK = R("data/work.json", { items: [], cycles: 0, topics: [] });
-const K = { groq: process.env.GROQ_API_KEY, gemini: process.env.GEMINI_API_KEY, openrouter: process.env.OPENROUTER_API_KEY };
+const K = { groq: process.env.GROQ_API_KEY, gemini: process.env.GEMINI_API_KEY, openrouter: process.env.OPENROUTER_API_KEY, cloud: process.env.SV_MCP_TOKEN };
+const CLOUD_URL = (process.env.SV_MCP_URL || "https://agentverse.pravanigroup.workers.dev").replace(/\/+$/, "");
 const DEPTS = ["Market Radar","Search Visibility","Content Engine","Creative Studio","Reviews & Reputation","Publishing & Social","Leads & Conversations","Results & Reporting"];
 const log = (...a) => console.log("[agent]", ...a);
 const uid = () => Math.random().toString(36).slice(2, 8);
-if (!K.groq && !K.gemini && !K.openrouter) { log("no AI key in repo secrets (GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY) — skipping"); process.exit(0); }
+if (!K.groq && !K.gemini && !K.openrouter && !K.cloud) { log("no brain: add repo secret SV_MCP_TOKEN (free AGENTVERSE cloud brain) or GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY — skipping"); process.exit(0); }
 
 // rotate brands: one brand per run
 const names = Object.keys(CFG.brands);
@@ -67,8 +68,14 @@ async function openrouter() {
   return { model, out: parse(r.choices[0].message.content) };
 }
 
+async function cloud() {
+  const r = await j(CLOUD_URL + "/api/brain", { method: "POST", headers: { Authorization: "Bearer " + K.cloud, "Content-Type": "application/json" },
+    body: JSON.stringify({ system: SYS + "\nReturn ONLY JSON.", prompt: USER }) });
+  return { model: "cloudflare/" + r.model, out: parse(r.text) };
+}
+
 let res, used;
-for (const [name, fn] of [["groq", groq], ["gemini", gemini], ["openrouter", openrouter]]) {
+for (const [name, fn] of [["groq", groq], ["gemini", gemini], ["openrouter", openrouter], ["cloud", cloud]]) {
   if (!K[name]) continue;
   try { res = await fn(); used = name; break; } catch (e) { log(name, "failed:", e.message.slice(0, 120)); }
 }

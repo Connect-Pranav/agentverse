@@ -13,6 +13,7 @@
     "run_worker_first": ["/mcp", "/mcp/*", "/api/*", "/u/*", "/sv/*", "/health"]
   },
   // No id: Wrangler creates the KV namespace on the first deploy and keeps the binding afterwards.
+  "ai": { "binding": "AI" },
   "kv_namespaces": [{ "binding": "MEDIA" }],
   "vars": { "SONGVIDEO_IMAGE_USD": "0.067" },
   "observability": { "enabled": true }

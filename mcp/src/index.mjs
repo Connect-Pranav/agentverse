@@ -183,6 +183,32 @@ function kick(env, ctx) {
   return true;
 }
 
+/* ---------------- AGENTVERSE cloud brain (Cloudflare Workers AI, free tier) ---------------- */
+const BRAIN_MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct-fast', '@cf/meta/llama-3.1-8b-instruct'];
+async function cloudBrain(env, a) {
+  if (!env.AI) throw new HttpError(503, 'Cloud brain is not enabled on this Worker (AI binding missing)');
+  const system = clean(a.system, 12_000), prompt = clean(a.prompt, 24_000);
+  if (!prompt) throw new HttpError(400, 'prompt is required');
+  // daily cap keeps it inside the free Workers AI allowance (no surprise spend)
+  const cap = Number(env.BRAIN_DAILY_CALLS) > 0 ? Number(env.BRAIN_DAILY_CALLS) : 150;
+  const key = `brain/usage/${new Date().toISOString().slice(0, 10)}`;
+  const used = Number(await kv(env).get(key)) || 0;
+  if (used >= cap) throw new HttpError(429, `Cloud brain daily limit reached (${cap} calls) — it resets at 05:30 IST`);
+  await kv(env).put(key, String(used + 1), { expirationTtl: 3 * 86400 });
+  // big model for the first calls of the day, then the small one (~6× fewer neurons) — stays under 10k neurons/day
+  const big = Number(env.BRAIN_BIG_CALLS) >= 0 && env.BRAIN_BIG_CALLS !== undefined ? Number(env.BRAIN_BIG_CALLS) : 40;
+  const models = a.quick || used >= big ? BRAIN_MODELS.slice(1) : BRAIN_MODELS;
+  let last;
+  for (const model of models) {
+    try {
+      const r = await env.AI.run(model, { messages: [{ role: 'system', content: system || 'You are a helpful assistant. Reply with JSON only.' }, { role: 'user', content: prompt }], max_tokens: a.quick ? 600 : 2200, temperature: 0.8 });
+      const text = typeof r?.response === 'string' ? r.response : JSON.stringify(r?.response ?? r ?? '');
+      if (text && text !== '""') return { text, model: model.replace('@cf/', ''), used: used + 1, cap };
+    } catch (e) { last = e; console.error('brain', model, e?.message); }
+  }
+  throw new HttpError(502, `Cloud brain failed: ${String(last?.message ?? 'no answer').slice(0, 160)}`);
+}
+
 /* ---------------- runner API ---------------- */
 const runnerView = (j) => ({ id: j.id, title: j.title, style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb) });
 async function claim(env) {
@@ -418,7 +444,7 @@ async function route(request, env) {
   const method = request.method;
   const len = Number(request.headers.get('content-length') ?? 0);
 
-  if (path === '/health') return json({ ok: true, app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN) });
+  if (path === '/health') return json({ ok: true, app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI) });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1]);
   if (seg[0] === 'u' && seg[1]) {
@@ -428,6 +454,7 @@ async function route(request, env) {
     if (method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctxOf(request)); return json(view(env, request, r)); }
     throw new HttpError(405, 'Use GET or PUT');
   }
+  if (path === '/api/brain' && method === 'POST') { owner(request, env); return json(await cloudBrain(env, await readJson(request, 64 * 1024))); }
   // Owner REST (AGENTVERSE dashboard → Song Studio), same token as MCP
   if (seg[0] === 'api' && seg[1] === 'songvideo' && seg[2] !== 'runner') {
     owner(request, env);

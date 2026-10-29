@@ -655,6 +655,15 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
 @media(prefers-reduced-motion:reduce){.mt-step.on,.mt-dot{animation:none}}
 #mcpTile .ph h3 i{display:inline-block!important}
 .mt-vid{max-width:560px;display:block}
+/* MCP tile inside the right column (above Agent in Focus) */
+#mcpTile.in-col{margin:0;position:relative;z-index:2}
+#mcpTile.in-col .mt-grid{grid-template-columns:1fr;gap:12px}
+#mcpTile.in-col .mt-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
+#mcpTile.in-col .mt-info{grid-template-columns:1fr}
+#mcpTile.in-col .mt-drop{min-height:84px;padding:12px}
+#mcpTile.in-col>.sub,#mcpTile.in-col .mcpt>.sub{display:none}
+#mcpTile.in-col .mt-vid{max-width:100%}
+.wrap>.col:nth-child(5){display:flex;flex-direction:column;gap:14px}
 
 </style>
 </head>
@@ -752,6 +761,28 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
   </div>
 
   <div class="col">
+<section class="board stage in-col" id="mcpTile">
+  <div class="panel mcpt">
+    <div class="ph"><h3><i>MCP</i>Song &rarr; Video &middot; Sunverse</h3><span class="badge" id="mtBadge">CHECKING</span></div>
+    <div class="sub">Upload a song &rarr; Gemini reads its mood, theme and lyrics &rarr; Gemini makes the images &rarr; the video is built with your logo intro and credits &rarr; it goes on YouTube when you say post.</div>
+    <div class="mt-grid">
+      <div class="mt-up">
+        <label class="mt-drop" id="mtDrop"><input id="mtFile" type="file" accept="audio/*,.mp3,.m4a,.wav"><span data-i="upload"></span><b id="mtFileName">Tap to choose your MP3</b><small>or drop it here &middot; MP3, M4A or WAV &middot; max 24 MB</small></label>
+        <input id="mtTitle" placeholder="Song title (optional)" aria-label="Song title">
+        <details class="mt-more"><summary>Lyrics, style &amp; credits (optional)</summary>
+          <textarea id="mtLyrics" placeholder="Lyrics in English letters, one line per row (better caption timing)" aria-label="Lyrics"></textarea>
+          <input id="mtStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text" aria-label="Visual style">
+          <div class="mt-two"><input id="mtLyr" value="COCO" aria-label="Lyrics by"><input id="mtSing" value="KoBhit" aria-label="Singer"></div>
+        </details>
+        <div class="mt-tok" id="mtTok"><input id="mtTokIn" type="password" autocomplete="off" placeholder="AGENTVERSE token (MCP_TOKEN)" aria-label="AGENTVERSE token"><button id="mtTokSave" type="button">Save</button></div>
+        <button class="btnp" id="mtGo" type="button">Upload &amp; start</button>
+        <div class="stu-bar"><i id="mtBar"></i></div>
+        <div class="sub" id="mtMsg" aria-live="polite"></div>
+      </div>
+      <div class="mt-job" id="mtJob" aria-live="polite"><div class="empty"><b>No song yet.</b><br>Upload an MP3 and the live progress shows here.</div></div>
+    </div>
+  </div>
+</section>
     <section class="panel focus" id="pFocus" aria-live="polite">
       <div class="fk"><div class="k">AGENT IN FOCUS</div><div class="topic" id="topic">TOPIC · —</div></div>
       <h2 id="focusName">Orchestrator</h2>
@@ -795,29 +826,6 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
       </div>
     </div>
     <div class="cards" id="cards"></div>
-  </div>
-</section>
-
-<section class="board stage" id="mcpTile">
-  <div class="panel mcpt">
-    <div class="ph"><h3><i>MCP</i>Song &rarr; Video &middot; Sunverse</h3><span class="badge" id="mtBadge">CHECKING</span></div>
-    <div class="sub">Upload a song &rarr; Gemini reads its mood, theme and lyrics &rarr; Gemini makes the images &rarr; the video is built with your logo intro and credits &rarr; it goes on YouTube when you say post.</div>
-    <div class="mt-grid">
-      <div class="mt-up">
-        <label class="mt-drop" id="mtDrop"><input id="mtFile" type="file" accept="audio/*,.mp3,.m4a,.wav"><span data-i="upload"></span><b id="mtFileName">Tap to choose your MP3</b><small>or drop it here &middot; MP3, M4A or WAV &middot; max 24 MB</small></label>
-        <input id="mtTitle" placeholder="Song title (optional)" aria-label="Song title">
-        <details class="mt-more"><summary>Lyrics, style &amp; credits (optional)</summary>
-          <textarea id="mtLyrics" placeholder="Lyrics in English letters, one line per row (better caption timing)" aria-label="Lyrics"></textarea>
-          <input id="mtStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text" aria-label="Visual style">
-          <div class="mt-two"><input id="mtLyr" value="COCO" aria-label="Lyrics by"><input id="mtSing" value="KoBhit" aria-label="Singer"></div>
-        </details>
-        <div class="mt-tok" id="mtTok"><input id="mtTokIn" type="password" autocomplete="off" placeholder="AGENTVERSE token (MCP_TOKEN)" aria-label="AGENTVERSE token"><button id="mtTokSave" type="button">Save</button></div>
-        <button class="btnp" id="mtGo" type="button">Upload &amp; start</button>
-        <div class="stu-bar"><i id="mtBar"></i></div>
-        <div class="sub" id="mtMsg" aria-live="polite"></div>
-      </div>
-      <div class="mt-job" id="mtJob" aria-live="polite"><div class="empty"><b>No song yet.</b><br>Upload an MP3 and the live progress shows here.</div></div>
-    </div>
   </div>
 </section>
 
@@ -1034,6 +1042,8 @@ var HAS_GSAP = typeof gsap!=="undefined";
 
 /* ---------------- state ---------------- */
 var SET = lsGet("agentverse_settings")||{}; for (var k in DEF_SET){ if(SET[k]===undefined) SET[k]=DEF_SET[k]; }
+/* one-time: team works by default (owner can still switch Autopilot off; that choice is kept) */
+if(!SET.apDefault){ SET.apDefault=1; SET.autopilot=true; lsSet("agentverse_settings",SET); }
 if(/^gemini-(1\.5|2\.0|2\.5)/.test(SET.gmodel||""))SET.gmodel="auto"; /* retired names → auto-discover */
 var ST = {notes:[],yt:null,ig:{},localLeads:[],brand:"Foliocraft",brands:clone(DEFAULT_BRANDS),memory:["Never invent prices, numbers or testimonials.","Lead replies must be helpful first; no spam, no hard sell."],feedback:[],outputs:[],leadState:{},stats:{topics:0,drafts:0},cycles:0,lastTopics:[]};
 function mergeState(v){ if(!v||typeof v!=="object")return; for(var k in v){ if(v.hasOwnProperty(k)) ST[k]=v[k]; } if(!ST.brands[ST.brand]){ for(var b in ST.brands){ST.brand=b;break;} } }
@@ -1071,23 +1081,24 @@ if (window.claude && typeof window.claude.use==="function"){
 
 /* ---------------- brain ---------------- */
 /* ---------------- multi-brain with live model discovery + automatic fallback ---------------- */
-var BRAIN_NAMES={ganesha:"Ganesha keys",claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",free:"Free AI",none:"not connected",rules:"rules"};
+var BRAIN_NAMES={ganesha:"Ganesha keys",claude:"Claude",groq:"Groq",gemini:"Gemini",openrouter:"OpenRouter",free:"Free AI",cloud:"AGENTVERSE Cloud",none:"not connected",rules:"rules"};
 var LAST_BRAIN="", LAST_MODEL="";
 function chain(){
   var p=SET.provider,c=[];
   function add(x){ if(c.indexOf(x)<0)c.push(x); }
-  var ok={ganesha:!!ganeshaToken(),claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey,free:SET.freeAI===true};
+  var ok={ganesha:!!ganeshaToken(),claude:!!SAMPLE,groq:!!SET.groqKey,gemini:!!SET.gkey,openrouter:!!SET.orKey,cloud:cloudOk(),free:SET.freeAI===true};
   if(p!=="auto"&&ok[p])add(p);
-  var order=["ganesha","claude","groq","gemini","openrouter","free"];
+  var order=["ganesha","claude","groq","gemini","openrouter","cloud","free"];
   for(var i=0;i<order.length;i++){ if(ok[order[i]])add(order[i]); }
   return c;
 }
 function provider(){ return chain()[0]||"none"; }
+function cloudOk(){ return typeof STU!=="undefined"&&!!STU&&!!STU.backend&&!!(STU.health&&STU.health.brain)&&!!SET.mcpToken; }
 function updateBrain(){
   var c=chain(),p=c[0]||"none",name=BRAIN_NAMES[p];
   $("brainName").innerHTML=esc(LAST_BRAIN&&c.indexOf(LAST_BRAIN)>=0?BRAIN_NAMES[LAST_BRAIN]:name); $("brainChip").className="brainchip"+(p==="none"?" demo":"");
   $("brainChip").title=LAST_MODEL?("Model: "+LAST_MODEL):"Which AI brain the agents use";
-  $("brainNote").innerHTML = p==="none" ? "<b>No AI brain connected.</b> Settings mein free Groq key (console.groq.com/keys) ya Gemini key daalo — agents turant kaam shuru kar denge." :
+  $("brainNote").innerHTML = p==="none" ? "<b>No AI brain connected.</b> Cloudflare link par MCP tile mein apna AGENTVERSE token daalo (free cloud brain), ya Settings mein free Groq/Gemini key — agents turant kaam shuru kar denge." :
     "Brain chain: <b>"+c.map(function(x){return BRAIN_NAMES[x];}).join(" → ")+"</b>. If one fails, the next takes over automatically."+(LAST_MODEL?" Now: "+esc(LAST_MODEL)+".":"");
   if(SERVER&&SERVER.updated) $("brainNote").innerHTML+=" · 24/7 agent last ran "+ago(Date.parse(SERVER.updated))+" ago ("+esc((SERVER.last&&SERVER.last.brain)||"")+").";
   var note=$("sProvNote"); if(note) note.innerHTML = "Order now: <b>"+(c.length?c.map(function(x){return BRAIN_NAMES[x];}).join(" → "):"none — add a key")+"</b>"+(SAMPLE?"":" · Claude works only inside claude.ai");
@@ -1186,8 +1197,13 @@ function ganeshaChat(system,user,opts){
       if(!r.ok){ var e=new Error("Ganesha "+r.status+": "+((j&&j.error)||t).toString().slice(0,160)); e.status=r.status; e.code=r.status===429?"rate_limited":(r.status===401?"auth":"error"); throw e; }
       LAST_MODEL=(j.provider||"")+" · "+(j.model||""); return j.json||parseJSON(j.text); }); });
 }
+function cloudChat(system,user,opts){
+  return fetch("/api/brain",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json",Authorization:"Bearer "+SET.mcpToken},body:JSON.stringify({system:system+"\nReturn ONLY one JSON object.",prompt:user,quick:!!opts.quick})})
+    .then(function(r){ return r.text().then(function(t){ var j={}; try{j=JSON.parse(t);}catch(e){} if(!r.ok){ var e=new Error("Cloud "+r.status+": "+((j&&j.error)||t).slice(0,140)); e.status=r.status; e.code=r.status===429?"rate_limited":"error"; throw e; } LAST_MODEL=j.model+" · "+j.used+"/"+j.cap+" today"; return parseJSON(j.text); }); });
+}
 function callBrain(p,system,user,opts){
   if(p==="ganesha")return ganeshaChat(system,user,opts);
+  if(p==="cloud")return cloudChat(system,user,opts);
   if(p==="free")return freeChat(system,user,opts);
   if(p==="claude"){
     return SAMPLE([{role:"user",content:system+"\n\n"+user+"\n\nReturn ONLY one valid JSON object, nothing else."}],{cache:false,modelTier:opts.quick?"quick":"default"})
@@ -1266,7 +1282,7 @@ function brandCtx(extraLead){
 }
 var ORCH_SYS = "You are the ORCHESTRATOR of AGENTVERSE, an autonomous AI social media and growth team working for the owner. Decide what the team works on next for ONE brand. Use the brand brain, follow the owner rules strictly, learn from owner feedback, and avoid repeating recent topics. Departments: "+DEPNAMES.join(", ")+". Respond with JSON: {\"topic\":\"max 8 words\",\"why\":\"max 20 words\",\"tasks\":[{\"dept\":\"exact department name\",\"task\":\"max 25 words\",\"lead_id\":\"id or null\"}]} with 3 to 5 tasks. If FRESH LEADS exist, add one 'Leads & Conversations' task per lead (max 2) with its lead_id.";
 var DEPT_SYS = "You are the department agents of AGENTVERSE. For every task in the PLAN, produce the finished deliverable the owner can use right away: e.g. a post caption with hashtags, a 30-second reel script in 3 scenes, a YouTube title + description + tags, a comment reply, a reply message to a lead, SEO keywords, or a short learning note. Write in the brand voice. Never invent facts, prices, numbers, results or testimonials; use [placeholders] instead. Replies to leads must answer the person's actual need first, be short, human and non-spammy, and mention the product only where it truly helps. Respond with JSON: {\"items\":[{\"dept\":\"department name\",\"title\":\"max 10 words\",\"body\":\"max 150 words\",\"needs_approval\":true or false,\"lead_id\":\"id or null\"}],\"summary\":\"max 20 words, what the team learned or did\"}. needs_approval must be true for anything that would be published or sent to a person.";
-var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice with the owner, "+CONFIG.owner+". Reply in natural spoken Hinglish (Hindi in Roman script mixed with English), 1 to 3 short sentences, no markdown, no emojis, no lists, no ids read aloud unless asked. You can control AGENTVERSE by adding actions: approve {id}, reject {id, reason}, run_cycle {value: optional focus text}, autopilot {value: true or false}, set_brand {value: brand name}, remember {value: a rule the team must follow}, draft_lead {id}, open_board {value: waiting|ready|all|leads}, open_link {value: youtube|instagram|ganesha|github|gmail|alerts}. Take an action only when the owner clearly asks for it; for 'approve all' add one approve per waiting id. Answer questions from STATE honestly; if something isn't in STATE say you don't know. Respond with JSON: {\"reply\":\"what you say\",\"actions\":[{\"type\":\"...\",\"id\":\"...\",\"value\":\"...\",\"reason\":\"...\"}]}";
+var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice with the owner, "+CONFIG.owner+". Reply in natural spoken Hinglish (Hindi in Roman script mixed with English), 1 to 3 short sentences, no markdown, no emojis, no lists, no ids read aloud unless asked. You can control AGENTVERSE by adding actions: approve {id}, reject {id, reason}, run_cycle {value: optional focus text}, autopilot {value: true or false}, set_brand {value: brand name}, remember {value: a rule the team must follow}, draft_lead {id}, open_board {value: waiting|ready|all|leads}, open_link {value: youtube|instagram|ganesha|github|gmail|alerts}, open_mcp {} (opens the MCP song-to-video tile: upload a song, see progress, approve, post to YouTube), approve_song {id: song job_id} (only when the owner clearly says approve the song), post_song {id: song job_id, value: public|unlisted|private} (only when the owner clearly says post it on YouTube). STATE lists the MCP song jobs. Take an action only when the owner clearly asks for it; for 'approve all' add one approve per waiting id. Answer questions from STATE honestly; if something isn't in STATE say you don't know. Respond with JSON: {\"reply\":\"what you say\",\"actions\":[{\"type\":\"...\",\"id\":\"...\",\"value\":\"...\",\"reason\":\"...\"}]}";
 
 /* ---------------- demo brain (no AI) ---------------- */
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
@@ -1280,6 +1296,7 @@ function ruleBrain(opts){
     if(/start|chalu|autopilot|on kar/.test(x))return {reply:"Autopilot chalu. Team khud kaam karegi.",actions:[{type:"autopilot",value:true}]};
     if(/cycle|naya|run|post bana|content/.test(x))return {reply:"Chalo, naya cycle chala rahi hoon "+ST.brand+" ke liye.",actions:[{type:"run_cycle"}]};
     for(var bn in ST.brands){ if(x.indexOf(bn.toLowerCase().split(" ")[0])>=0)return {reply:bn+" par switch kar diya.",actions:[{type:"set_brand",value:bn}]}; }
+    if(/\bmcp\b|song studio|song video|gaana|song upload/.test(x))return {reply:"MCP tile khol diya. Yahan song upload karo, progress aur time wahi dikhega.",actions:[{type:"open_mcp"}]};
     var lk=x.match(/youtube|sunverse|instagram|littleloop|little loop|ganesha|github|repo|gmail|alerts/);
     if(lk&&/open|khol|dikha|chalao|jao/.test(x))return {reply:"Ye raha link, tap karke khol lo.",actions:[{type:"open_link",value:lk[0]}]};
     if(/^(hi|hello|hey|namaste)/.test(x))return {reply:"Namaste "+CONFIG.owner+"! Bolo kya karna hai?",actions:[]};
@@ -1404,7 +1421,7 @@ function depState(i,on,txt){
     b.className="badge run";b.innerHTML="WORKING";card.classList.add("active");
     if(HAS_GSAP&&!REDUCED){gsap.killTweensOf(bar);gsap.fromTo(bar,{scaleX:0},{scaleX:.85,duration:6,ease:"power1.out"});}
   }else{
-    b.className="badge done";b.innerHTML="DONE";card.classList.remove("active");
+    b.className="badge done";b.innerHTML="DONE";b.setAttribute("data-t",Date.now());card.classList.remove("active");
     if(HAS_GSAP&&!REDUCED){gsap.killTweensOf(bar);gsap.to(bar,{scaleX:1,duration:.4});}
   }
 }
@@ -1552,6 +1569,20 @@ function runCycle(focus){
 }
 function learnSummary(s){ addTerm([["w","learned: "+String(s).slice(0,70)]]); }
 
+/* idle departments say why they are idle and when they start next */
+function depIdle(){
+  var p=provider(),lbl,cls="badge done",wait=0;
+  if(p==="none"){ lbl="NO BRAIN"; cls="badge"; }
+  else if(paused){ lbl="PAUSED"; }
+  else if(!autopilot){ lbl="TAP RUN"; }
+  else { var gap=Math.max(p==="free"?10:(p==="cloud"?45:2),+SET.interval||30)*60000; wait=Math.max(0,lastCycle+gap-Date.now()); lbl=busy?"QUEUED":(wait<60000?"STARTING":"NEXT "+Math.ceil(wait/60000)+"m"); }
+  for(var i=0;i<DEPS.length;i++){ var b=$("db"+i); if(!b)continue; var h=b.innerHTML;
+    if(h==="WORKING")continue;
+    if(h==="DONE"&&Date.now()-(+b.getAttribute("data-t")||0)<120000)continue;
+    if(h!==lbl){ b.innerHTML=lbl; b.className=cls; }
+    b.title=p==="none"?"Connect a brain: AGENTVERSE token in the MCP tile, or a Groq/Gemini key in Settings":(autopilot?"Autopilot is on":"Autopilot is off — tap Run or switch Autopilot on"); }
+}
+setInterval(depIdle,5000); setTimeout(depIdle,1500);
 /* autopilot scheduler */
 function setAutopilot(on){
   if(on&&provider()==="none"){ toast("Pehle AI brain connect karo (Settings → Groq key)",false); vsys("Autopilot ke liye AI brain chahiye. Settings mein free Groq key daalo."); openSettings(); on=false; }
@@ -1562,7 +1593,7 @@ setInterval(function(){
   if(!autopilot||busy||paused)return;
   var hourAgo=Date.now()-3600000; cycleTimes=cycleTimes.filter(function(t){return t>hourAgo;});
   if(provider()==="none")return;
-  var gap=Math.max(provider()==="free"?10:2,+SET.interval||30)*60000;
+  var gap=Math.max(provider()==="free"?10:(provider()==="cloud"?45:2),+SET.interval||30)*60000;
   var max=Math.max(1,+SET.maxHour||4);
   if(Date.now()-lastCycle>=gap&&cycleTimes.length<max)runCycle();
 },5000);
@@ -1838,8 +1869,14 @@ function openLink(k){
   var d=document.createElement("div");d.className="vm a";d.innerHTML='<a href="'+L[1]+'" target="_blank" rel="noopener" style="color:inherit;font-weight:600">'+icon("external-link")+' '+esc(L[0])+'</a>';
   $("vlog").appendChild(d);$("vlog").scrollTop=$("vlog").scrollHeight;
 }
+function mcpSummary(){
+  if(typeof STU==="undefined"||!STU.backend)return " MCP song studio: runs on the Cloudflare link "+SV_CF+".";
+  if(!SET.mcpToken)return " MCP song studio: token not entered yet.";
+  if(!STU.jobs.length)return " MCP song jobs: none yet.";
+  return " MCP song jobs: "+STU.jobs.slice(0,5).map(function(j){var e=svEta(j);return j.job_id+" '"+((j.youtube&&j.youtube.title)||j.title||"untitled")+"' = "+(j.publish?"youtube "+j.publish.state:j.status)+(e.s?" (~"+Math.ceil(e.s/60)+" min left)":"")+(j.status==="needs_approval"?" needs approval, est "+(j.est_cost_inr?"Rs "+j.est_cost_inr:"$"+j.est_cost_usd):"");}).join("; ")+".";
+}
 function stateSummary(){
-  var w=waiting(),i,s="Active brand: "+ST.brand+". Brands: "+Object.keys(ST.brands).join(", ")+". Autopilot: "+(autopilot?"on":"off")+". Brain: "+provider()+". Cycles done: "+ST.cycles+". Ready to post: "+readyCount()+".";
+  var w=waiting(),i,s=mcpSummary()+" Active brand: "+ST.brand+". Brands: "+Object.keys(ST.brands).join(", ")+". Autopilot: "+(autopilot?"on":"off")+". Brain: "+provider()+". Cycles done: "+ST.cycles+". Ready to post: "+readyCount()+".";
   s+="\nWAITING FOR OWNER ("+w.length+"):";for(i=0;i<w.length&&i<8;i++){s+="\n- id "+w[i].id+" | "+w[i].brand+" | "+w[i].dept+" | "+w[i].title+" | "+w[i].body.slice(0,140).replace(/\s+/g," ");}
   s+="\nLATEST OUTPUTS:";for(i=0;i<ST.outputs.length&&i<5;i++){s+="\n- "+ST.outputs[i].status+" | "+ST.outputs[i].title;}
   var L=brandLeads();s+="\nFRESH LEADS for "+ST.brand+" ("+L.length+" of "+freshCount()+" total):";for(i=0;i<L.length&&i<5;i++){s+="\n- id "+L[i].id+" | "+L[i].source+" | score "+(L[i].score||0)+" | "+String(L[i].title).slice(0,90);}
@@ -1868,6 +1905,8 @@ function doActions(acts){
     else if(t==="remember"&&a.value){ST.memory.push(String(a.value).slice(0,200));save();addTerm([["","✓ memory.add(rule)"]]);}
     else if(t==="draft_lead")draftLead(a.id);
     else if(t==="open_link")openLink(a.value||a.id);
+    else if(t==="open_mcp")go("studio");
+    else if((t==="approve_song"||t==="post_song")&&a.id&&SET.mcpToken)stuApi("POST","/api/songvideo/"+a.id+"/"+(t==="approve_song"?"approve":"publish"),t==="post_song"?{privacy:/^(public|unlisted|private)$/.test(a.value)?a.value:"public"}:{}).then(function(){toast(t==="approve_song"?"Song approved":"Posting to YouTube…",true);stuLoad();},function(e){vsys("MCP: "+e.message);});
     else if(t==="open_board"){var ov=a.value||"waiting"; if(ov==="leads")go("leads"); else {VIEWS.work.tab=ov; switchView("work"); if(VIEW==="work"){boardTab=ov;renderBoard();}}}
   }
 }
@@ -1942,7 +1981,9 @@ function applyView(v){
   for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
   $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
   /* each page has its own panel: Work = work board only, Leads = lead radar only */
-  if(v==="studio")stuLoad();
+  var mt=$("mcpTile"),fc=$("pFocus").parentNode;
+  if(v==="studio"){ if(mt.nextElementSibling!==$("studio"))$("studio").parentNode.insertBefore(mt,$("studio")); mt.classList.remove("in-col"); stuLoad(); }
+  else if(mt.parentNode!==fc){ fc.insertBefore(mt,$("pFocus")); mt.classList.add("in-col"); }
   if(v==="work"){ $("boardTitle").innerHTML="Work Board"; $("tabs").style.display=""; $("tabLeads").style.display="none"; if(boardTab==="leads")boardTab="waiting"; }
   else if(v==="leads"){ $("boardTitle").innerHTML="Lead Radar"; $("tabs").style.display="none"; }
   if(V.tab){boardTab=V.tab;renderBoard._tab=null;renderBoard();}
@@ -2482,7 +2523,7 @@ var STU_LABEL={uploading:"waiting for upload",queued:"queued",analyzing:"Gemini 
 var SV_CF="https://agentverse.pravanigroup.workers.dev";
 function stuProbe(cb){
   if(STU.backend!==null){cb(STU.backend);return;}
-  fetch("/health",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){STU.backend=!!(j&&j.songStudio);STU.health=j||{};cb(STU.backend);}).catch(function(){STU.backend=false;cb(false);});
+  fetch("/health",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){STU.backend=!!(j&&j.songStudio);STU.health=j||{};updateBrain();if(SET.autopilot&&!autopilot&&provider()!=="none")setAutopilot(true);cb(STU.backend);}).catch(function(){STU.backend=false;cb(false);});
 }
 function stuApi(method,path,body){
   return fetch(path,{method:method,cache:"no-store",headers:{"Content-Type":"application/json",Authorization:"Bearer "+SET.mcpToken},body:body?JSON.stringify(body):undefined})
@@ -2632,7 +2673,7 @@ $("mtFile").onchange=function(){ mtPick(this.files&&this.files[0]); };
 ["dragenter","dragover"].forEach(function(ev){ $("mtDrop").addEventListener(ev,function(e){e.preventDefault();$("mtDrop").classList.add("on");}); });
 $("mtDrop").addEventListener("dragleave",function(){ if(!STU.file)$("mtDrop").classList.remove("on"); });
 $("mtDrop").addEventListener("drop",function(e){ e.preventDefault(); mtPick(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]); });
-$("mtTokSave").onclick=function(){ var t=$("mtTokIn").value.replace(/\s+/g,""); if(!t){toast("Paste the token first",false);return;} SET.mcpToken=t; saveSet(); $("mtTokIn").value=""; toast("Token saved in this browser",true); stuLoad(); };
+$("mtTokSave").onclick=function(){ var t=$("mtTokIn").value.replace(/\s+/g,""); if(!t){toast("Paste the token first",false);return;} SET.mcpToken=t; saveSet(); $("mtTokIn").value=""; toast("Token saved in this browser",true); updateBrain(); if(SET.autopilot&&!autopilot&&provider()!=="none")setAutopilot(true); stuLoad(); };
 $("mtGo").onclick=function(){
   var f=STU.file; if(!f){toast("Choose an MP3 first",false);return;}
   if(f.size>24*1024*1024){toast("File is over 24 MB — export a 192 kbps MP3",false);return;}

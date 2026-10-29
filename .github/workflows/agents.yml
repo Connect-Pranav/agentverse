@@ -1,7 +1,7 @@
 name: AGENTVERSE 24/7 agents
 on:
   schedule:
-    - cron: "41 */3 * * *"   # every 3 hours, one brand per run (rotates)
+    - cron: "41 */2 * * *"   # every 2 hours, one brand per run (rotates)
   workflow_dispatch:
     inputs:
       brand:
@@ -25,6 +25,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
           BRAND: ${{ github.event.inputs.brand }}
       - name: Save work
         run: |
