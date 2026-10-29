@@ -436,6 +436,21 @@ body.glass .gnav button.on{background:transparent}
 body.glass .dock button.on{color:#1d1510}
 #settings{transition:none}
 
+/* ===== page views + video-style transition ===== */
+.view-hide{display:none!important}
+.wrap.v-agents{grid-template-columns:1.5fr 1fr}
+.wrap.v-agents>.col:nth-child(2),.wrap.v-agents>.col:nth-child(3){display:none}
+.panel>*{transition:opacity .5s cubic-bezier(.22,1,.36,1),filter .55s cubic-bezier(.22,1,.36,1)}
+.panel.skel>*{opacity:0;filter:blur(10px)}
+body.glass .panel.skel{background:linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.05))}
+.stage{transition:filter .35s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1)}
+.stage.out{filter:blur(22px);opacity:.0}
+.vtitle{display:none;font:700 26px var(--fb);letter-spacing:-.02em;margin:18px 24px -4px 92px;position:relative;z-index:2}
+body.glass .vtitle{display:block}
+.vtitle small{display:block;font:400 12px var(--fb);color:var(--mut);margin-top:2px}
+@media(max-width:1350px){.vtitle{margin-left:84px}.wrap.v-agents{grid-template-columns:1fr}}
+@media(max-width:760px){.vtitle{margin-left:12px;font-size:22px}}
+
 </style>
 </head>
 <body>
@@ -471,7 +486,8 @@ body.glass .dock button.on{color:#1d1510}
 </header>
 <div class="ticker" aria-hidden="true"><div class="tr" id="ticker"></div></div>
 
-<div class="wrap" id="wrap">
+<div class="vtitle" id="vtitle">Good evening, Pranav<small id="vsub">Your agent team at a glance</small></div>
+<div class="wrap stage" id="wrap">
   <svg id="wires" aria-hidden="true"><defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g id="wireBase"></g><g id="wireFx"></g></svg>
 
   <div class="col">
@@ -552,8 +568,8 @@ body.glass .dock button.on{color:#1d1510}
   </div>
 </div>
 
-<div class="loop" id="loop"><i id="ld1"></i><i id="ld2"></i><span>RESULTS FEED SIGNALS AGAIN</span></div>
-<div class="legend">
+<div class="loop stage" id="loop"><i id="ld1"></i><i id="ld2"></i><span>RESULTS FEED SIGNALS AGAIN</span></div>
+<div class="legend stage" id="legend">
   <span style="--c:#fff">Work flow</span>
   <span style="--c:#ff3d7f">Feedback loop</span>
   <span class="d" style="--c:#8b6cff">Human control</span>
@@ -561,7 +577,7 @@ body.glass .dock button.on{color:#1d1510}
   <span class="d" style="--c:#f5a623">Safety net</span>
 </div>
 
-<section class="board" id="board">
+<section class="board stage view-hide" id="board">
   <div class="panel">
     <div class="bhead">
       <div class="ph"><h3><i>06</i>Work Board &amp; Lead Radar</h3></div>
@@ -922,8 +938,8 @@ fill("signals",SIGNALS);fill("record",RECORD);fill("brain",BRAIN);
 function doCtrl(a){
   if(a==="settings"){openSettings();}
   else if(a==="memory"){openSettings();setTimeout(function(){$("memAdd").focus();},50);}
-  else if(a==="queue"){boardTab="waiting";renderBoard();$("board").scrollIntoView({behavior:"smooth"});}
-  else if(a==="leads"){boardTab="leads";renderBoard();$("board").scrollIntoView({behavior:"smooth"});}
+  else if(a==="queue"){go("queue");}
+  else if(a==="leads"){go("leads");}
   else if(a==="kill"){setAutopilot(false);toast("Kill switch: autopilot stopped",false);addTerm([["p","⛔ kill_switch() → all agents idle"]]);}
 }
 
@@ -960,7 +976,8 @@ function drawWires(){
   var g=$("wireBase");g.innerHTML="";
   if(window.innerWidth<=1350)return;
   for(var i=0;i<EDGES.length;i++){
-    var e=EDGES[i],p=document.createElementNS(SVGNS,"path");
+    var e=EDGES[i]; if(!$(e[0]).offsetParent||!$(e[1]).offsetParent)continue;
+    var p=document.createElementNS(SVGNS,"path");
     p.setAttribute("d",pathD(e[0],e[1]));p.setAttribute("class","base");p.setAttribute("stroke",e[2]);if(e[3])p.setAttribute("stroke-dasharray",e[3]);
     g.appendChild(p);
   }
@@ -968,7 +985,7 @@ function drawWires(){
 function pulse(from,to,color){
   if(window.innerWidth<=1350||!HAS_GSAP||REDUCED||paused)return;
   var a=NODE[from]||from,b=NODE[to]||to;
-  if(!$(a)||!$(b)||a===b)return;
+  if(!$(a)||!$(b)||a===b||!$(a).offsetParent||!$(b).offsetParent)return;
   var fx=$("wireFx"),p=document.createElementNS(SVGNS,"path");p.setAttribute("d",pathD(a,b));p.setAttribute("class","flash");p.setAttribute("stroke",color);fx.appendChild(p);
   var L=p.getTotalLength();p.style.strokeDasharray=L;p.style.strokeDashoffset=L;
   var c=document.createElementNS(SVGNS,"circle");c.setAttribute("r","5");c.setAttribute("fill",color);fx.appendChild(c);
@@ -1400,7 +1417,7 @@ function doActions(acts){
     else if(t==="set_brand"){var ok=setBrand(a.value);if(!ok){for(var b in ST.brands){if(b.toLowerCase().indexOf(String(a.value).toLowerCase())>=0){setBrand(b);break;}}}}
     else if(t==="remember"&&a.value){ST.memory.push(String(a.value).slice(0,200));save();addTerm([["","✓ memory.add(rule)"]]);}
     else if(t==="draft_lead")draftLead(a.id);
-    else if(t==="open_board"){boardTab=a.value||"waiting";renderBoard();$("board").scrollIntoView({behavior:"smooth"});}
+    else if(t==="open_board"){var ov=a.value||"waiting"; if(ov==="leads")go("leads"); else {VIEWS.work.tab=ov; switchView("work"); if(VIEW==="work"){boardTab=ov;renderBoard();}}}
   }
 }
 $("vhead").onclick=function(e){
@@ -1457,11 +1474,78 @@ function modalOut(){
   gsap.to("#settings",{backgroundColor:"rgba(0,0,0,0)",duration:.28,onComplete:function(){$("settings").className="";gsap.set(".sbox",{clearProps:"all"});}});
 }
 
+
+/* ---------------- page views (video-style: blur out → glass skeleton → sharpen) ---------------- */
+var VIEW="overview";
+var VIEWS={
+  overview:{t:"Overview",s:"Your agent team at a glance",show:["wrap","loop","legend"]},
+  agents:{t:"Agents",s:"Eight departments and the live feed",show:["wrap"],cls:"v-agents"},
+  work:{t:"Work",s:"Everything the team made — approve, reject, copy",show:["board"],tab:"waiting"},
+  leads:{t:"Leads",s:"People who need what you sell",show:["board"],tab:"leads"}
+};
+function greet(){var h=new Date().getHours();return h<12?"Good morning":(h<17?"Good afternoon":"Good evening");}
+function setTitle(v){ $("vtitle").firstChild.nodeValue=(v==="overview"?greet()+", "+CONFIG.owner:VIEWS[v].t); $("vsub").innerHTML=VIEWS[v].s; }
+function applyView(v){
+  var V=VIEWS[v],ids=["wrap","loop","legend","board"];
+  for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
+  $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
+  if(V.tab){boardTab=V.tab;renderBoard._tab=null;renderBoard();}
+  setTitle(v);
+}
+function visiblePanels(){
+  var out=[],ps=document.querySelectorAll(".panel");
+  for(var i=0;i<ps.length;i++){ if(ps[i].offsetParent!==null) out.push(ps[i]); }
+  return out;
+}
+function revealPanels(){
+  var ps=visiblePanels(),i;
+  for(i=0;i<ps.length;i++){ps[i].classList.add("skel");}
+  if(MOTION){ gsap.fromTo(ps,{opacity:0,scale:.975,filter:"blur(16px)"},{opacity:1,scale:1,filter:"blur(0px)",duration:.55,stagger:.05,ease:"expo.out",clearProps:"opacity,transform,filter"}); }
+  for(i=0;i<ps.length;i++){ (function(p,d){ setTimeout(function(){p.classList.remove("skel");},d); })(ps[i],MOTION?380+i*90:0); }
+  /* numbers count up, bars grow — like the reference */
+  setTimeout(function(){
+    for(var k in SV){ SV[k]=0; $(k).innerHTML="0"; } refreshStats();
+    if(MOTION){ gsap.fromTo(".dep .bar i",{scaleX:0},{scaleX:1,duration:.9,stagger:.05,ease:"power3.out"}); if(VIEW==="work"||VIEW==="leads")cardsIn(); }
+  },MOTION?420:0);
+}
+function switchView(v){
+  if(!VIEWS[v])return;
+  if(v===VIEW){ if(v==="work"||v==="leads"){applyView(v);} return; }
+  VIEW=v;
+  var stages=[$("wrap"),$("loop"),$("legend"),$("board")];
+  if(!MOTION){ applyView(v); drawWires(); revealPanels(); return; }
+  for(var i=0;i<stages.length;i++)stages[i].classList.add("out");
+  gsap.to("#vtitle",{opacity:0,y:-6,filter:"blur(8px)",duration:.25});
+  setTimeout(function(){
+    applyView(v); window.scrollTo(0,0);
+    for(var j=0;j<stages.length;j++)stages[j].classList.remove("out");
+    gsap.fromTo("#vtitle",{opacity:0,y:8,filter:"blur(8px)"},{opacity:1,y:0,filter:"blur(0px)",duration:.5,ease:"expo.out",clearProps:"filter"});
+    drawWires(); revealPanels();
+  },360);
+}
+
 /* ---------------- theme + glass navigation ---------------- */
 function applyTheme(){ document.body.classList.toggle("glass",SET.theme!=="neon"); setTimeout(function(){drawWires();movePills(true);},80); }
 applyTheme();
 function openVani(){ if(!vaniOpen()){ $("vmin").onclick({stopPropagation:function(){}}); } $("vinput").focus(); }
+function markNav(t,nv){
+  var navs=document.querySelectorAll(".dock,.gnav");
+  for(var n=0;n<navs.length;n++){
+    var bs=navs[n].querySelectorAll("[data-go]"),hit=null,b;
+    for(b=0;b<bs.length;b++){ if(bs[b].getAttribute("data-go")===t){hit=bs[b];break;} }
+    if(!hit&&nv){ for(b=0;b<bs.length;b++){ if(GOVIEW[bs[b].getAttribute("data-go")]===nv){hit=bs[b];break;} } }
+    for(b=0;b<bs.length;b++){ bs[b].classList.toggle("on",bs[b]===hit); }
+  }
+  movePills(false);
+}
+var GOVIEW={top:"overview",pDeps:"agents",pFocus:"agents",board:"work",queue:"work",leads:"leads"};
 function go(t){
+  if(GOVIEW[t]){
+    var nv=GOVIEW[t];
+    if(t==="queue")VIEWS.work.tab="waiting"; else if(t==="board")VIEWS.work.tab="all";
+    switchView(nv);
+    markNav(t,nv); return;
+  }
   if(t==="top"){window.scrollTo({top:0,behavior:"smooth"});}
   else if(t==="run"){runCycle();}
   else if(t==="vani"){openVani();}
@@ -1469,10 +1553,7 @@ function go(t){
   else if(t==="board"){boardTab="all";renderBoard();$("board").scrollIntoView({behavior:"smooth"});}
   else if($(t)){$(t).scrollIntoView({behavior:"smooth",block:"center"});setTimeout(function(){spotlight(t);},350);}
   if(t==="board"||t==="queue"||t==="leads")setTimeout(function(){spotlight("board");},350);
-  if(t==="run"){return;}
-  var all=document.querySelectorAll("[data-go]");
-  for(var i=0;i<all.length;i++){ all[i].classList.toggle("on",all[i].getAttribute("data-go")===t); }
-  movePills(false);
+  /* modal / VANI / run don't change the active page */
 }
 (function(){ var g=document.querySelectorAll("[data-go]"); for(var i=0;i<g.length;i++){ g[i].onclick=function(){go(this.getAttribute("data-go"));}; } })();
 navPills();window.addEventListener("resize",function(){movePills(true);});
@@ -1484,6 +1565,7 @@ function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();
 
 /* ---------------- boot / intro ---------------- */
 function startLoops(){
+  setTitle("overview");
   setTimeout(function(){document.body.classList.add("ready");},1200);
   drawWires(); renderAll(); loadLeads(); setInterval(loadLeads,10*60000);
   setInterval(glowIcons,1300);setInterval(stepCycle,1300);
