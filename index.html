@@ -513,6 +513,12 @@ body.glass .ic.glow{transform:translateY(-2px) scale(1.08)}
 body.glass .ic.gl{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),inset 0 -6px 12px rgba(0,0,0,.15),0 6px 14px rgba(0,0,0,.3),0 0 16px -4px currentColor}
 body.glass .dep .ic,.dep .ic{width:34px;height:34px;border-radius:10px;font-size:10.5px}
 
+/* dock tooltips must not sit on top of the page title */
+.dock button span{z-index:20}
+body.glass .vtitle{margin-left:112px}
+@media(max-width:1350px){body.glass .vtitle{margin-left:104px}}
+@media(max-width:760px){body.glass .vtitle{margin-left:12px}}
+
 </style>
 </head>
 <body>
@@ -642,12 +648,12 @@ body.glass .dep .ic,.dep .ic{width:34px;height:34px;border-radius:10px;font-size
 <section class="board stage view-hide" id="board">
   <div class="panel">
     <div class="bhead">
-      <div class="ph"><h3><i>06</i>Work Board &amp; Lead Radar</h3></div>
-      <div class="tabs" id="tabs">
+      <div class="ph"><h3 id="boardTitle"><i>06</i>Work Board &amp; Lead Radar</h3></div>
+      <div class="tabs" id="tabs" role="tablist">
         <button data-t="waiting">Waiting<span class="n" id="nW">0</span></button>
         <button data-t="ready">Ready<span class="n" id="nR">0</span></button>
         <button data-t="all">All work<span class="n" id="nA">0</span></button>
-        <button data-t="leads">Leads<span class="n" id="nL">0</span></button>
+        <button data-t="leads" id="tabLeads">Leads<span class="n" id="nL">0</span></button>
       </div>
     </div>
     <div class="cards" id="cards"></div>
@@ -1573,6 +1579,9 @@ function applyView(v){
   var V=VIEWS[v],ids=["wrap","loop","legend","board"];
   for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
   $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
+  /* each page has its own panel: Work = work board only, Leads = lead radar only */
+  if(v==="work"){ $("boardTitle").innerHTML="Work Board"; $("tabs").style.display=""; $("tabLeads").style.display="none"; if(boardTab==="leads")boardTab="waiting"; }
+  else if(v==="leads"){ $("boardTitle").innerHTML="Lead Radar"; $("tabs").style.display="none"; }
   if(V.tab){boardTab=V.tab;renderBoard._tab=null;renderBoard();}
   setTitle(v);
 }
