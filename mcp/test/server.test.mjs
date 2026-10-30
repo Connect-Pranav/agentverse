@@ -260,3 +260,29 @@ test('scene image previews: runner uploads, owner sees them by unguessable link'
   await tool(e, 'delete_song_job', { job_id: id });
   assert.equal((await worker.fetch(new Request(j.images[0].url), e)).status, 404);
 });
+
+test('push: VAPID key, subscribe, inbox, wake-up push with ES256 VAPID JWT', async () => {
+  const e = env();
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body, h = H) => worker.fetch(new Request(B + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined }), e);
+  assert.equal((await f('/api/push/key', 'GET', null, {})).status, 401);
+  const key = (await (await f('/api/push/key')).json()).key;
+  assert.equal(Buffer.from(key, 'base64url').length, 65);
+  assert.equal((await f('/api/push/subscribe', 'POST', { subscription: { endpoint: 'javascript:x' } })).status, 400);
+  const { inbox } = await (await f('/api/push/subscribe', 'POST', { subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/abc' } })).json();
+  const realFetch = globalThis.fetch; const sent = [];
+  globalThis.fetch = async (u, o) => { sent.push([String(u), o.headers]); return new Response(null, { status: 201 }); };
+  try {
+    assert.equal((await (await f('/api/push/test', 'POST', {})).json()).sent, 1);
+    const auth = sent[0][1].Authorization;
+    const [, t, k] = /^vapid t=([^,]+), k=(.+)$/.exec(auth);
+    assert.equal(k, key);
+    const [h, p, sig] = t.split('.');
+    assert.equal(JSON.parse(Buffer.from(p, 'base64url')).aud, 'https://fcm.googleapis.com');
+    const pub = await crypto.subtle.importKey('raw', Buffer.from(key, 'base64url'), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    assert.ok(await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, Buffer.from(sig, 'base64url'), new TextEncoder().encode(`${h}.${p}`)), 'VAPID signature valid');
+  } finally { globalThis.fetch = realFetch; }
+  const msgs = (await (await f(`/api/push/inbox/${inbox}`, 'GET', null, {})).json()).messages;
+  assert.equal(msgs[0].body, 'Notifications are on ✓');
+  assert.equal((await f('/api/push/inbox/nope', 'GET', null, {})).status, 404);
+});

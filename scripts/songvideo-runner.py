@@ -290,6 +290,28 @@ def transcribe(audio, jid):
     return out
 
 
+def to_roman(t):
+    """Devanagari → readable Hinglish (fallback when the brain does not transliterate)."""
+    if not re.search(r"[\u0900-\u097F]", t):
+        return t
+    try:
+        from indic_transliteration import sanscript
+        from indic_transliteration.sanscript import transliterate
+        x = transliterate(t, sanscript.DEVANAGARI, sanscript.IAST)
+    except Exception:
+        return ""
+    import unicodedata
+    x = x.replace("ch", "\x01").replace("c", "ch").replace("\x01", "chh")
+    for k, v in (("ś", "sh"), ("ṣ", "sh"), ("ā", "aa"), ("ī", "ee"), ("ū", "oo"), ("ṃ", "n"), ("ṁ", "n"), ("ṅ", "n"), ("ñ", "n"), ("ṛ", "ri")):
+        x = x.replace(k, v)
+    x = "".join(ch for ch in unicodedata.normalize("NFKD", x) if not unicodedata.combining(ch))
+    x = re.sub(r"(?<=[^aeiou\s])a\b", "", x)  # drop the silent final 'a' (shaama → shaam)
+    x = re.sub(r"ee\b", "i", x)
+    x = re.sub(r"(?<=\w\w)aa\b", "a", x)
+    x = re.sub(r"[^A-Za-z0-9 ,.'!?-]", "", x).strip()
+    return x[:1].upper() + x[1:]
+
+
 def analyze_free(job, work, audio, dur, jid):
     n = max(6, min(12, round(dur / 18)))
     cr = job.get("credits") or {}
@@ -315,7 +337,9 @@ def analyze_free(job, work, audio, dur, jid):
     for i, l in enumerate(lines[:120]):
         if i < len(roman) and str(roman[i]).strip() and not re.search(r"[\u0900-\u097F]", str(roman[i])):
             l["text"] = str(roman[i]).strip()[:200]
-    lines = [l for l in lines[:120] if not re.search(r"[\u0900-\u097F]", l["text"])]  # never show Devanagari
+    for l in lines[:120]:
+        l["text"] = to_roman(l["text"])
+    lines = [l for l in lines[:120] if l["text"] and not re.search(r"[\u0900-\u097F]", l["text"])]  # never show Devanagari
     sc = [x for x in (a.get("scenes") or []) if x.get("image_prompt")][:n] or [{"summary": "song", "image_prompt": job.get("style") or "cinematic watercolor scene"}]
     per = dur / len(sc)
     scenes = [{"start": round(i * per, 2), "end": round(dur if i == len(sc) - 1 else (i + 1) * per, 2), "summary": x.get("summary", ""), "image_prompt": x["image_prompt"]} for i, x in enumerate(sc)]

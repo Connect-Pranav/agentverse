@@ -17,6 +17,7 @@
 // PUBLIC_BASE_URL, GH_REPO (default Connect-Pranav/agentverse).
 
 import * as growth from './growth.mjs';
+import * as push from './push.mjs';
 
 const VERSION = '1.3.0';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -528,6 +529,13 @@ async function cloudImage(env, prompt) {
   return new Response(b64u(r.image.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store' } });
 }
 
+function ping(env, request, msg) {
+  const p = push.notify(kv(env), { url: '/#studio', ...msg });
+  const c = ctxOf(request);
+  if (c?.waitUntil) c.waitUntil(p);
+}
+const songName = (j) => j.youtube?.title || j.title || 'Your song';
+
 /* ---------------- router ---------------- */
 function owner(request, env, pathToken) {
   if (!env.MCP_TOKEN) throw new HttpError(503, 'Server locked: secret MCP_TOKEN is not set on the Worker');
@@ -564,11 +572,26 @@ async function route(request, env) {
     throw new HttpError(405, 'Use GET or PUT');
   }
   if (path === '/api/brain' && method === 'POST') { if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env); else owner(request, env); return json(await cloudBrain(env, await readJson(request, 64 * 1024))); }
+  if (seg[0] === 'api' && seg[1] === 'push') {
+    if (seg[2] === 'inbox' && seg[3] && method === 'GET') { const m = await push.inbox(kv(env), seg[3]); if (!m) throw new HttpError(404, 'Unknown inbox'); return json({ messages: m }, 200, { 'cache-control': 'no-store' }); }
+    owner(request, env);
+    if (seg[2] === 'key' && method === 'GET') return json({ key: await push.publicKey(kv(env)) });
+    if (seg[2] === 'subscribe' && method === 'POST') { try { return json(await push.subscribe(kv(env), (await readJson(request)).subscription)); } catch (e) { throw new HttpError(e.status || 500, e.message); } }
+    if (seg[2] === 'test' && method === 'POST') return json({ sent: await push.notify(kv(env), { title: 'AGENTVERSE', body: 'Notifications are on ✓', url: '/', tag: 'test' }) });
+    throw new HttpError(404, 'Not found');
+  }
   if (seg[0] === 'api' && seg[1] === 'growth') {
     if (seg[2] === 'runner') await runner(request, env); else owner(request, env);
     const k = kv(env);
     if (seg[2] === 'runner' && !seg[3] && method === 'GET') return json(await growth.runnerState(k));
-    if (seg[2] === 'runner' && seg[3] === 'report' && method === 'POST') return json(growth.ownerView(await growth.runnerReport(k, await readJson(request))));
+    if (seg[2] === 'runner' && seg[3] === 'report' && method === 'POST') {
+      const before = growth.ownerView(await growth.load(k));
+      const v = growth.ownerView(await growth.runnerReport(k, await readJson(request)));
+      const ns = v.new_subscribers.filter((x) => !before.new_subscribers.some((y) => y.id === x.id)).length;
+      if (v.waiting > before.waiting) ping(env, request, { title: 'Comment replies need your OK', body: `${v.waiting - before.waiting} new repl${v.waiting - before.waiting > 1 ? 'ies' : 'y'} waiting in Growth.`, url: '/', tag: 'growth' });
+      else if (ns) ping(env, request, { title: 'New subscribers', body: `${ns} new public subscriber${ns > 1 ? 's' : ''} on Sunverse.`, url: '/', tag: 'subs' });
+      return json(v);
+    }
     if (!seg[2] && method === 'GET') return json(growth.ownerView(await growth.load(k)));
     if (seg[2] === 'settings' && method === 'POST') return json(growth.ownerView(await growth.setSettings(k, await readJson(request))));
     if (seg[2] === 'reply' && seg[3] && method === 'POST') return json(growth.ownerView(await growth.decideReply(k, decodeURIComponent(seg[3]), await readJson(request))));
@@ -610,11 +633,18 @@ async function route(request, env) {
       if (!o?.value) throw new HttpError(404, 'Song audio not found');
       return new Response(o.value, { headers: { 'content-type': o.metadata?.mime ?? 'audio/mpeg', 'cache-control': 'no-store' } });
     }
-    if (seg[4] === 'analysis' && method === 'PUT') return json({ job: runnerView(await saveAnalysis(env, j, await readJson(request))) });
+    if (seg[4] === 'analysis' && method === 'PUT') {
+      const r = await saveAnalysis(env, j, await readJson(request));
+      ping(env, request, r.status === 'needs_approval'
+        ? { title: 'Approve the images', body: `${songName(r)}: ${r.imageCount} images, est. ${r.estCostInr ? '₹' + r.estCostInr : '$' + r.estCostUsd}. Tap to approve.`, tag: r.id }
+        : { title: 'Song analysed', body: `${songName(r)}: ${r.analysis?.mood || ''} — making ${r.imageCount} images and the video now.`, tag: r.id });
+      return json({ job: runnerView(r) });
+    }
     if (seg[4] === 'video' && method === 'PUT') {
       let meta = null;
       try { meta = JSON.parse(url.searchParams.get('meta') ?? 'null'); } catch { throw new HttpError(400, 'meta must be JSON'); }
       const r = await putVideoPart(env, j, { body: request.body, length: len, part: url.searchParams.get('part'), parts: url.searchParams.get('parts'), meta });
+      if (r.status === 'ready') ping(env, request, { title: 'Video ready 🎬', body: `${songName(r)} is ready. Tap to watch, download or post to YouTube.`, tag: r.id });
       return json({ job: { id: r.id, status: r.status } });
     }
     if (seg[4] === 'thumb' && method === 'PUT') {
@@ -636,12 +666,12 @@ async function route(request, env) {
       return json({ ok: true, n });
     }
     if (seg[4] === 'image' && method === 'POST') return cloudImage(env, (await readJson(request)).prompt);
-    if (seg[4] === 'short-done' && method === 'POST') { const r = await markShort(env, j, await readJson(request)); return json({ job: { id: r.id, short: r.short } }); }
+    if (seg[4] === 'short-done' && method === 'POST') { const r = await markShort(env, j, await readJson(request)); ping(env, request, { title: 'Short is live', body: `${songName(r)} Short is on YouTube.`, url: r.short.url, tag: r.id + 's' }); return json({ job: { id: r.id, short: r.short } }); }
     if (seg[4] === 'progress' && method === 'POST') { const r = await saveProgress(env, j, await readJson(request)); return json({ ok: true, status: r.status }); }
-    if (seg[4] === 'published' && method === 'POST') { const r = await markPublished(env, j, await readJson(request)); return json({ job: { id: r.id, publish: r.publish } }); }
+    if (seg[4] === 'published' && method === 'POST') { const r = await markPublished(env, j, await readJson(request)); ping(env, request, { title: 'Live on YouTube', body: `${songName(r)} (${r.publish.privacyEffective}).`, url: r.publish.url, tag: r.id + 'p' }); return json({ job: { id: r.id, publish: r.publish } }); }
     if (seg[4] === 'video' && method === 'GET') { if (j.status !== 'ready') throw new HttpError(409, 'Video not ready'); return streamVideo(env, j, 'video.mp4'); }
     if (seg[4] === 'thumb' && method === 'GET') { const t = await kv(env).get(`sv/thumb/${j.id}`, 'stream'); if (!t) throw new HttpError(404, 'No thumbnail'); return new Response(t, { headers: { 'content-type': 'image/jpeg' } }); }
-    if (seg[4] === 'fail' && method === 'POST') { const fb = await readJson(request); const r = await failJob(env, j, fb.error, fb.stage); return json({ job: { id: r.id, status: r.status } }); }
+    if (seg[4] === 'fail' && method === 'POST') { const fb = await readJson(request); const r = await failJob(env, j, fb.error, fb.stage); if (r.status === 'failed' || r.publish?.state === 'failed' || r.short?.state === 'failed') ping(env, request, { title: 'Song job failed', body: `${songName(r)}: ${String(fb.error || '').slice(0, 140)}`, tag: r.id + 'f' }); return json({ job: { id: r.id, status: r.status } }); }
   }
   // everything else: the AGENTVERSE dashboard (static assets)
   if (env.ASSETS && (method === 'GET' || method === 'HEAD')) return env.ASSETS.fetch(request);
