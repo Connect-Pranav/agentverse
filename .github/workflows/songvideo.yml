@@ -36,7 +36,11 @@ jobs:
           python3 - <<'PY'
           import importlib.util, os
           s = importlib.util.spec_from_file_location("r", "scripts/songvideo-runner.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
-          n = r.ganesha("GET", "/api/songvideo/runner/pending").get("pending", 0)
+          try:
+              n = r.ganesha("GET", "/api/songvideo/runner/pending").get("pending", 0)
+          except Exception as e:
+              print(f"::error title=AGENTVERSE runner sign-in::{r.redact(e)}")
+              raise
           print(f"{n} song job(s) waiting")
           open(os.environ["GITHUB_OUTPUT"], "a").write(f"pending={n}\n")
           PY
