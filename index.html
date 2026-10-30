@@ -2777,7 +2777,8 @@ function mtRender(){
   for(var q=0;q<ids.length;q++){ var el=$(ids[q]); if(el&&sameJob)keep[ids[q]]=el.value; }
   $("mtJob").innerHTML=h; $("mtJob").setAttribute("data-job",j.job_id);
   for(var q2 in keep){ if($(q2))$(q2).value=keep[q2]; }
-  if(wasOpen&&sameJob&&$("mtJob").querySelector(".mt-redo"))$("mtJob").querySelector(".mt-redo").open=true;
+  var rdNew=$("mtJob").querySelector(".mt-redo");
+  if(rdNew){ if(STU.redoOpen===j.job_id||(wasOpen&&sameJob))rdNew.open=true; rdNew.addEventListener("toggle",function(){ STU.redoOpen=rdNew.open?j.job_id:null; }); }
   if(act&&$(act)&&sameJob){ try{$(act).focus();}catch(e){} }
   var els=$("mtJob").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
   var ga=$("mtJob").querySelector("[data-go]"); if(ga)ga.onclick=function(){go("studio");};
