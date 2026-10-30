@@ -257,6 +257,7 @@ Rules:
 - Every image_prompt: visual style "{style}"; 16:9 cinematic wide shot; keep the same main characters (describe them the same way in every prompt) and colour palette across scenes so the video feels like one story; absolutely no text, letters, words, subtitles, logos or watermarks in the image.
 - Song title given by the owner: "{title}" (if empty, choose one from the lyrics).
 - Owner's theme / story hint (most important, follow it): "{hint}". If the title or hint names a known story, epic, mythology or historical figure (e.g. Angad from the Ramayana), build every scene from that story's real setting, characters, costumes and key moments, shown respectfully — never a generic romance.
+- House look for devotional / mythological songs: premium cinematic Indian devotional matte painting, ultra detailed, epic scale, golden-hour or night-lamp lighting with god rays and volumetric clouds, warm saffron-gold-crimson palette against deep blue; heroes mostly in wide heroic shots, silhouettes or from behind so they stay consistent; reverent, never cartoonish. Other genres: an equally premium cinematic look that fits the song.
 - Also return "characters": one paragraph fixing every recurring character's face, age, build, hair, costume and colours, and "style_lock": one sentence fixing art style, lighting and palette for all images.
 - Write EVERYTHING in English / Roman letters: lyrics_lines, title, description, tags, mood, theme. No Devanagari script anywhere.
 - Never invent facts about the artists beyond the credits given."""
@@ -276,7 +277,8 @@ Return ONE JSON object:
  "style_lock": "one sentence fixing art style, medium, lighting, colour palette and camera feel for ALL images (must match the visual style above)",
  "scenes": [{{"summary": "max 15 words", "image_prompt": "what happens in this scene: characters by name, action, setting, composition"}}],
  "youtube": {{"title": "max 70 chars, catchy, includes the song name", "description": "3 short paragraphs: the feeling/story of the song, credits (Lyrics: {lyricist} | Singer: {singer}), an invitation to subscribe to Sunverse; end with 5 hashtags", "tags": ["15-20 search tags, Hindi + English"]}}}}
-Rules: exactly {n} scenes in song order following its story (beginning, rising tension, climax, ending); every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
+House look for devotional / mythological songs (the owner's approved reference): premium cinematic Indian devotional matte painting, ultra detailed, epic scale, golden-hour or night-lamp lighting with god rays and volumetric clouds, warm saffron-gold-crimson palette against deep blue, temples, ghats, diyas, mountains and skies; heroes shown mostly in wide heroic shots, silhouettes or from behind/three-quarter so they stay consistent; reverent, never cartoonish. Other genres: choose an equally premium cinematic look that fits the song.
+Rules: exactly {n} scenes in song order following its story (beginning, rising tension, climax, ending); mix wide establishing shots with a few medium hero shots; every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
 
 
 def cloud_json(system, prompt):
@@ -514,15 +516,34 @@ def render_card_frames(folder, logo_path, title, credits, kind):
     g = g.filter(ImageFilter.GaussianBlur(160))
     bg.paste(Image.new("RGBA", (W, H), (70, 40, 140, 255)), (0, 0), g)
     t_font, c_font, s_font = font(84, deva=has_deva(title)), font(46), font(30, bold=False)
+    # title card sits ON the first scene (like the Bajrangbali video): soft dark band behind the text only
+    band = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(band).rounded_rectangle((W * 0.18, H / 2 - 260, W * 0.82, H / 2 + 200), radius=200, fill=150)
+    band = band.filter(ImageFilter.GaussianBlur(90))
+    shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    shade.putalpha(band)
     for i in range(frames):
         t = i / FPS
-        im = bg.copy()
+        over_scene = kind == "intro" and t >= INTRO_S - 0.8
+        if over_scene:  # dissolve the dark logo card away to reveal scene 1 under the title
+            fade = max(0.0, (INTRO_S - t) / 0.8)
+            im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            sh = shade.copy()
+            sh.putalpha(sh.getchannel("A").point(lambda v: int(v * (1 - fade))))
+            im.alpha_composite(sh)
+            if fade > 0:
+                b2 = bg.copy()
+                b2.putalpha(int(255 * fade))
+                im.alpha_composite(b2)
+        else:
+            im = bg.copy()
         sl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         sd = ImageDraw.Draw(sl)
         for (x, y, s) in stars:
             a = int(60 + 120 * s * (0.5 + 0.5 * math.sin(t * 2 + s * 9)))
             sd.ellipse((x, y, x + 2 + s * 2, y + 2 + s * 2), fill=(200, 210, 255, a))
-        im.alpha_composite(sl)
+        if not over_scene:
+            im.alpha_composite(sl)
         d = ImageDraw.Draw(im)
         if kind == "intro":
             if t < INTRO_S:
@@ -555,12 +576,15 @@ def render_card_frames(folder, logo_path, title, credits, kind):
                     im.alpha_composite(tl)
             else:
                 ct = t - INTRO_S
-                rows = [(title or "Sunverse", t_font, (255, 255, 255), 0.0), ("Lyrics — " + credits.get("lyrics", "COCO"), c_font, (230, 215, 255), 0.6), ("Singer — " + credits.get("singer", "KoBhit"), c_font, (230, 215, 255), 1.0)]
+                rows = [(title or "Sunverse", t_font, (255, 208, 120), 0.0), ("Lyrics — " + credits.get("lyrics", "COCO"), c_font, (230, 215, 255), 0.6), ("Singer — " + credits.get("singer", "KoBhit"), c_font, (230, 215, 255), 1.0)]
                 y = H / 2 - 150
                 for text, fnt, col, delay in rows:
                     a = ease((ct - delay) / 0.7)
                     w = d.textlength(text, font=fnt)
                     tl = Image.new("RGBA", (W, H), (0, 0, 0, 0))  # blend, never punch holes in the card
+                    td = ImageDraw.Draw(tl)
+                    td.text((W / 2 - w / 2 + 3, y + 30 * (1 - a) + 4), text, font=fnt, fill=(0, 0, 0, int(170 * a)))
+                    tl = tl.filter(ImageFilter.GaussianBlur(3))
                     ImageDraw.Draw(tl).text((W / 2 - w / 2, y + 30 * (1 - a)), text, font=fnt, fill=col + (int(255 * a),))
                     im.alpha_composite(tl)
                     y += 150 if fnt is t_font else 80
