@@ -2632,6 +2632,7 @@ function stuNotify(){
 /* ---------- time estimates (seconds) ---------- */
 function svWait(j,since){
   if(STU.health&&STU.health.instantStart)return Math.max(20,90-since);
+  if(since>1200)return -1e7; /* GitHub's schedule is overdue — don't pretend with a fresh countdown */
   var d=new Date(),m=d.getUTCMinutes(),s=d.getUTCSeconds(),slots=[3,18,33,48],next=63;
   for(var i=0;i<slots.length;i++)if(slots[i]*60>m*60+s){next=slots[i];break;}
   return (next*60-(m*60+s))+600; /* GitHub often starts scheduled runs late */
@@ -2651,6 +2652,7 @@ function svEta(j){
   else if(j.status==="ready"&&j.short&&j.short.state==="making"){ x=fromP("short"); if(x===null)x=150; label="until the Short is live"; }
   else if(j.status==="ready"&&j.publish&&j.publish.state==="requested"){ x=svWait(j,since(j.publish.requested_at))+svPublishEst(j); label="until it is live on YouTube"; }
   else if(j.status==="ready"&&j.publish&&j.publish.state==="publishing"){ x=fromP("publish"); if(x===null)x=svPublishEst(j); label="until it is live on YouTube"; }
+  if(x!==null&&x<0){ x=null; label="overdue"; }
   return {s:x,label:label,after:after};
 }
 function fmtDur(s){ s=Math.max(0,Math.round(s)); var m=Math.floor(s/60),r=s%60; return m>=60?Math.floor(m/60)+"h "+(m%60)+"m":m+":"+(r<10?"0":"")+r; }
@@ -2700,7 +2702,9 @@ function mtRender(){
     h+='<div class="stu-bar"><i style="width:'+(pct||4)+'%"></i></div>';
     var waitingRunner=(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")||(j.short&&j.short.state==="requested"))&&!p;
     if(waitingRunner)h+='<div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
-  } else STU.deadline=0;
+  } else { STU.deadline=0;
+    if(e.label==="overdue")h+='<div class="mt-now"><span class="mt-dot" style="background:#f5a623;box-shadow:0 0 8px #f5a623"></span>GitHub has not started the renderer yet (its schedule is running late). Tap <b>Start now</b> to begin immediately.</div><div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
+  }
   if(j.plan){
     if(j.auto_approved||j.image_engine==="cloudflare")h+='<p class="mt-free">Free plan: Cloudflare images, no cost — went straight to the video.</p>';
     h+='<div class="mt-info"><div><h6>Mood</h6><p>'+esc(j.plan.mood||"—")+'</p><h6>Theme</h6><p>'+esc(j.plan.theme||"—")+'</p></div><div><h6>Lyrics'+(j.lyrics_lines_count?' &middot; '+j.lyrics_lines_count+' lines':'')+'</h6><div class="mt-lyr">'+esc((j.lyrics_preview||[]).join("\n")||"—")+((j.lyrics_lines_count||0)>8?"\n…":"")+'</div></div></div>';
