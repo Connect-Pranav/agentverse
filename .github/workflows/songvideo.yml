@@ -43,7 +43,7 @@ jobs:
           except Exception as e:
               print("::error title=AGENTVERSE runner sign-in::" + " ".join(r.redact(e).split())[:500])
               raise
-          print(f"{n} song job(s) waiting")
+          print(f"::notice title=songs waiting::{n}")
           open(os.environ["GITHUB_OUTPUT"], "a").write(f"pending={n}\n")
           PY
       - name: Install ffmpeg, fonts, Pillow
