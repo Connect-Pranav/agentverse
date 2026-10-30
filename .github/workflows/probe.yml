@@ -5,8 +5,9 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - run: |
+      - shell: bash {0}
+        run: |
           for s in pravanigroup connect-pranav09 connect-pranav pranavkumar-skd pranavkumar pranav-kumar connectpranav09 connectpranav pranav skd pranavkumarskd connect-pranav-09 pravani pravani-group; do
-            c=$(curl -s -o /tmp/b -w "%{http_code}" -A "Mozilla/5.0 probe" "https://agentverse.$s.workers.dev/health")
-            echo "::warning title=$s::$c $(head -c 160 /tmp/b | tr '\n' ' ')"
+            c=$(curl -s -m 15 -D /tmp/h -o /tmp/b -w "%{http_code}" -A "Mozilla/5.0 probe" "https://agentverse.$s.workers.dev/health")
+            echo "::warning title=$s::$c $(grep -i '^cf-ray\|^server\|^content-type' /tmp/h | tr -d '\r' | tr '\n' ' ') $(head -c 160 /tmp/b | tr '\n' ' ')"; rm -f /tmp/h /tmp/b
           done
