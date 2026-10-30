@@ -23,7 +23,7 @@ import base64, json, math, os, re, shutil, subprocess, sys, tempfile, time, urll
 GL = "https://generativelanguage.googleapis.com"
 PART = 22 * 1024 * 1024
 W, H, FPS = 1920, 1080, 24
-CAPTIONS = (os.environ.get("SONGVIDEO_CAPTIONS") or "").lower() in ("on", "1", "true", "yes")
+CAPTIONS = (os.environ.get("SONGVIDEO_CAPTIONS") or "on").lower() not in ("off", "0", "false", "no")  # katana-strike lyrics
 INTRO_S, CREDITS_S, OUTRO_S = 5.0, 4.0, 5.0
 
 
@@ -771,7 +771,12 @@ def render(job, work):
         off += float(scenes[i]["end"]) - float(scenes[i]["start"])
     total = dur + OUTRO_S
     ass = os.path.join(work, "lyrics.ass")
-    write_ass(a.get("lyrics_lines") if CAPTIONS else [], ass, INTRO_S + CREDITS_S - 0.5)  # owner brief: no lyrics on screen
+    if CAPTIONS:  # owner's chosen format: katana-strike kinetic lyrics
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import lyrics_katana
+        lyrics_katana.write(a.get("lyrics_lines") or [], ass, W, H, start_after=INTRO_S + CREDITS_S - 0.5)
+    else:
+        write_ass([], ass, INTRO_S + CREDITS_S - 0.5)
     n = len(imgs)
     inputs += ["-framerate", str(FPS), "-i", os.path.join(work, "intro", "%04d.png"),
                "-framerate", str(FPS), "-i", os.path.join(work, "outro", "%04d.png"), "-i", audio]

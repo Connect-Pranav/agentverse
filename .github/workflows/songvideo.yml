@@ -50,7 +50,7 @@ jobs:
         if: steps.cfg.outputs.pending != '0'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-dejavu-core >/dev/null
+          sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-dejavu-core fonts-inter >/dev/null || sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-dejavu-core >/dev/null
           python3 -m pip install --quiet pillow
       - name: Install free speech-to-text
         if: steps.cfg.outputs.pending != '0'
