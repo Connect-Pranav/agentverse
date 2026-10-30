@@ -302,18 +302,22 @@ async function putVideoPart(env, j, { body, length, part, parts, meta }) {
   if (!(Number.isInteger(n) && Number.isInteger(total) && n >= 1 && n <= total && total <= MAX_PARTS)) throw new HttpError(400, `part/parts must be integers, 1 ≤ part ≤ parts ≤ ${MAX_PARTS}`);
   if (!(length > 0)) throw new HttpError(411, 'content-length is required');
   if (length > MAX_PART) throw new HttpError(413, 'Each part must be ≤ 24 MB');
-  await kv(env).put(`sv/video/${j.id}/${n}`, body);
-  j.videoPartsDone = [...new Set([...(j.videoPartsDone ?? []), n])];
-  j.videoPartBytes = { ...(j.videoPartBytes ?? {}), [n]: length };
-  if (j.videoPartsDone.length === total) {
-    j.videoParts = total;
-    j.videoBytes = Object.values(j.videoPartBytes).reduce((x, y) => x + y, 0);
-    j.videoMeta = meta ?? null;
-    j.costUsd = Number(meta?.imageCostUsd) || null;
-    j.ticket = hex(16);
-    Object.assign(j, { status: 'ready', leaseUntil: null, error: null, progress: null });
+  // parts may arrive in parallel: each part carries its own size, and completeness is checked from storage,
+  // not from the job record (which parallel requests could overwrite)
+  await kv(env).put(`sv/video/${j.id}/${n}`, body, { metadata: { bytes: length } });
+  if (n !== total) return j;
+  const fresh = await jobOf(env, j.id);
+  const sizes = {};
+  for (let k = 1; k <= total; k++) {
+    const o = await kv(env).getWithMetadata(`sv/video/${j.id}/${k}`, 'stream');
+    if (!o?.value) throw new HttpError(409, `part ${k} of ${total} is missing — send it, then send part ${total} again`);
+    if (o.value.cancel) await o.value.cancel().catch(() => {});
+    sizes[k] = Number(o.metadata?.bytes) || (k === n ? length : 0);
   }
-  return saveJob(env, j);
+  Object.assign(fresh, { videoParts: total, videoPartsDone: Object.keys(sizes).map(Number), videoPartBytes: sizes,
+    videoBytes: Object.values(sizes).reduce((x, y) => x + y, 0), videoMeta: meta ?? null, costUsd: Number(meta?.imageCostUsd) || null,
+    ticket: hex(16), status: 'ready', leaseUntil: null, error: null, progress: null });
+  return saveJob(env, fresh);
 }
 async function saveProgress(env, j, a) {
   j.progress = { stage: clean(a.stage, 20), step: clean(a.step, 120), done: Number(a.done) || 0, total: Number(a.total) || 0, eta_s: Math.max(0, Math.round(Number(a.eta_s) || 0)), at: nowIso() };

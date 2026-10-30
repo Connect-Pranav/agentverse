@@ -699,45 +699,10 @@ def render(job, work):
     per_img = 20.0
     t0 = time.time()
     progress(jid, "render", f"Making image 1 of {n_sc}", 0, n_sc, n_sc * per_img + enc_est + up_est)
-    for i, s in enumerate(scenes):
-        out = os.path.join(work, f"img{i:02d}.png")
-        lock = " ".join(x for x in [a.get("styleLock") or a.get("style_lock") or (job.get("style") or ""), a.get("characters") or ""] if x).strip()
-        p = (lock[:800] + " Scene: " if lock else "") + s["image_prompt"][:950] + " Same art style and same character designs as every other scene. Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
-        used = None
-        if engine.startswith("gemini") and not gem_off:
-            try:
-                used = gemini_image(models, p, out)
-            except Exception as e:
-                if engine == "gemini":  # paid mode: owner approved Gemini, so report the failure
-                    raise
-                gem_off = True
-                log(f"[{jid}] Gemini free tier unavailable ({redact(e)[:120]}) — switching to free Cloudflare images")
-        elif engine == "openai":
-            used = openai_image(p, out)
-        if not used:
-            img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
-            open(out, "wb").write(img)
-            used = "cloudflare/flux-1-schnell"
-        norm = os.path.join(work, f"scene{i:02d}.png")
-        # whole artwork, never cropped: sharp image centred on a soft blurred copy of itself (16:9 images fill the frame)
-        run(["ffmpeg", "-y", "-v", "error", "-i", out, "-filter_complex",
-             f"[0:v]split[a][b];[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},gblur=sigma=38,eq=brightness=-0.10:saturation=0.85[bg];"
-             f"[b]scale={W}:{H}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=rgb24", "-frames:v", "1", norm])
-        imgs.append(norm)
-        log(f"[{jid}] image {i + 1}/{len(scenes)} via {used}")
-        try:  # small preview so the owner can watch the images arrive in AGENTVERSE
-            pv = os.path.join(work, f"pv{i:02d}.jpg")
-            run(["ffmpeg", "-y", "-v", "error", "-i", norm, "-vf", "scale=960:-2", "-q:v", "5", pv])
-            q = urllib.parse.urlencode({"summary": s.get("summary") or f"Scene {i + 1}"})
-            ganesha("PUT", f"/api/songvideo/runner/{jid}/img/{i + 1}?{q}", open(pv, "rb").read(), {"content-type": "image/jpeg"}, timeout=60)
-        except Exception as e:
-            log(f"[{jid}] preview {i + 1} not shared: {redact(e)}")
-        per_img = (time.time() - t0) / (i + 1)
-        left = n_sc - i - 1
-        progress(jid, "render", f"Making image {i + 2} of {n_sc}" if left else "Images done, building the video", i + 1, n_sc, left * per_img + enc_est + up_est)
-    cost = round(len(imgs) * per, 3)
-
-    # logo from the studio (Sunverse brand asset)
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    lock_ = threading.Lock()
+    # intro/outro cards don't need the images: draw them in the background while the images are being made
     here = os.path.dirname(os.path.abspath(__file__))
     shutil.copy(os.path.join(here, "..", "mcp", "assets", "sunverse-logo.webp"), os.path.join(work, "logo.webp"))
     logo = os.path.join(work, "logo.png")
@@ -745,13 +710,79 @@ def render(job, work):
     title = (job.get("youtube") or {}).get("title") or job.get("title") or "Sunverse"
     song_title = job.get("title") or title
     credits = job.get("credits") or {"lyrics": "COCO", "singer": "KoBhit"}
-    render_card_frames(os.path.join(work, "intro"), logo, song_title, credits, "intro")
-    render_card_frames(os.path.join(work, "outro"), logo, song_title, credits, "outro")
+    card_err = []
+
+    def cards():
+        try:
+            render_card_frames(os.path.join(work, "intro"), logo, song_title, credits, "intro")
+            render_card_frames(os.path.join(work, "outro"), logo, song_title, credits, "outro")
+        except Exception as e:  # reported after the images
+            card_err.append(e)
+    card_thread = threading.Thread(target=cards, daemon=True)
+    card_thread.start()
+    state = {"gem_off": gem_off, "done": 0}
+
+    def make_image(i, s):
+        out = os.path.join(work, f"img{i:02d}.png")
+        lock = " ".join(x for x in [a.get("styleLock") or a.get("style_lock") or (job.get("style") or ""), a.get("characters") or ""] if x).strip()
+        p = (lock[:800] + " Scene: " if lock else "") + s["image_prompt"][:950] + " Same art style and same character designs as every other scene. Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
+        used = None
+        for attempt in range(2):  # a lost "packet" is asked for again once
+            try:
+                if engine.startswith("gemini") and not state["gem_off"]:
+                    try:
+                        used = gemini_image(models, p, out)
+                    except Exception as e:
+                        if engine == "gemini":  # paid mode: owner approved Gemini, so report the failure
+                            raise
+                        with lock_:
+                            if not state["gem_off"]:
+                                log(f"[{jid}] Gemini free tier unavailable ({redact(e)[:120]}) — switching to free Cloudflare images")
+                            state["gem_off"] = True
+                elif engine == "openai":
+                    used = openai_image(p, out)
+                if not used:
+                    img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
+                    open(out, "wb").write(img)
+                    used = "cloudflare/flux-1-schnell"
+                break
+            except Exception as e:
+                if attempt:
+                    raise
+                log(f"[{jid}] image {i + 1} failed, retrying: {redact(e)[:120]}")
+                time.sleep(3)
+        norm = os.path.join(work, f"scene{i:02d}.png")
+        # whole artwork, never cropped: sharp image centred on a soft blurred copy of itself (16:9 images fill the frame)
+        run(["ffmpeg", "-y", "-v", "error", "-i", out, "-filter_complex",
+             f"[0:v]split[a][b];[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},gblur=sigma=38,eq=brightness=-0.10:saturation=0.85[bg];"
+             f"[b]scale={W}:{H}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=rgb24", "-frames:v", "1", norm])
+        try:  # small preview so the owner can watch the images arrive in AGENTVERSE
+            pv = os.path.join(work, f"pv{i:02d}.jpg")
+            run(["ffmpeg", "-y", "-v", "error", "-i", norm, "-vf", "scale=960:-2", "-q:v", "5", pv])
+            q = urllib.parse.urlencode({"summary": s.get("summary") or f"Scene {i + 1}"})
+            ganesha("PUT", f"/api/songvideo/runner/{jid}/img/{i + 1}?{q}", open(pv, "rb").read(), {"content-type": "image/jpeg"}, timeout=60)
+        except Exception as e:
+            log(f"[{jid}] preview {i + 1} not shared: {redact(e)}")
+        with lock_:
+            state["done"] += 1
+            k = state["done"]
+            log(f"[{jid}] image {i + 1}/{n_sc} via {used} ({k} done)")
+            per_img_ = (time.time() - t0) / k
+            progress(jid, "render", f"Making images in parallel: {k} of {n_sc} done" if k < n_sc else "Images done, building the video", k, n_sc, (n_sc - k) * per_img_ / PAR_IMG + enc_est + up_est)
+        return i, norm, used
+
+    PAR_IMG = 2 if engine.startswith("gemini") else 4   # Gemini free tier allows only a few requests per minute
+    with ThreadPoolExecutor(max_workers=PAR_IMG) as ex:
+        results = sorted(ex.map(lambda x: make_image(*x), list(enumerate(scenes))))
+    imgs = [r[1] for r in results]                        # reassembled in scene order, like numbered packets
+    used = results[-1][2] if results else None
+    cost = round(len(imgs) * per, 3)
+
 
     # scene clips with Ken Burns motion, crossfaded
     XF = 1.2
     TRANS = ["fade", "smoothleft", "fade", "fadeblack", "fade", "smoothright", "fade", "smoothup"]
-    inputs, filt, labels = [], [], []
+    inputs, filt, labels, jobs = [], [], [], []
     for i, (s, img) in enumerate(zip(scenes, imgs)):
         d = float(s["end"]) - float(s["start"]) + (XF if i < len(scenes) - 1 else OUTRO_S)
         frames = int(math.ceil(d * FPS))
@@ -760,10 +791,22 @@ def render(job, work):
         z = f"1.0+0.07*on/{frames}" if zin else f"1.07-0.07*on/{frames}"
         pan = (i % 4)
         x = {0: "iw/2-(iw/zoom/2)", 1: f"(iw-iw/zoom)*(0.35+0.3*on/{frames})", 2: "iw/2-(iw/zoom/2)", 3: f"(iw-iw/zoom)*(0.65-0.3*on/{frames})"}[pan]
-        inputs += ["-loop", "1", "-t", f"{d:.3f}", "-i", img]
-        filt.append(f"[{i}:v]scale={W * 3}:{H * 3}:flags=lanczos,zoompan=z='{z}':x='{x}':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},"
-                    f"eq=contrast=1.04:saturation=1.06,vignette=PI/5,format=yuv420p,setpts=PTS-STARTPTS[v{i}]")
+        clip = os.path.join(work, f"clip{i:02d}.mp4")
+        jobs.append(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-t", f"{d:.3f}", "-i", img, "-vf",
+                     f"scale={W * 3}:{H * 3}:flags=lanczos,zoompan=z='{z}':x='{x}':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},"
+                     f"eq=contrast=1.04:saturation=1.06,vignette=PI/5,format=yuv420p", "-frames:v", str(frames),
+                     "-c:v", "libx264", "-preset", "ultrafast", "-crf", "14", "-threads", "1", clip])
+        inputs += ["-i", clip]
+        filt.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
         labels.append(f"v{i}")
+    progress(jid, "render", f"Animating {len(jobs)} scenes in parallel", n_sc, n_sc, enc_est + up_est)
+    t1 = time.time()
+    with ThreadPoolExecutor(max_workers=max(2, os.cpu_count() or 2)) as ex:
+        list(ex.map(run, jobs))
+    log(f"[{jid}] {len(jobs)} scene clips in {time.time() - t1:.0f}s on {os.cpu_count()} cores")
+    card_thread.join()
+    if card_err:
+        raise card_err[0]
     cur, off = labels[0], float(scenes[0]["end"]) - float(scenes[0]["start"])
     for i in range(1, len(labels)):
         filt.append(f"[{cur}][{labels[i]}]xfade=transition={TRANS[(i - 1) % len(TRANS)]}:duration={XF}:offset={off:.3f}[x{i}]")
@@ -801,11 +844,26 @@ def render(job, work):
     ganesha("PUT", f"/api/songvideo/runner/{jid}/thumb", tb, {"content-type": "image/jpeg"})
     meta = {"durationS": round(vdur, 1), "width": W, "height": H, "images": n, "imageEngine": used, "imageCostUsd": cost}
     parts = max(1, math.ceil(size / PART))
-    with open(out, "rb") as f:
-        for p in range(1, parts + 1):
+
+    def put_part(p):  # numbered parts go up in parallel; a failed part is retried, the rest is not resent
+        with open(out, "rb") as f:
+            f.seek((p - 1) * PART)
             chunk = f.read(PART)
-            q = urllib.parse.urlencode({"part": p, "parts": parts, "meta": json.dumps(meta)})
-            ganesha("PUT", f"/api/songvideo/runner/{jid}/video?{q}", chunk, {"content-type": "application/octet-stream"}, timeout=600)
+        q = urllib.parse.urlencode({"part": p, "parts": parts, "meta": json.dumps(meta)})
+        for attempt in range(3):
+            try:
+                return ganesha("PUT", f"/api/songvideo/runner/{jid}/video?{q}", chunk, {"content-type": "application/octet-stream"}, timeout=600)
+            except Exception as e:
+                if attempt == 2:
+                    raise
+                log(f"[{jid}] part {p} failed, resending: {redact(e)[:100]}")
+                time.sleep(3 * (attempt + 1))
+
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    if parts > 1:
+        with _TPE(max_workers=3) as ex:
+            list(ex.map(put_part, range(1, parts)))
+    put_part(parts)  # last part last: the Worker marks the video ready when every part is in
     log(f"[{jid}] uploaded in {parts} part(s)")
 
 

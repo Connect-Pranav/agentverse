@@ -381,3 +381,21 @@ test('CRM: runner upserts leads, owner approves, runner sends, follow-up, replie
   const m = (await tool(e, 'get_foliocraft_leads', {})).structuredContent;
   assert.ok(m.counts.total >= 2);
 });
+
+test('video parts uploaded in parallel / out of order still complete correctly', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const c = (await tool(e, 'create_song_job', { title: 'P' })).structuredContent;
+  const id = c.job_id;
+  await worker.fetch(new Request(c.upload_url, { method: 'PUT', headers: { 'content-type': 'audio/mpeg', 'content-length': '2' }, body: new Uint8Array(2) }), e);
+  const claim = () => worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e);
+  await claim();
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/analysis`, { method: 'PUT', headers: R, body: JSON.stringify({ durationS: 5, image_engine: 'cloudflare', scenes: [{ start: 0, end: 5, image_prompt: 'x' }] }) }), e);
+  await claim();
+  const put = (n, arr) => worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video?part=${n}&parts=4`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': String(arr.length) }, body: new Uint8Array(arr) }), e);
+  assert.equal((await put(4, [9])).status, 409, 'last part before the others → asks for the missing ones');
+  await Promise.all([put(2, [3, 4]), put(1, [1, 2]), put(3, [5, 6, 7, 8])]);
+  assert.equal((await (await put(4, [9])).json()).job.status, 'ready');
+  const url = (await tool(e, 'get_song_job', { job_id: id })).structuredContent.video_url;
+  assert.deepEqual([...new Uint8Array(await (await worker.fetch(new Request(url), e)).arrayBuffer())], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+});
