@@ -288,6 +288,10 @@ def transcribe(audio, jid):
     m = WhisperModel(os.environ.get("WHISPER_MODEL") or "small", device="cpu", compute_type="int8")
     segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1,
                            initial_prompt="Hindi song lyrics.")
+    segs = list(segs)
+    if not segs:  # loud music can hide the voice from the voice detector — listen to everything
+        segs, _ = m.transcribe(audio, language="hi", vad_filter=False, beam_size=1, initial_prompt="Hindi song lyrics.")
+        segs = list(segs)
     out = []
     for sg in segs:
         t = sg.text.strip()
@@ -467,10 +471,13 @@ def render_card_frames(folder, logo_path, title, credits, kind):
     for i in range(frames):
         t = i / FPS
         im = bg.copy()
-        d = ImageDraw.Draw(im)
+        sl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(sl)
         for (x, y, s) in stars:
             a = int(60 + 120 * s * (0.5 + 0.5 * math.sin(t * 2 + s * 9)))
-            d.ellipse((x, y, x + 2 + s * 2, y + 2 + s * 2), fill=(200, 210, 255, a))
+            sd.ellipse((x, y, x + 2 + s * 2, y + 2 + s * 2), fill=(200, 210, 255, a))
+        im.alpha_composite(sl)
+        d = ImageDraw.Draw(im)
         if kind == "intro":
             if t < INTRO_S:
                 k = ease(t / 1.6)
@@ -497,7 +504,9 @@ def render_card_frames(folder, logo_path, title, credits, kind):
                     a2 = int(255 * min(1, (t - 2.2) / 0.8) * (alpha if t > INTRO_S - 0.8 else 1))
                     txt = "S U N V E R S E   P R E S E N T S"
                     w = d.textlength(txt, font=s_font)
-                    d.text((W / 2 - w / 2, H / 2 + 200), txt, font=s_font, fill=(220, 210, 255, a2))
+                    tl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    ImageDraw.Draw(tl).text((W / 2 - w / 2, H / 2 + 200), txt, font=s_font, fill=(220, 210, 255, a2))
+                    im.alpha_composite(tl)
             else:
                 ct = t - INTRO_S
                 rows = [(title or "Sunverse", t_font, (255, 255, 255), 0.0), ("Lyrics — " + credits.get("lyrics", "COCO"), c_font, (230, 215, 255), 0.6), ("Singer — " + credits.get("singer", "KoBhit"), c_font, (230, 215, 255), 1.0)]
@@ -505,10 +514,14 @@ def render_card_frames(folder, logo_path, title, credits, kind):
                 for text, fnt, col, delay in rows:
                     a = ease((ct - delay) / 0.7)
                     w = d.textlength(text, font=fnt)
-                    d.text((W / 2 - w / 2, y + 30 * (1 - a)), text, font=fnt, fill=col + (int(255 * a),))
+                    tl = Image.new("RGBA", (W, H), (0, 0, 0, 0))  # blend, never punch holes in the card
+                    ImageDraw.Draw(tl).text((W / 2 - w / 2, y + 30 * (1 - a)), text, font=fnt, fill=col + (int(255 * a),))
+                    im.alpha_composite(tl)
                     y += 150 if fnt is t_font else 80
                 lx = int(W / 2 - 260 * ease(ct / 1.2))
-                d.line((lx, H / 2 - 20, W - lx, H / 2 - 20), fill=(180, 150, 255, 200), width=2)
+                ll = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                ImageDraw.Draw(ll).line((lx, H / 2 - 20, W - lx, H / 2 - 20), fill=(180, 150, 255, 200), width=2)
+                im.alpha_composite(ll)
         else:  # outro end card
             a = ease(t / 1.0)
             lg = base_logo.resize((380, int(380 * base_logo.height / base_logo.width)), Image.LANCZOS)
@@ -517,7 +530,9 @@ def render_card_frames(folder, logo_path, title, credits, kind):
             im.alpha_composite(L, (int(W / 2 - L.width / 2), int(H / 2 - L.height / 2 - 80)))
             for k, (text, fnt) in enumerate((("Subscribe to SUNVERSE", c_font), (f"Lyrics — {credits.get('lyrics', 'COCO')}   ·   Singer — {credits.get('singer', 'KoBhit')}", s_font))):
                 w = d.textlength(text, font=fnt)
-                d.text((W / 2 - w / 2, H / 2 + 150 + k * 70), text, font=fnt, fill=(235, 225, 255, int(255 * ease((t - 0.4 - k * 0.3) / 0.8))))
+                tl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                ImageDraw.Draw(tl).text((W / 2 - w / 2, H / 2 + 150 + k * 70), text, font=fnt, fill=(235, 225, 255, int(255 * ease((t - 0.4 - k * 0.3) / 0.8))))
+                im.alpha_composite(tl)
         # alpha fade so the card blends into the song visuals
         if kind == "intro" and t > total - 1.0:
             im.putalpha(im.getchannel("A").point(lambda v: int(v * max(0.0, (total - t) / 1.0))))
@@ -552,7 +567,7 @@ def ass_time(s):
 
 def write_ass(lines, path, start_after):
     deva = any(has_deva(l.get("text", "")) for l in lines)
-    fontname = "Noto Sans Devanagari" if deva else "DejaVu Sans"
+    fontname = "Noto Sans Devanagari" if deva else "Noto Sans"
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -560,7 +575,7 @@ PlayResY: {H}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Lyric,{fontname},64,&H00FFFFFF,&H00FFFFFF,&H00301040,&H96000000,1,0,0,0,100,100,1,0,1,3,2,2,120,120,90,1
+Style: Lyric,{fontname},58,&H00FFFFFF,&H00FFFFFF,&H64000000,&H8C000000,1,0,0,0,100,100,0.5,0,1,2.2,3,2,160,160,96,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -571,8 +586,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if b <= start_after:
             continue
         a = max(a, start_after)
-        txt = l["text"].replace("{", "(").replace("}", ")").replace("\n", " ")
-        ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Lyric,,0,0,0,,{{\\fad(250,250)}}{txt}")
+        txt = l["text"].replace("{", "(").replace("}", ")").replace("\n", " ").strip()
+        if len(txt) > 42:  # two balanced lines instead of one long strip
+            words, half, cut = txt.split(), len(txt) / 2, 0
+            for k in range(1, len(words)):
+                if len(" ".join(words[:k])) >= half:
+                    cut = k
+                    break
+            if cut:
+                txt = " ".join(words[:cut]) + "\\N" + " ".join(words[cut:])
+        b = max(b, a + 1.2)
+        ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Lyric,,0,0,0,,{{\\fad(300,300)\\blur0.6}}{txt}")
     open(path, "w", encoding="utf-8").write(head + "\n".join(ev) + "\n")
 
 
@@ -609,7 +633,10 @@ def render(job, work):
         else:
             used = openai_image(p, out) if engine == "openai" else gemini_image(models, p, out)
         norm = os.path.join(work, f"scene{i:02d}.png")
-        run(["ffmpeg", "-y", "-v", "error", "-i", out, "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}", norm])
+        # whole artwork, never cropped: sharp image centred on a soft blurred copy of itself (16:9 images fill the frame)
+        run(["ffmpeg", "-y", "-v", "error", "-i", out, "-filter_complex",
+             f"[0:v]split[a][b];[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},gblur=sigma=38,eq=brightness=-0.10:saturation=0.85[bg];"
+             f"[b]scale={W}:{H}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=rgb24", "-frames:v", "1", norm])
         imgs.append(norm)
         log(f"[{jid}] image {i + 1}/{len(scenes)} via {used}")
         try:  # small preview so the owner can watch the images arrive in AGENTVERSE
@@ -636,20 +663,24 @@ def render(job, work):
     render_card_frames(os.path.join(work, "outro"), logo, song_title, credits, "outro")
 
     # scene clips with Ken Burns motion, crossfaded
-    XF = 1.0
+    XF = 1.2
+    TRANS = ["fade", "smoothleft", "fade", "fadeblack", "fade", "smoothright", "fade", "smoothup"]
     inputs, filt, labels = [], [], []
     for i, (s, img) in enumerate(zip(scenes, imgs)):
         d = float(s["end"]) - float(s["start"]) + (XF if i < len(scenes) - 1 else OUTRO_S)
         frames = int(math.ceil(d * FPS))
+        # slow, even camera: gentle push-in / pull-out over the whole scene, drawn at 3x so the motion is smooth
         zin = i % 2 == 0
-        z = f"min(1.0+0.0009*on,1.18)" if zin else f"max(1.18-0.0009*on,1.0)"
-        x = "iw/2-(iw/zoom/2)" if i % 3 else f"(iw-iw/zoom)*on/{frames}"
+        z = f"1.0+0.07*on/{frames}" if zin else f"1.07-0.07*on/{frames}"
+        pan = (i % 4)
+        x = {0: "iw/2-(iw/zoom/2)", 1: f"(iw-iw/zoom)*(0.35+0.3*on/{frames})", 2: "iw/2-(iw/zoom/2)", 3: f"(iw-iw/zoom)*(0.65-0.3*on/{frames})"}[pan]
         inputs += ["-loop", "1", "-t", f"{d:.3f}", "-i", img]
-        filt.append(f"[{i}:v]scale={W * 2}:{H * 2},zoompan=z='{z}':x='{x}':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p,setpts=PTS-STARTPTS[v{i}]")
+        filt.append(f"[{i}:v]scale={W * 3}:{H * 3}:flags=lanczos,zoompan=z='{z}':x='{x}':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},"
+                    f"eq=contrast=1.04:saturation=1.06,vignette=PI/5,format=yuv420p,setpts=PTS-STARTPTS[v{i}]")
         labels.append(f"v{i}")
     cur, off = labels[0], float(scenes[0]["end"]) - float(scenes[0]["start"])
     for i in range(1, len(labels)):
-        filt.append(f"[{cur}][{labels[i]}]xfade=transition=fade:duration={XF}:offset={off:.3f}[x{i}]")
+        filt.append(f"[{cur}][{labels[i]}]xfade=transition={TRANS[(i - 1) % len(TRANS)]}:duration={XF}:offset={off:.3f}[x{i}]")
         cur = f"x{i}"
         off += float(scenes[i]["end"]) - float(scenes[i]["start"])
     total = dur + OUTRO_S
@@ -666,7 +697,7 @@ def render(job, work):
     out = os.path.join(work, "video.mp4")
     progress(jid, "render", "Encoding the MP4 (logo intro, credits, lyrics)", n_sc, n_sc, enc_est + up_est)
     run(["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(filt), "-map", "[vout]", "-map", "[aout]",
-         "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-r", str(FPS),
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", str(FPS),
          "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", f"{total:.3f}", out])
     vdur = probe_duration(out)
     size = os.path.getsize(out)

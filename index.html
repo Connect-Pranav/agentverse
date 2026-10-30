@@ -2705,7 +2705,7 @@ function mtRender(){
   }
   if(j.status==="ready"){
     h+=(j.video_url?'<video controls preload="metadata" playsinline class="mt-vid" '+(j.thumbnail_url?'poster="'+esc(j.thumbnail_url)+'"':'')+' src="'+esc(j.video_url)+'"></video>':'');
-    h+='<div class="acts"><a href="'+esc(j.video_url)+'" download><span data-i="download"></span>MP4'+(j.video_mb?' &middot; '+j.video_mb+' MB':'')+'</a>'+(j.thumbnail_url?'<a href="'+esc(j.thumbnail_url)+'" download><span data-i="image"></span>Thumbnail</a>':'')+'</div>';
+    h+='<div class="acts"><a href="'+esc(j.video_url)+'?dl=1" download><span data-i="download"></span>MP4'+(j.video_mb?' &middot; '+j.video_mb+' MB':'')+'</a>'+(j.thumbnail_url?'<a href="'+esc(j.thumbnail_url)+'" download><span data-i="image"></span>Thumbnail</a>':'')+'</div>';
     var sh=j.short;
     if(sh&&sh.state==="published")h+='<div class="acts"><a href="'+esc(sh.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Short is live</a></div>';
     else if(sh&&(sh.state==="requested"||sh.state==="making"))h+='<p class="mt-sh">Short: '+(sh.state==="making"?"cutting &amp; uploading…":"queued")+'</p>';
@@ -2820,7 +2820,7 @@ function stuRender(){
     h+='<div class="sitem"><div class="ct"><span class="pill '+pc+'">'+esc(pb==="published"?"on YouTube":(pb?"YouTube: "+pb:(STU_LABEL[j.status]||j.status)))+'</span><span>'+ago(Date.parse(j.updated_at||j.created_at))+' ago</span>'+(j.duration_s?'<span>'+Math.round(j.duration_s)+' s</span>':'')+(j.cost_usd!=null?'<span>cost ~$'+j.cost_usd+'</span>':'')+'</div><h4>'+esc((j.youtube&&j.youtube.title)||j.title||"Untitled song")+'</h4>';
     if(j.plan)h+='<p>'+esc(j.plan.mood||"")+(j.plan.theme?" · "+esc(j.plan.theme):"")+'</p>';
     h+='<div class="acts">';
-    if(j.video_url)h+='<a href="'+esc(j.video_url)+'" download><span data-i="download"></span>MP4</a>';
+    if(j.video_url)h+='<a href="'+esc(j.video_url)+'?dl=1" download><span data-i="download"></span>MP4</a>';
     if(j.youtube)h+='<button data-sc="title" data-id="'+j.job_id+'"><span data-i="copy"></span>Title</button><button data-sc="desc" data-id="'+j.job_id+'"><span data-i="copy"></span>Description</button>';
     if(pb==="published")h+='<a href="'+esc(j.publish.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>YouTube</a>';
     h+='<button data-sa="delete" data-id="'+j.job_id+'"><span data-i="x"></span>Delete</button></div></div>'; }

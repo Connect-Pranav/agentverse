@@ -309,3 +309,30 @@ test('redo with a new theme: same MP3, plan and images cleared, queued again', a
   assert.equal(cl.stage, 'analyze');
   assert.equal(cl.job.hint, 'Ramayana — Angad challenges Ravana');
 });
+
+test('video plays across stored parts: Range requests return 206 per part; full download streams all parts', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const c = (await tool(e, 'create_song_job', { title: 'R' })).structuredContent;
+  const id = c.job_id;
+  await worker.fetch(new Request(c.upload_url, { method: 'PUT', headers: { 'content-type': 'audio/mpeg', 'content-length': '2' }, body: new Uint8Array(2) }), e);
+  const claim = () => worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e);
+  await claim();
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/analysis`, { method: 'PUT', headers: R, body: JSON.stringify({ durationS: 5, image_engine: 'cloudflare', scenes: [{ start: 0, end: 5, image_prompt: 'x' }] }) }), e);
+  await claim();
+  const put = (n, arr) => worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video?part=${n}&parts=3`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': String(arr.length) }, body: new Uint8Array(arr) }), e);
+  await put(1, [0, 1, 2, 3]); await put(2, [4, 5, 6]); await put(3, [7, 8, 9]);
+  const url = (await tool(e, 'get_song_job', { job_id: id })).structuredContent.video_url;
+  const get = (range) => worker.fetch(new Request(url, { headers: range ? { range } : {} }), e);
+  let r = await get('bytes=0-');
+  assert.equal(r.status, 206); assert.equal(r.headers.get('content-range'), 'bytes 0-3/10'); assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [0, 1, 2, 3]);
+  r = await get('bytes=5-8');
+  assert.equal(r.headers.get('content-range'), 'bytes 5-6/10'); assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [5, 6]);
+  r = await get('bytes=-2');
+  assert.equal(r.headers.get('content-range'), 'bytes 8-9/10');
+  assert.equal((await get('bytes=20-')).status, 416);
+  r = await get();
+  assert.equal(r.status, 200); assert.equal(r.headers.get('accept-ranges'), 'bytes'); assert.match(r.headers.get('content-disposition'), /^inline/);
+  assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.match((await worker.fetch(new Request(url + '?dl=1'), e)).headers.get('content-disposition'), /^attachment/);
+});

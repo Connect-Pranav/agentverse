@@ -466,7 +466,7 @@ r.onload=function(){var j={};try{j=JSON.parse(r.responseText)}catch(e){}m.textCo
 }
 
 /* ---------------- media by ticket ---------------- */
-async function serveMedia(env, name) {
+async function serveMedia(env, name, request) {
   const m = /^([0-9a-f]{32})\.(mp4|jpg)$/.exec(name);
   if (!m) return new Response('Not found', { status: 404 });
   const j = await jobByTicket(env, 'ticket', m[1]);
@@ -476,20 +476,46 @@ async function serveMedia(env, name) {
     const t = await kv(env).get(`sv/thumb/${j.id}`, 'stream');
     return t ? new Response(t, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'content-disposition': `inline; filename="${safe}.jpg"` } }) : new Response('Not found', { status: 404 });
   }
-  return streamVideo(env, j, `${safe}.mp4`);
+  return streamVideo(env, j, `${safe}.mp4`, request);
 }
-function streamVideo(env, j, filename) {
+function partTable(j) {
+  const out = [];
+  let off = 0;
+  for (let n = 1; n <= j.videoParts; n++) { const len = Number(j.videoPartBytes?.[n] ?? 0); out.push({ n, start: off, end: off + len - 1, len }); off += len; }
+  return out;
+}
+/** MP4 with HTTP Range support: phones play, seek and keep playing across the stored parts. */
+async function streamVideo(env, j, filename, request) {
+  const total = Number(j.videoBytes);
+  const dl = request && new URL(request.url).searchParams.has('dl');
+  const base = { 'content-type': 'video/mp4', 'accept-ranges': 'bytes', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'content-disposition': `${dl ? 'attachment' : 'inline'}; filename="${filename}"` };
+  const range = request?.headers.get('range');
+  const m = range && /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+  if (m && total > 0) {
+    let start = m[1] === '' ? Math.max(0, total - Number(m[2])) : Number(m[1]);
+    let end = m[1] === '' || m[2] === '' ? total - 1 : Math.min(Number(m[2]), total - 1);
+    if (!(start <= end && start < total)) return new Response(null, { status: 416, headers: { ...base, 'content-range': `bytes */${total}` } });
+    const part = partTable(j).find((p) => start >= p.start && start <= p.end);
+    end = Math.min(end, part.end); // one stored part per response; the player asks for the next range
+    const buf = await kv(env).get(`sv/video/${j.id}/${part.n}`, 'arrayBuffer');
+    if (!buf) return new Response('part missing', { status: 500 });
+    const body = buf.slice(start - part.start, end - part.start + 1);
+    return new Response(body, { status: 206, headers: { ...base, 'content-range': `bytes ${start}-${end}/${total}`, 'content-length': String(body.byteLength) } });
+  }
   const { readable, writable } = new TransformStream();
+  const w = writable.getWriter();
   (async () => {
     try {
       for (let n = 1; n <= j.videoParts; n++) {
-        const s = await kv(env).get(`sv/video/${j.id}/${n}`, 'stream');
-        if (!s) throw new Error(`part ${n} missing`);
-        await s.pipeTo(writable, { preventClose: n < j.videoParts });
+        const st = await kv(env).get(`sv/video/${j.id}/${n}`, 'stream');
+        if (!st) throw new Error(`part ${n} missing`);
+        const rd = st.getReader();
+        for (;;) { const { done, value } = await rd.read(); if (done) break; await w.write(value); }
       }
-    } catch (e) { await writable.abort(e).catch(() => {}); }
+      await w.close();
+    } catch (e) { await w.abort(e).catch(() => {}); }
   })();
-  return new Response(readable, { headers: { 'content-type': 'video/mp4', 'content-length': String(j.videoBytes), 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'content-disposition': `attachment; filename="${filename}"` } });
+  return new Response(readable, { headers: { ...base, 'content-length': String(total) } });
 }
 
 /* ---------------- GitHub Actions OIDC (runner auth without repo secrets) ---------------- */
@@ -579,7 +605,7 @@ async function route(request, env) {
     const img = j ? await kv(env).get(`sv/img/${j.id}/${Number(m[1])}`, 'stream') : null;
     return img ? new Response(img, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex' } }) : new Response('Not found', { status: 404 });
   }
-  if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1]);
+  if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1], request);
   if (seg[0] === 'u' && seg[1]) {
     const j = /^[0-9a-f]{32}$/.test(seg[1]) ? await jobByTicket(env, 'uploadTicket', seg[1]) : null;
     if (!j) return new Response('This upload link is not valid.', { status: 404 });
@@ -686,7 +712,7 @@ async function route(request, env) {
     if (seg[4] === 'short-done' && method === 'POST') { const r = await markShort(env, j, await readJson(request)); ping(env, request, { title: 'Short is live', body: `${songName(r)} Short is on YouTube.`, url: r.short.url, tag: r.id + 's' }); return json({ job: { id: r.id, short: r.short } }); }
     if (seg[4] === 'progress' && method === 'POST') { const r = await saveProgress(env, j, await readJson(request)); return json({ ok: true, status: r.status }); }
     if (seg[4] === 'published' && method === 'POST') { const r = await markPublished(env, j, await readJson(request)); ping(env, request, { title: 'Live on YouTube', body: `${songName(r)} (${r.publish.privacyEffective}).`, url: r.publish.url, tag: r.id + 'p' }); return json({ job: { id: r.id, publish: r.publish } }); }
-    if (seg[4] === 'video' && method === 'GET') { if (j.status !== 'ready') throw new HttpError(409, 'Video not ready'); return streamVideo(env, j, 'video.mp4'); }
+    if (seg[4] === 'video' && method === 'GET') { if (j.status !== 'ready') throw new HttpError(409, 'Video not ready'); return streamVideo(env, j, 'video.mp4', request); }
     if (seg[4] === 'thumb' && method === 'GET') { const t = await kv(env).get(`sv/thumb/${j.id}`, 'stream'); if (!t) throw new HttpError(404, 'No thumbnail'); return new Response(t, { headers: { 'content-type': 'image/jpeg' } }); }
     if (seg[4] === 'fail' && method === 'POST') { const fb = await readJson(request); const r = await failJob(env, j, fb.error, fb.stage); if (r.status === 'failed' || r.publish?.state === 'failed' || r.short?.state === 'failed') ping(env, request, { title: 'Song job failed', body: `${songName(r)}: ${String(fb.error || '').slice(0, 140)}`, tag: r.id + 'f' }); return json({ job: { id: r.id, status: r.status } }); }
   }
