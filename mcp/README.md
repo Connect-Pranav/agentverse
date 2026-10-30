@@ -29,11 +29,14 @@ YouTube posting needs three GitHub repo secrets (free, YouTube Data API v3):
 2. OAuth consent screen → External → add yourself as a user → **Publish app** (in "Testing" the refresh token expires after 7 days).
 3. Credentials → OAuth client ID → *Web application* → redirect URI `https://developers.google.com/oauthplayground`.
 4. <https://developers.google.com/oauthplayground> → ⚙ → *Use your own OAuth credentials* → scope
-   `https://www.googleapis.com/auth/youtube.upload` → Authorize (choose the Sunverse channel) → Exchange → copy the refresh token.
+   `https://www.googleapis.com/auth/youtube.force-ssl` (posts videos, Shorts and comment replies, reads subscribers) → Authorize (choose the Sunverse channel) → Exchange → copy the refresh token.
 5. Repo secrets: `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`.
 
 Until Google audits the API project, YouTube keeps API uploads **private**; the tile then says so and links to
 YouTube Studio, where one click makes it public.
+
+Song videos need **no GitHub secrets**: the renderer signs in with GitHub OIDC; without `GEMINI_API_KEY` it uses free
+faster-whisper + the cloud brain + Cloudflare FLUX images and skips the spend approval.
 
 Optional instant start: add Cloudflare Worker secret `GH_DISPATCH_TOKEN` (GitHub fine-grained token for this repo with
 **Actions: read and write**). Without it the renderer runs every 15 minutes and the time estimate includes that wait.

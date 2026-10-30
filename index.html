@@ -664,6 +664,26 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
 #mcpTile.in-col>.sub,#mcpTile.in-col .mcpt>.sub{display:none}
 #mcpTile.in-col .mt-vid{max-width:100%}
 .wrap>.col:nth-child(5){display:flex;flex-direction:column;gap:14px}
+/* Growth tile */
+#growthTile h6{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--org2);margin:12px 0 6px}
+#growthTile.board-like{margin:0 24px 18px}
+.gr-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.gr-stats div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:10px}
+.gr-stats b{display:block;font:700 20px var(--fb);font-variant-numeric:tabular-nums}
+.gr-stats small{font-size:10.5px;color:var(--mut)}
+.gr-subs{display:flex;flex-wrap:wrap;gap:6px}
+.gr-subs a{font-size:12px;color:#fff;text-decoration:none;padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22)}
+.gr-note{font-size:11px;color:var(--mut);margin:6px 0 0}
+.gr-c{background:rgba(139,108,255,.14);border:1px solid rgba(196,181,255,.4);border-radius:14px;padding:10px;margin-bottom:8px}
+.gr-q{font-size:12.5px;margin-bottom:6px;overflow-wrap:anywhere}
+.gr-c textarea{width:100%;box-sizing:border-box;min-height:58px;font:13px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px}
+.gr-c .acts,.mt-job .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.gr-c .acts button{display:inline-flex;align-items:center;gap:5px;font:600 12px var(--fb);border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:#fff;border-radius:99px;padding:7px 13px;min-height:36px}
+.gr-c .acts .ap{background:#fff;color:#1d1510;border-color:#fff}
+.gr-done{font-size:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.1);overflow-wrap:anywhere}
+.gr-auto{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:12px}
+#growthTile .r,.mt-sh{font-size:12px}#growthTile .r{color:#ffb3c9}
+.mt-free{font-size:12px;margin:8px 0 0;color:#b8f5d0}
 
 </style>
 </head>
@@ -783,6 +803,11 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
     </div>
   </div>
 </section>
+<section class="panel" id="growthTile">
+      <div class="ph"><h3>Growth &middot; Sunverse YouTube</h3><span class="badge" id="grBadge">CHECKING</span></div>
+      <div class="sub">new subscribers &middot; AI replies to comments &middot; Shorts for reach</div>
+      <div id="grBody" aria-live="polite"><div class="empty">Loading…</div></div>
+    </section>
     <section class="panel focus" id="pFocus" aria-live="polite">
       <div class="fk"><div class="k">AGENT IN FOCUS</div><div class="topic" id="topic">TOPIC · —</div></div>
       <h2 id="focusName">Orchestrator</h2>
@@ -1281,8 +1306,8 @@ function brandCtx(extraLead){
   return s;
 }
 var ORCH_SYS = "You are the ORCHESTRATOR of AGENTVERSE, an autonomous AI social media and growth team working for the owner. Decide what the team works on next for ONE brand. Use the brand brain, follow the owner rules strictly, learn from owner feedback, and avoid repeating recent topics. Departments: "+DEPNAMES.join(", ")+". Respond with JSON: {\"topic\":\"max 8 words\",\"why\":\"max 20 words\",\"tasks\":[{\"dept\":\"exact department name\",\"task\":\"max 25 words\",\"lead_id\":\"id or null\"}]} with 3 to 5 tasks. If FRESH LEADS exist, add one 'Leads & Conversations' task per lead (max 2) with its lead_id.";
-var DEPT_SYS = "You are the department agents of AGENTVERSE. For every task in the PLAN, produce the finished deliverable the owner can use right away: e.g. a post caption with hashtags, a 30-second reel script in 3 scenes, a YouTube title + description + tags, a comment reply, a reply message to a lead, SEO keywords, or a short learning note. Write in the brand voice. Never invent facts, prices, numbers, results or testimonials; use [placeholders] instead. Replies to leads must answer the person's actual need first, be short, human and non-spammy, and mention the product only where it truly helps. Respond with JSON: {\"items\":[{\"dept\":\"department name\",\"title\":\"max 10 words\",\"body\":\"max 150 words\",\"needs_approval\":true or false,\"lead_id\":\"id or null\"}],\"summary\":\"max 20 words, what the team learned or did\"}. needs_approval must be true for anything that would be published or sent to a person.";
-var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice with the owner, "+CONFIG.owner+". Reply in natural spoken Hinglish (Hindi in Roman script mixed with English), 1 to 3 short sentences, no markdown, no emojis, no lists, no ids read aloud unless asked. You can control AGENTVERSE by adding actions: approve {id}, reject {id, reason}, run_cycle {value: optional focus text}, autopilot {value: true or false}, set_brand {value: brand name}, remember {value: a rule the team must follow}, draft_lead {id}, open_board {value: waiting|ready|all|leads}, open_link {value: youtube|instagram|ganesha|github|gmail|alerts}, open_mcp {} (opens the MCP song-to-video tile: upload a song, see progress, approve, post to YouTube), approve_song {id: song job_id} (only when the owner clearly says approve the song), post_song {id: song job_id, value: public|unlisted|private} (only when the owner clearly says post it on YouTube). STATE lists the MCP song jobs. Take an action only when the owner clearly asks for it; for 'approve all' add one approve per waiting id. Answer questions from STATE honestly; if something isn't in STATE say you don't know. Respond with JSON: {\"reply\":\"what you say\",\"actions\":[{\"type\":\"...\",\"id\":\"...\",\"value\":\"...\",\"reason\":\"...\"}]}";
+var DEPT_SYS = "You are the department agents of AGENTVERSE. Never write bulk or unsolicited DMs, follow-for-follow, giveaway bait or messages with placeholders like [Follower Name] (Instagram/YouTube ban accounts for mass messaging); for outreach only write a reply to a specific named lead or a public comment/post. For every task in the PLAN, produce the finished deliverable the owner can use right away: e.g. a post caption with hashtags, a 30-second reel script in 3 scenes, a YouTube title + description + tags, a comment reply, a reply message to a lead, SEO keywords, or a short learning note. Write in the brand voice. Never invent facts, prices, numbers, results or testimonials; use [placeholders] instead. Replies to leads must answer the person's actual need first, be short, human and non-spammy, and mention the product only where it truly helps. Respond with JSON: {\"items\":[{\"dept\":\"department name\",\"title\":\"max 10 words\",\"body\":\"max 150 words\",\"needs_approval\":true or false,\"lead_id\":\"id or null\"}],\"summary\":\"max 20 words, what the team learned or did\"}. needs_approval must be true for anything that would be published or sent to a person.";
+var VANI_SYS = "You are VANI, the voice agent of AGENTVERSE, talking by voice with the owner, "+CONFIG.owner+". Reply in natural spoken Hinglish (Hindi in Roman script mixed with English), 1 to 3 short sentences, no markdown, no emojis, no lists, no ids read aloud unless asked. You can control AGENTVERSE by adding actions: approve {id}, reject {id, reason}, run_cycle {value: optional focus text}, autopilot {value: true or false}, set_brand {value: brand name}, remember {value: a rule the team must follow}, draft_lead {id}, open_board {value: waiting|ready|all|leads}, open_link {value: youtube|instagram|ganesha|github|gmail|alerts}, open_mcp {} (opens the MCP song-to-video tile: upload a song, see progress, approve, post to YouTube), approve_song {id: song job_id} (only when the owner clearly says approve the song), post_song {id: song job_id, value: public|unlisted|private} (only when the owner clearly says post it on YouTube). STATE lists the MCP song jobs and the YouTube growth numbers. make_short {id: song job_id} (only when the owner clearly asks for a Short). Take an action only when the owner clearly asks for it; for 'approve all' add one approve per waiting id. Answer questions from STATE honestly; if something isn't in STATE say you don't know. Respond with JSON: {\"reply\":\"what you say\",\"actions\":[{\"type\":\"...\",\"id\":\"...\",\"value\":\"...\",\"reason\":\"...\"}]}";
 
 /* ---------------- demo brain (no AI) ---------------- */
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
@@ -1875,8 +1900,9 @@ function mcpSummary(){
   if(!STU.jobs.length)return " MCP song jobs: none yet.";
   return " MCP song jobs: "+STU.jobs.slice(0,5).map(function(j){var e=svEta(j);return j.job_id+" '"+((j.youtube&&j.youtube.title)||j.title||"untitled")+"' = "+(j.publish?"youtube "+j.publish.state:j.status)+(e.s?" (~"+Math.ceil(e.s/60)+" min left)":"")+(j.status==="needs_approval"?" needs approval, est "+(j.est_cost_inr?"Rs "+j.est_cost_inr:"$"+j.est_cost_usd):"");}).join("; ")+".";
 }
+function growthSummary(){ var d=typeof GR!=="undefined"&&GR.d; if(!d)return ""; if(!d.connected)return " YouTube growth agent: not connected yet."; return " YouTube: "+d.channel.subs+" subscribers"+(d.subs_7d!==null?" ("+(d.subs_7d>=0?"+":"")+d.subs_7d+" in 7 days)":"")+", "+d.posted_today+" comment replies today, "+d.waiting+" replies waiting for approval, newest subscribers: "+(d.new_subscribers||[]).slice(0,3).map(function(s){return s.name;}).join(", ")+"."; }
 function stateSummary(){
-  var w=waiting(),i,s=mcpSummary()+" Active brand: "+ST.brand+". Brands: "+Object.keys(ST.brands).join(", ")+". Autopilot: "+(autopilot?"on":"off")+". Brain: "+provider()+". Cycles done: "+ST.cycles+". Ready to post: "+readyCount()+".";
+  var w=waiting(),i,s=mcpSummary()+growthSummary()+" Active brand: "+ST.brand+". Brands: "+Object.keys(ST.brands).join(", ")+". Autopilot: "+(autopilot?"on":"off")+". Brain: "+provider()+". Cycles done: "+ST.cycles+". Ready to post: "+readyCount()+".";
   s+="\nWAITING FOR OWNER ("+w.length+"):";for(i=0;i<w.length&&i<8;i++){s+="\n- id "+w[i].id+" | "+w[i].brand+" | "+w[i].dept+" | "+w[i].title+" | "+w[i].body.slice(0,140).replace(/\s+/g," ");}
   s+="\nLATEST OUTPUTS:";for(i=0;i<ST.outputs.length&&i<5;i++){s+="\n- "+ST.outputs[i].status+" | "+ST.outputs[i].title;}
   var L=brandLeads();s+="\nFRESH LEADS for "+ST.brand+" ("+L.length+" of "+freshCount()+" total):";for(i=0;i<L.length&&i<5;i++){s+="\n- id "+L[i].id+" | "+L[i].source+" | score "+(L[i].score||0)+" | "+String(L[i].title).slice(0,90);}
@@ -1906,6 +1932,7 @@ function doActions(acts){
     else if(t==="draft_lead")draftLead(a.id);
     else if(t==="open_link")openLink(a.value||a.id);
     else if(t==="open_mcp")go("studio");
+    else if(t==="make_short"&&a.id&&SET.mcpToken)stuApi("POST","/api/songvideo/"+a.id+"/short",{}).then(function(){toast("Short coming",true);stuLoad();},function(e){vsys("MCP: "+e.message);});
     else if((t==="approve_song"||t==="post_song")&&a.id&&SET.mcpToken)stuApi("POST","/api/songvideo/"+a.id+"/"+(t==="approve_song"?"approve":"publish"),t==="post_song"?{privacy:/^(public|unlisted|private)$/.test(a.value)?a.value:"public"}:{}).then(function(){toast(t==="approve_song"?"Song approved":"Posting to YouTube…",true);stuLoad();},function(e){vsys("MCP: "+e.message);});
     else if(t==="open_board"){var ov=a.value||"waiting"; if(ov==="leads")go("leads"); else {VIEWS.work.tab=ov; switchView("work"); if(VIEW==="work"){boardTab=ov;renderBoard();}}}
   }
@@ -1968,22 +1995,23 @@ function modalOut(){
 /* ---------------- page views (video-style: blur out → glass skeleton → sharpen) ---------------- */
 var VIEW="overview";
 var VIEWS={
-  overview:{t:"Overview",s:"Your agent team at a glance",show:["wrap","loop","legend","mcpTile"]},
+  overview:{t:"Overview",s:"Your agent team at a glance",show:["wrap","loop","legend","mcpTile","growthTile"]},
   agents:{t:"Agents",s:"Eight departments and the live feed",show:["wrap"],cls:"v-agents"},
   work:{t:"Work",s:"Everything the team made — approve, reject, copy",show:["board"],tab:"waiting"},
   leads:{t:"Leads",s:"People who need what you sell",show:["board"],tab:"leads"},
-  studio:{t:"MCP · Song → Video",s:"Upload a song — get a finished Sunverse video on YouTube",show:["mcpTile","studio"]}
+  studio:{t:"MCP · Song → Video",s:"Upload a song — get a finished Sunverse video on YouTube",show:["mcpTile","growthTile","studio"]}
 };
 function greet(){var h=new Date().getHours();return h<12?"Good morning":(h<17?"Good afternoon":"Good evening");}
 function setTitle(v){ $("vtitle").firstChild.nodeValue=(v==="overview"?greet()+", "+CONFIG.owner:VIEWS[v].t); $("vsub").innerHTML=VIEWS[v].s; }
 function applyView(v){
-  var V=VIEWS[v],ids=["wrap","loop","legend","board","mcpTile","studio"];
+  var V=VIEWS[v],ids=["wrap","loop","legend","board","mcpTile","growthTile","studio"];
   for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
   $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
   /* each page has its own panel: Work = work board only, Leads = lead radar only */
   var mt=$("mcpTile"),fc=$("pFocus").parentNode;
-  if(v==="studio"){ if(mt.nextElementSibling!==$("studio"))$("studio").parentNode.insertBefore(mt,$("studio")); mt.classList.remove("in-col"); stuLoad(); }
-  else if(mt.parentNode!==fc){ fc.insertBefore(mt,$("pFocus")); mt.classList.add("in-col"); }
+  var gt=$("growthTile");
+  if(v==="studio"){ if(mt.nextElementSibling!==$("studio"))$("studio").parentNode.insertBefore(mt,$("studio")); mt.classList.remove("in-col"); $("studio").parentNode.insertBefore(gt,$("studio")); gt.classList.add("board-like"); stuLoad(); grLoad(); }
+  else if(mt.parentNode!==fc){ fc.insertBefore(mt,$("pFocus")); fc.insertBefore(gt,$("pFocus")); mt.classList.add("in-col"); gt.classList.remove("board-like"); }
   if(v==="work"){ $("boardTitle").innerHTML="Work Board"; $("tabs").style.display=""; $("tabLeads").style.display="none"; if(boardTab==="leads")boardTab="waiting"; }
   else if(v==="leads"){ $("boardTitle").innerHTML="Lead Radar"; $("tabs").style.display="none"; }
   if(V.tab){boardTab=V.tab;renderBoard._tab=null;renderBoard();}
@@ -2529,7 +2557,7 @@ function stuApi(method,path,body){
   return fetch(path,{method:method,cache:"no-store",headers:{"Content-Type":"application/json",Authorization:"Bearer "+SET.mcpToken},body:body?JSON.stringify(body):undefined})
     .then(function(r){return r.text().then(function(t){var j={};try{j=JSON.parse(t);}catch(e){} if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status)); return j;});});
 }
-function isLive(j){ return !!j&&(["queued","analyzing","approved","rendering"].indexOf(j.status)>=0||(j.status==="ready"&&j.publish&&(j.publish.state==="requested"||j.publish.state==="publishing"))); }
+function isLive(j){ return !!j&&(["queued","analyzing","approved","rendering"].indexOf(j.status)>=0||(j.status==="ready"&&((j.publish&&(j.publish.state==="requested"||j.publish.state==="publishing"))||(j.short&&(j.short.state==="requested"||j.short.state==="making"))))); }
 function stuLoad(){
   stuProbe(function(ok){
     mtSetup(ok);
@@ -2562,7 +2590,7 @@ function svWait(j,since){
   if(STU.health&&STU.health.instantStart)return Math.max(20,90-since);
   var d=new Date(),m=d.getUTCMinutes(),s=d.getUTCSeconds(),slots=[3,18,33,48],next=63;
   for(var i=0;i<slots.length;i++)if(slots[i]*60>m*60+s){next=slots[i];break;}
-  return (next*60-(m*60+s))+150; /* GitHub schedule start-up delay */
+  return (next*60-(m*60+s))+600; /* GitHub often starts scheduled runs late */
 }
 function svRenderEst(j){ var n=j.image_count||10,d=j.duration_s||180; return n*20+40+d*0.9+25; }
 function svPublishEst(j){ return 40+(j.video_mb||40)*0.3; }
@@ -2570,11 +2598,13 @@ function svEta(j){
   var now=Date.now(),p=j.progress,since=function(t){return t?Math.max(0,(now-Date.parse(t))/1000):0;};
   var fromP=function(stage){ return p&&p.stage===stage&&p.at?Math.max(5,p.eta_s-since(p.at)):null; };
   var x=null,label="",after=null;
-  if(j.status==="queued"){ x=svWait(j,since(j.queued_at))+110; label="until the song is analysed"; }
+  if(j.status==="queued"){ x=svWait(j,since(j.queued_at))+200; label="until the song is analysed"; }
   else if(j.status==="analyzing"){ x=fromP("analyze"); if(x===null)x=Math.max(10,120-since(j.updated_at)); label="until the analysis is ready"; }
   else if(j.status==="needs_approval"){ after=svWait(j,0)+svRenderEst(j); label="waiting for you"; }
   else if(j.status==="approved"){ x=svWait(j,since(j.decided_at))+svRenderEst(j); label="until the video is ready"; }
   else if(j.status==="rendering"){ x=fromP("render"); if(x===null)x=Math.max(15,svRenderEst(j)-since(j.updated_at)); label="until the video is ready"; }
+  else if(j.status==="ready"&&j.short&&j.short.state==="requested"&&!(j.publish&&(j.publish.state==="requested"||j.publish.state==="publishing"))){ x=svWait(j,since(j.short.requested_at))+150; label="until the Short is live"; }
+  else if(j.status==="ready"&&j.short&&j.short.state==="making"){ x=fromP("short"); if(x===null)x=150; label="until the Short is live"; }
   else if(j.status==="ready"&&j.publish&&j.publish.state==="requested"){ x=svWait(j,since(j.publish.requested_at))+svPublishEst(j); label="until it is live on YouTube"; }
   else if(j.status==="ready"&&j.publish&&j.publish.state==="publishing"){ x=fromP("publish"); if(x===null)x=svPublishEst(j); label="until it is live on YouTube"; }
   return {s:x,label:label,after:after};
@@ -2618,10 +2648,11 @@ function mtRender(){
   if(e.s!==null){ STU.deadline=Date.now()+e.s*1000; STU.etaLabel=e.label;
     var pct=p&&p.total?Math.round(p.done/p.total*100):0;
     h+='<div class="mt-eta"><b id="mtEta">≈ '+fmtDur(e.s)+'</b><span id="mtEtaL">'+esc(e.label)+' &middot; about '+fmtClock(STU.deadline)+'</span></div>';
-    h+='<div class="mt-now"><span class="mt-dot"></span>'+esc(p&&p.step?p.step:(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")?((STU.health&&STU.health.instantStart)?"Starting the renderer…":"Waiting for the renderer (it starts every 15 min)"):"Working…"))+'</div>';
+    h+='<div class="mt-now"><span class="mt-dot"></span>'+esc(p&&p.step?p.step:(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")?((STU.health&&STU.health.instantStart)?"Starting the renderer…":"Waiting for the GitHub renderer (scheduled every 15 min — GitHub sometimes starts it late)"):"Working…"))+'</div>';
     h+='<div class="stu-bar"><i style="width:'+(pct||4)+'%"></i></div>';
   } else STU.deadline=0;
   if(j.plan){
+    if(j.auto_approved||j.image_engine==="cloudflare")h+='<p class="mt-free">Free plan: Cloudflare images, no cost — went straight to the video.</p>';
     h+='<div class="mt-info"><div><h6>Mood</h6><p>'+esc(j.plan.mood||"—")+'</p><h6>Theme</h6><p>'+esc(j.plan.theme||"—")+'</p></div><div><h6>Lyrics'+(j.lyrics_lines_count?' &middot; '+j.lyrics_lines_count+' lines':'')+'</h6><div class="mt-lyr">'+esc((j.lyrics_preview||[]).join("\n")||"—")+((j.lyrics_lines_count||0)>8?"\n…":"")+'</div></div></div>';
   }
   if(j.status==="needs_approval"){
@@ -2630,6 +2661,10 @@ function mtRender(){
   if(j.status==="ready"){
     h+=(j.video_url?'<video controls preload="metadata" playsinline class="mt-vid" '+(j.thumbnail_url?'poster="'+esc(j.thumbnail_url)+'"':'')+' src="'+esc(j.video_url)+'"></video>':'');
     h+='<div class="acts"><a href="'+esc(j.video_url)+'" download><span data-i="download"></span>MP4'+(j.video_mb?' &middot; '+j.video_mb+' MB':'')+'</a>'+(j.thumbnail_url?'<a href="'+esc(j.thumbnail_url)+'" download><span data-i="image"></span>Thumbnail</a>':'')+'</div>';
+    var sh=j.short;
+    if(sh&&sh.state==="published")h+='<div class="acts"><a href="'+esc(sh.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Short is live</a></div>';
+    else if(sh&&(sh.state==="requested"||sh.state==="making"))h+='<p class="mt-sh">Short: '+(sh.state==="making"?"cutting &amp; uploading…":"queued")+'</p>';
+    else h+='<div class="acts"><button data-mt="short" type="button"><span data-i="film"></span>'+(sh&&sh.state==="failed"?"Retry YouTube Short":"Make YouTube Short (chorus, 40 s)")+'</button></div>'+(sh&&sh.error?'<p class="r">'+esc(String(sh.error).slice(0,160))+'</p>':'');
     if(pub&&pub.state==="published"){
       h+='<div class="mt-ask ok"><p><b>Live on YouTube</b> &middot; '+esc(pub.privacy_effective||pub.privacy)+'</p><div class="acts"><a class="ap" href="'+esc(pub.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Open video</a><a href="https://studio.youtube.com/" target="_blank" rel="noopener"><span data-i="external-link"></span>YouTube Studio</a></div>'+
         ((pub.privacy_effective&&pub.privacy_effective!==pub.privacy)?'<p class="r">YouTube kept it '+esc(pub.privacy_effective)+'. Open YouTube Studio &rarr; Visibility &rarr; '+esc(pub.privacy)+'.</p>':'')+'</div>';
@@ -2656,6 +2691,12 @@ setInterval(function(){
 $("mtJob").onclick=function(e){
   var b=e.target.closest?e.target.closest("button[data-mt]"):null; if(!b||!STU.cur)return;
   var a=b.getAttribute("data-mt"),id=STU.cur.job_id;
+  if(a==="short"){
+    if(b.getAttribute("data-c")!=="1"){ b.setAttribute("data-c","1"); b.lastChild.nodeValue="Tap again to post the Short"; return; }
+    b.disabled=true;
+    stuApi("POST","/api/songvideo/"+id+"/short",{}).then(function(r){ toast("Short coming — chorus cut, posted to YouTube",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    return;
+  }
   if(a==="publish"){
     var pv=$("mtYtP").value;
     if(b.getAttribute("data-c")!=="1"){ b.setAttribute("data-c","1"); b.textContent="Tap again to post ("+pv+")"; setTimeout(function(){ if(b.parentNode){b.removeAttribute("data-c");b.textContent="Post to YouTube";} },6000); return; }
@@ -2712,6 +2753,65 @@ $("stuJobs").onclick=function(e){
 setInterval(function(){ if(!SET.mcpToken||!STU.backend||document.hidden)return; if(isLive(STU.cur))stuRefreshCur(); },10000);
 setInterval(function(){ if(SET.mcpToken&&STU.backend&&!document.hidden)stuLoad(); },90000);
 setTimeout(stuLoad,2500);
+
+/* =====================================================================
+   GROWTH — Sunverse YouTube: subscribers, AI comment replies (simple = auto, rest = your OK)
+   ===================================================================== */
+var GR={d:null};
+function grLoad(){
+  if(!STU.backend||!SET.mcpToken){ grSetup(); return; }
+  stuApi("GET","/api/growth").then(function(d){ var prev=GR.d; GR.d=d; grRender(); grNotify(prev,d); },function(e){ $("grBody").innerHTML='<p class="r">'+esc(e.message)+'</p>'; });
+}
+function grSetup(){
+  var b=$("grBadge");
+  if(!STU.backend){ b.textContent="CLOUDFLARE ONLY"; $("grBody").innerHTML='<div class="empty">Runs on the Cloudflare AGENTVERSE.</div>'; return; }
+  if(!SET.mcpToken){ b.textContent="ADD TOKEN"; $("grBody").innerHTML='<div class="empty">Add your AGENTVERSE token in the MCP tile.</div>'; }
+}
+function grNotify(prev,d){
+  if(!prev||!d)return;
+  var nw=(d.new_subscribers||[]).filter(function(s){ return !(prev.new_subscribers||[]).some(function(p){return p.id===s.id;}); });
+  if(nw.length)feed("Leads & Conversations","Owner","users",nw.length+" new subscriber"+(nw.length>1?"s":"")+": "+nw.slice(0,3).map(function(s){return s.name;}).join(", "));
+  if(d.waiting>(prev.waiting||0))feed("Reviews & Reputation","Owner","message-circle",(d.waiting-(prev.waiting||0))+" comment repl"+(d.waiting-(prev.waiting||0)>1?"ies":"y")+" need your OK in Growth.");
+}
+function grRender(){
+  var d=GR.d,h="",i,b=$("grBadge");
+  if(!d){grSetup();return;}
+  if(!d.connected){
+    b.textContent="CONNECT YOUTUBE"; b.className="badge";
+    h='<div class="empty"><b>YouTube not connected yet.</b><br>Add GitHub secrets YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.force-ssl) — steps in mcp/README.md.'+(d.last_error?'<br><span class="r">Last run: '+esc(d.last_error.message)+'</span>':'')+'</div>';
+    $("grBody").innerHTML=h; return;
+  }
+  b.textContent=d.waiting?d.waiting+" WAITING":"LIVE"; b.className="badge "+(d.waiting?"":"run");
+  var c=d.channel;
+  h+='<div class="gr-stats"><div><b>'+(c.hidden_subs?"hidden":Number(c.subs).toLocaleString("en-IN"))+'</b><small>subscribers'+(d.subs_7d!==null?' · '+(d.subs_7d>=0?"+":"")+d.subs_7d+' in 7 days':'')+'</small></div><div><b>'+Number(c.views).toLocaleString("en-IN")+'</b><small>views</small></div><div><b>'+d.posted_today+'</b><small>replies today</small></div></div>';
+  if((d.new_subscribers||[]).length){
+    h+='<h6>New subscribers</h6><div class="gr-subs">';
+    for(i=0;i<Math.min(8,d.new_subscribers.length);i++){ var s=d.new_subscribers[i]; h+='<a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.name||"viewer")+'</a>'; }
+    h+='</div><p class="gr-note">YouTube shows only subscribers who keep their subscriptions public.</p>';
+  }
+  var w=(d.replies||[]).filter(function(r){return r.state==="waiting"||r.state==="failed";});
+  if(w.length){
+    h+='<h6>Replies waiting for you</h6>';
+    for(i=0;i<Math.min(6,w.length);i++){ var r=w[i];
+      h+='<div class="gr-c" data-cid="'+esc(r.cid)+'"><div class="gr-q"><b>'+esc(r.author)+'</b>'+(r.video_title?' · '+esc(r.video_title):'')+'<br>'+esc(r.text)+'</div><textarea aria-label="Reply">'+esc(r.draft)+'</textarea>'+(r.error?'<p class="r">'+esc(r.error)+'</p>':'')+'<div class="acts"><button class="ap" data-gr="approve" type="button"><span data-i="send"></span>Send reply</button><button data-gr="reject" type="button"><span data-i="x"></span>Skip</button></div></div>'; }
+  }
+  var p=(d.replies||[]).filter(function(r){return r.state==="posted";}).slice(0,3);
+  if(p.length){ h+='<h6>Recently replied</h6>'; for(i=0;i<p.length;i++)h+='<div class="gr-done"><b>'+esc(p[i].author)+':</b> '+esc(String(p[i].text).slice(0,70))+'<br>↳ '+esc(p[i].draft)+'</div>'; }
+  if(!w.length&&!p.length)h+='<p class="gr-note">No new comments yet. The agent checks every hour.</p>';
+  h+='<label class="gr-auto"><input type="checkbox" id="grAuto"'+(d.settings&&d.settings.autoSimple?" checked":"")+'> Auto-send simple replies (thanks, praise, greetings). Others wait for you.</label>';
+  h+='<p class="gr-note">Checked '+(d.last_run?ago(Date.parse(d.last_run))+' ago':'—')+(d.last_error?' · <span class="r">'+esc(d.last_error.message)+'</span>':'')+'</p>';
+  $("grBody").innerHTML=h;
+  var els=$("grBody").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
+  var au=$("grAuto"); if(au)au.onchange=function(){ stuApi("POST","/api/growth/settings",{autoSimple:au.checked}).then(function(x){GR.d=x;grRender();toast(au.checked?"Simple replies go out automatically":"Every reply waits for you",true);},function(e){toast(e.message,false);}); };
+}
+$("grBody").onclick=function(e){
+  var b=e.target.closest?e.target.closest("button[data-gr]"):null; if(!b)return;
+  var box=b.closest(".gr-c"),cid=box.getAttribute("data-cid"),a=b.getAttribute("data-gr");
+  b.disabled=true;
+  stuApi("POST","/api/growth/reply/"+encodeURIComponent(cid),{action:a,draft:box.querySelector("textarea").value}).then(function(x){ GR.d=x; grRender(); toast(a==="approve"?"Reply queued — posts within the hour":"Skipped",a==="approve"); },function(e2){ toast(e2.message,false); b.disabled=false; });
+};
+setInterval(function(){ if(STU.backend&&SET.mcpToken&&!document.hidden)grLoad(); },120000);
+setTimeout(grLoad,3500);
 
 /* ---------------- render all ---------------- */
 function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();updateBrain();}

@@ -1,0 +1,36 @@
+name: SUNVERSE growth agent (YouTube)
+
+# Hourly: channel stats, new public subscribers, AI replies to new comments.
+# Simple replies (thanks/praise) post automatically when enabled in AGENTVERSE; everything else waits for approval.
+# Secrets: YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.force-ssl); optional GEMINI_API_KEY.
+
+on:
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: growth
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Growth cycle
+        env:
+          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$YT_REFRESH_TOKEN" ]; then echo "YouTube not connected yet (YT_* secrets) — nothing to do."; exit 0; fi
+          python3 scripts/growth-runner.py

@@ -11,8 +11,11 @@ Stage "publish" (only after the owner pressed "Post to YouTube"): uploads the MP
 the YouTube Data API (title, description with credits, tags, Music category, AI-content disclosure, thumbnail).
 Every stage reports progress + estimated time left to the Worker for the AGENTVERSE MCP tile.
 
-Env: SV_MCP_URL (the sunverse-mcp Worker), SV_MCP_TOKEN (its MCP_TOKEN), GEMINI_API_KEY (+ OPENAI_API_KEY for the openai engine).
-YouTube: YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.upload).
+Without GEMINI_API_KEY everything is free: faster-whisper (lyrics) + AGENTVERSE cloud brain (mood/theme/scenes) +
+Cloudflare FLUX images; free plans skip the spend approval.
+Env: SV_MCP_URL (the AGENTVERSE Worker); auth = SV_MCP_TOKEN or the GitHub Actions OIDC token (no secret needed);
+optional GEMINI_API_KEY (paid Gemini listening + images), OPENAI_API_KEY for the openai engine.
+YouTube: YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.force-ssl).
 Optional: GEMINI_TEXT_MODEL, GEMINI_IMAGE_MODEL, OPENAI_IMAGE_MODEL, SONGVIDEO_IMAGE_ENGINE, SONGVIDEO_IMAGE_USD.
 """
 import base64, json, math, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request
@@ -62,9 +65,27 @@ def http(method, url, body=None, headers=None, timeout=180, want="json"):
         raise RuntimeError(f"network error {url.split('?')[0]}: {redact(e)}")
 
 
+_TOK = {"v": None, "t": 0}
+
+
+def runner_token():
+    """SV_MCP_TOKEN secret if set; otherwise a fresh GitHub Actions OIDC token (no repo secret needed)."""
+    t = (os.environ.get("SV_MCP_TOKEN") or "").strip()
+    if t:
+        return t
+    url, req = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL"), os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+    if not (url and req):
+        raise RuntimeError("no runner credentials: set SV_MCP_TOKEN or run on GitHub Actions with permissions id-token: write")
+    if _TOK["v"] and time.time() - _TOK["t"] < 240:
+        return _TOK["v"]
+    r = http("GET", url + ("&" if "?" in url else "?") + "audience=agentverse", None, {"authorization": f"bearer {req}"}, 30)
+    _TOK.update(v=r["value"], t=time.time())
+    return _TOK["v"]
+
+
 def ganesha(method, path, body=None, headers=None, timeout=300, want="json"):
-    """Call the sunverse-mcp Worker (name kept for the shared runner code)."""
-    h = {"authorization": f"Bearer {env('SV_MCP_TOKEN')}"}
+    """Call the AGENTVERSE Worker (name kept for the shared runner code)."""
+    h = {"authorization": f"Bearer {runner_token()}"}
     h.update(headers or {})
     return http(method, env("SV_MCP_URL").rstrip("/") + path, body, h, timeout, want)
 
@@ -210,8 +231,88 @@ Rules:
 - Never invent facts about the artists beyond the credits given."""
 
 
+FREE_PLAN = """You are the creative director for SUNVERSE, a YouTube music channel (original Hindi songs; lyrics by {lyricist}, singer {singer}).
+Song title from the owner: "{title}". Duration {dur:.0f} s. Visual style: "{style}".
+LYRICS (numbered lines, may be in Devanagari or rough Hinglish from speech recognition):
+{lines}
+
+Return ONE JSON object:
+{{"roman": ["line 1 rewritten in clean Roman Hinglish", "... exactly {count} items, same order, same meaning"],
+ "language": "e.g. Hindi", "mood": "max 12 words", "theme": "max 40 words: what the song is about",
+ "scenes": [{{"summary": "max 15 words", "image_prompt": "detailed prompt"}}],
+ "youtube": {{"title": "max 70 chars, catchy, includes the song name", "description": "3 short paragraphs: the feeling/story of the song, credits (Lyrics: {lyricist} | Singer: {singer}), an invitation to subscribe to Sunverse; end with 5 hashtags", "tags": ["15-20 search tags, Hindi + English"]}}}}
+Rules: exactly {n} scenes in song order following its story; every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
+
+
+def cloud_json(system, prompt):
+    r = ganesha("POST", "/api/brain", {"system": system, "prompt": prompt}, timeout=180)
+    t = re.sub(r"```(json)?", "", str(r.get("text") or ""))
+    a, b = t.find("{"), t.rfind("}")
+    if a < 0 or b < a:
+        raise RuntimeError("cloud brain did not return JSON")
+    return json.loads(t[a:b + 1])
+
+
+def transcribe(audio, jid):
+    """Free speech-to-text on the runner (faster-whisper, CPU)."""
+    from faster_whisper import WhisperModel
+    m = WhisperModel(os.environ.get("WHISPER_MODEL") or "small", device="cpu", compute_type="int8")
+    segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1,
+                           initial_prompt="Hindi song lyrics.")
+    out = []
+    for sg in segs:
+        t = sg.text.strip()
+        if t and sg.end > sg.start:
+            out.append({"start": round(sg.start, 2), "end": round(sg.end, 2), "text": t})
+    return out
+
+
+def analyze_free(job, work, audio, dur, jid):
+    n = max(6, min(12, round(dur / 18)))
+    cr = job.get("credits") or {}
+    owner_lines = [l.strip() for l in (job.get("lyrics") or "").splitlines() if l.strip()]
+    progress(jid, "analyze", "Listening to the lyrics (free speech-to-text)", 2, 4, max(60, dur * 0.6))
+    heard = []
+    try:
+        heard = transcribe(audio, jid)
+    except Exception as e:
+        log(f"[{jid}] transcription failed: {redact(e)}")
+    lines = heard
+    if owner_lines:  # owner lyrics are the truth; spread them over the sung parts
+        sung = [(h["start"], h["end"]) for h in heard] or [(INTRO_S, dur - 2)]
+        a0, a1 = sung[0][0], sung[-1][1]
+        step = max(1.5, (a1 - a0) / max(1, len(owner_lines)))
+        lines = [{"start": round(a0 + i * step, 2), "end": round(a0 + (i + 1) * step - 0.2, 2), "text": t} for i, t in enumerate(owner_lines)]
+    progress(jid, "analyze", "Reading mood, theme and story", 3, 4, 40)
+    numbered = "\n".join(f"{i + 1}. {l['text']}" for i, l in enumerate(lines[:120])) or "(instrumental / no clear vocals)"
+    a = cloud_json("You are a precise creative director. Reply with one JSON object only.",
+                   FREE_PLAN.format(lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"), title=job.get("title") or "",
+                                    dur=dur, style=job.get("style") or "watercolor anime", lines=numbered, count=min(len(lines), 120), n=n))
+    roman = a.get("roman") or []
+    for i, l in enumerate(lines[:120]):
+        if i < len(roman) and str(roman[i]).strip() and not re.search(r"[\u0900-\u097F]", str(roman[i])):
+            l["text"] = str(roman[i]).strip()[:200]
+    lines = [l for l in lines[:120] if not re.search(r"[\u0900-\u097F]", l["text"])]  # never show Devanagari
+    sc = [x for x in (a.get("scenes") or []) if x.get("image_prompt")][:n] or [{"summary": "song", "image_prompt": job.get("style") or "cinematic watercolor scene"}]
+    per = dur / len(sc)
+    scenes = [{"start": round(i * per, 2), "end": round(dur if i == len(sc) - 1 else (i + 1) * per, 2), "summary": x.get("summary", ""), "image_prompt": x["image_prompt"]} for i, x in enumerate(sc)]
+    return {"durationS": dur, "language": a.get("language", "Hindi"), "mood": a.get("mood", ""), "theme": a.get("theme", ""),
+            "lyrics_lines": lines, "scenes": scenes, "youtube": a.get("youtube") or {}, "image_engine": "cloudflare",
+            "source": "whisper+cloud-brain"}
+
+
 def analyze(job, work):
     jid = job["id"]
+    if not os.environ.get("GEMINI_API_KEY"):
+        audio = os.path.join(work, "song")
+        progress(jid, "analyze", "Downloading the song", 1, 4, 150)
+        raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/audio", want="raw", timeout=600)
+        open(audio, "wb").write(raw)
+        dur = probe_duration(audio)
+        a = analyze_free(job, work, audio, dur, jid)
+        log(f"[{jid}] analysed (free): {len(a['scenes'])} scenes, {len(a['lyrics_lines'])} lyric lines")
+        ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
+        return
     audio = os.path.join(work, "song")
     progress(jid, "analyze", "Downloading the song", 1, 4, 120)
     raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/audio", want="raw", timeout=600)
@@ -233,6 +334,8 @@ def analyze(job, work):
         try:
             a = gemini_json(model, [{"file_data": {"mime_type": f.get("mimeType") or "audio/mpeg", "file_uri": f["uri"]}}, {"text": prompt}])
             a["durationS"] = dur
+            a["image_engine"] = (os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "gemini").lower()
+            a["source"] = model
             # make scenes contiguous and inside the song
             sc = sorted([s for s in a.get("scenes", []) if s.get("image_prompt")], key=lambda s: float(s.get("start", 0)))[:16]
             if not sc:
@@ -428,8 +531,10 @@ def render(job, work):
     raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/audio", want="raw", timeout=600)
     open(audio, "wb").write(raw)
     dur = probe_duration(audio)
-    engine = (os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "gemini").lower()
-    per = float(os.environ.get("SONGVIDEO_IMAGE_USD") or 0.067)
+    engine = (a.get("imageEngine") or os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "gemini").lower()
+    if engine == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+        engine = "cloudflare"
+    per = 0.0 if (a.get("imageEngine") == "cloudflare" or not os.environ.get("GEMINI_API_KEY")) else float(os.environ.get("SONGVIDEO_IMAGE_USD") or 0.067)
     imgs, used = [], None
     models = pick_image_models(gemini_models()) if engine == "gemini" else None
     n_sc = len(scenes)
@@ -441,7 +546,12 @@ def render(job, work):
     for i, s in enumerate(scenes):
         out = os.path.join(work, f"img{i:02d}.png")
         p = s["image_prompt"] + " Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
-        used = openai_image(p, out) if engine == "openai" else gemini_image(models, p, out)
+        if engine == "cloudflare":
+            img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
+            open(out, "wb").write(img)
+            used = "cloudflare/flux-1-schnell"
+        else:
+            used = openai_image(p, out) if engine == "openai" else gemini_image(models, p, out)
         norm = os.path.join(work, f"scene{i:02d}.png")
         run(["ffmpeg", "-y", "-v", "error", "-i", out, "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}", norm])
         imgs.append(norm)
@@ -591,6 +701,100 @@ def publish(job, work):
     ganesha("POST", f"/api/songvideo/runner/{jid}/published", {"video_id": vid, "privacy": eff})
 
 
+# ---------------- YouTube Short (only after the owner pressed "Make Short") ----------------
+SHORT_S = 40.0
+
+
+def chorus_start(job, dur):
+    """Start of the most repeated lyric line (the hook); else ~35% into the song."""
+    lines = ((job.get("analysis") or {}).get("lyrics_lines") or [])
+    count = {}
+    for l in lines:
+        k = re.sub(r"[^a-z ]", "", str(l.get("text", "")).lower()).strip()
+        if len(k) > 6:
+            count.setdefault(k, []).append(float(l.get("start") or 0))
+    best = max(count.values(), key=len) if count else []
+    st = best[0] - 1.0 if len(best) >= 2 else dur * 0.35
+    return max(INTRO_S + CREDITS_S, min(st, max(0.0, dur - SHORT_S - 1)))
+
+
+def short_overlay(path, logo_path, title):
+    from PIL import Image, ImageDraw
+    im = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for y in range(0, 330):  # soft top and bottom shades for legible text
+        a = int(150 * (1 - y / 330))
+        d.line([(0, y), (1080, y)], fill=(0, 0, 0, a))
+        d.line([(0, 1919 - y), (1080, 1919 - y)], fill=(0, 0, 0, a))
+    try:
+        lg = soft_logo(logo_path).resize((120, 120))
+        im.alpha_composite(lg, (480, 70))
+    except Exception:
+        pass
+    f1, f2 = font(64), font(40, bold=False)
+    t = title if len(title) <= 26 else title[:25] + "…"
+    w = d.textlength(t, font=f1)
+    d.text(((1080 - w) / 2, 210), t, font=f1, fill=(255, 255, 255, 255))
+    c = "Full song on SUNVERSE"
+    w2 = d.textlength(c, font=f2)
+    d.text(((1080 - w2) / 2, 1740), c, font=f2, fill=(255, 255, 255, 235))
+    im.save(path)
+
+
+def make_short(job, work):
+    jid = job["id"]
+    sh = job.get("short") or {}
+    privacy = sh.get("privacy") if sh.get("privacy") in ("public", "unlisted", "private") else "public"
+    progress(jid, "short", "Connecting to your YouTube channel", 1, 4, 150)
+    token = yt_token()
+    progress(jid, "short", "Downloading the full video", 2, 4, 130)
+    raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/video", want="raw", timeout=900)
+    src = os.path.join(work, "full.mp4")
+    open(src, "wb").write(raw)
+    dur = probe_duration(src)
+    st = chorus_start(job, dur)
+    ln = min(SHORT_S, max(10.0, dur - st))
+    logo = os.path.join(work, "logo.png")
+    here = os.path.dirname(os.path.abspath(__file__))
+    run(["ffmpeg", "-y", "-v", "error", "-i", os.path.join(here, "..", "mcp", "assets", "sunverse-logo.webp"), logo])
+    title = (job.get("youtube") or {}).get("title") or job.get("title") or "Sunverse"
+    song = (job.get("title") or title).split("|")[0].strip()
+    ov = os.path.join(work, "short_ov.png")
+    short_overlay(ov, logo, song)
+    out = os.path.join(work, "short.mp4")
+    progress(jid, "short", "Cutting the vertical Short (chorus)", 3, 4, 70)
+    run(["ffmpeg", "-y", "-v", "error", "-ss", f"{st:.2f}", "-t", f"{ln:.2f}", "-i", src, "-i", ov, "-filter_complex",
+         "[0:v]split[a][b];[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:2,eq=brightness=-0.06[bg];"
+         "[b]scale=1080:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[m];[m][1:v]overlay=0:0,format=yuv420p[v];"
+         f"[0:a]afade=t=in:d=0.6,afade=t=out:st={ln - 1.5:.2f}:d=1.5[aa]",
+         "-map", "[v]", "-map", "[aa]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-r", str(FPS),
+         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out])
+    full = (job.get("publish") or {}).get("videoId")
+    cr = job.get("credits") or {}
+    base_title = f"{song} #Shorts"[:100]
+    desc = (f"Full song: https://youtu.be/{full}\n\n" if full else "Full song on the SUNVERSE channel.\n\n") + \
+        f"Lyrics: {cr.get('lyrics', 'COCO')} | Singer: {cr.get('singer', 'KoBhit')}\n#Shorts #Sunverse #HindiSongs"
+    tags = ((job.get("youtube") or {}).get("tags") or [])[:10] + ["shorts", "sunverse"]
+    data = open(out, "rb").read()
+    meta = {"snippet": {"title": base_title, "description": desc, "tags": tags, "categoryId": "10"},
+            "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True}}
+    req = urllib.request.Request("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+                                 data=json.dumps(meta).encode(), method="POST",
+                                 headers={"authorization": f"Bearer {token}", "content-type": "application/json; charset=UTF-8",
+                                          "x-upload-content-type": "video/mp4", "x-upload-content-length": str(len(data))})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            loc = r.headers.get("location")
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"YouTube refused the Short: HTTP {e.code} {redact(e.read().decode(errors='replace'))}")
+    progress(jid, "short", f"Uploading the Short ({len(data) / 1e6:.0f} MB)", 4, 4, 30)
+    v = http("PUT", loc, data, {"content-type": "video/mp4"}, 900)
+    if not v.get("id"):
+        raise RuntimeError("YouTube upload finished without a video id")
+    log(f"[{jid}] Short posted: https://youtube.com/shorts/{v['id']}")
+    ganesha("POST", f"/api/songvideo/runner/{jid}/short-done", {"video_id": v["id"]})
+
+
 def main():
     for _ in range(4):  # up to four jobs per run
         c = ganesha("POST", "/api/songvideo/runner/claim", {})
@@ -600,11 +804,11 @@ def main():
             return
         work = tempfile.mkdtemp(prefix="sv_")
         try:
-            {"analyze": analyze, "render": render, "publish": publish}[c["stage"]](job, work)
+            {"analyze": analyze, "render": render, "publish": publish, "short": make_short}[c["stage"]](job, work)
         except Exception as e:
             log(f"[{job['id']}] {c['stage']} failed: {redact(e)}")
             try:
-                ganesha("POST", f"/api/songvideo/runner/{job['id']}/fail", {"error": redact(e)})
+                ganesha("POST", f"/api/songvideo/runner/{job['id']}/fail", {"error": redact(e), "stage": c["stage"]})
             except Exception as e2:
                 log("could not report the failure:", redact(e2))
         finally:

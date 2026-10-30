@@ -7,6 +7,13 @@ if (!CFG) { console.log("no data/brands.json"); process.exit(0); }
 const LEADS = R("data/leads.json", { leads: [] }).leads || [];
 const WORK = R("data/work.json", { items: [], cycles: 0, topics: [] });
 const K = { groq: process.env.GROQ_API_KEY, gemini: process.env.GEMINI_API_KEY, openrouter: process.env.OPENROUTER_API_KEY, cloud: process.env.SV_MCP_TOKEN };
+// no secret? sign in to the AGENTVERSE cloud brain with GitHub's OIDC token (needs permissions id-token: write)
+if (!K.cloud && process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+  try {
+    const r = await fetch(process.env.ACTIONS_ID_TOKEN_REQUEST_URL + "&audience=agentverse", { headers: { Authorization: "bearer " + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN } });
+    if (r.ok) K.cloud = (await r.json()).value;
+  } catch (e) { console.log("[agent] OIDC token failed:", e.message); }
+}
 const CLOUD_URL = (process.env.SV_MCP_URL || "https://agentverse.pravanigroup.workers.dev").replace(/\/+$/, "");
 const DEPTS = ["Market Radar","Search Visibility","Content Engine","Creative Studio","Reviews & Reputation","Publishing & Social","Leads & Conversations","Results & Reporting"];
 const log = (...a) => console.log("[agent]", ...a);
@@ -24,7 +31,8 @@ const SYS = `You are AGENTVERSE, an autonomous AI social media and growth team w
 Departments: ${DEPTS.join(", ")}.
 Produce 3-5 items: e.g. a post caption with hashtags, a 30-second reel script in 3 scenes, a YouTube title + description + tags, SEO keywords, and (if FRESH LEADS exist) one short helpful reply per lead.
 Follow OWNER RULES strictly. Never invent facts, prices, numbers or testimonials; use [placeholders]. Lead replies must answer the person's need first, be short and human, mention the product only if it truly helps.
-Return ONLY JSON: {"topic":"max 8 words","why":"max 20 words","items":[{"dept":"exact department","title":"max 10 words","body":"max 150 words","needs_approval":true|false,"lead_id":"id or null"}],"summary":"max 20 words"}. needs_approval=true for anything published or sent to a person.`;
+Return ONLY JSON: {"topic":"max 8 words","why":"max 20 words","items":[{"dept":"exact department","title":"max 10 words","body":"max 150 words","needs_approval":true|false,"lead_id":"id or null"}],"summary":"max 20 words"}. needs_approval=true for anything published or sent to a person.
+Never write bulk or unsolicited DMs, follow-for-follow, giveaway bait or messages with placeholders like [Follower Name] (Instagram/YouTube ban accounts for mass messaging); for outreach only write a reply to a specific named lead or a public comment/post. `;
 let USER = `BRAND: ${brand}\nWhat: ${b.what}\nAudience: ${b.aud}\nVoice: ${b.voice}\nGoal: ${b.goal}\nChannels: ${b.ch}\nTopic ideas: ${String(b.top).split("|").join(", ")}\n\nOWNER RULES:\n- ${(CFG.rules || []).join("\n- ")}`;
 if (recent.length) USER += `\n\nRECENT OUTPUTS (don't repeat):\n- ${recent.join("\n- ")}`;
 if ((WORK.topics || []).length) USER += `\nRECENT TOPICS: ${WORK.topics.slice(0, 8).join(", ")}`;

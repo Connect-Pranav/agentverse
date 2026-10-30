@@ -132,3 +132,98 @@ test('cloud brain: owner only, Workers AI with fallback, daily cap', async () =>
   assert.equal((await call(true)).status, 429, 'daily cap protects the free allowance');
   assert.equal((await (await worker.fetch(new Request(B + '/health'), e)).json()).brain, true);
 });
+
+test('growth: runner reports, simple auto vs approval, owner decisions, MCP tools', async () => {
+  const e = env();
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: H, body: body ? JSON.stringify(body) : undefined }), e);
+  assert.equal((await worker.fetch(new Request(B + '/api/growth'), e)).status, 401);
+  assert.equal((await (await f('/api/growth')).json()).connected, false);
+  const st = await (await f('/api/growth/runner')).json();
+  assert.equal(st.settings.autoSimple, true);
+  const rep = await (await f('/api/growth/runner/report', 'POST', {
+    channel: { id: 'UCx', title: 'SUNVERSE', subs: 120, views: 5000, videos: 12 },
+    new_subs: [{ id: 'UCa', name: 'Riya' }],
+    drafts: [
+      { cid: 'c1', thread_id: 'c1', author: 'Amit', text: 'Beautiful song!', reply: 'Thank you Amit! 🙏', kind: 'simple', posted: true },
+      { cid: 'c2', thread_id: 'c2', author: 'Neha', text: 'Can we collab?', reply: 'Hi Neha, thanks for reaching out!', kind: 'needs_ok' },
+      { cid: 'c3', thread_id: 'c3', author: 'bot', text: 'free subs here', reply: '', kind: 'skip' },
+    ],
+    seen: ['c1', 'c2', 'c3'],
+  })).json();
+  assert.equal(rep.connected, true);
+  assert.equal(rep.waiting, 1);
+  assert.equal(rep.posted_today, 1);
+  assert.equal(rep.new_subscribers[0].name, 'Riya');
+  assert.equal((await f('/api/growth/reply/c2', 'POST', { action: 'approve', draft: 'see https://x.y' })).status, 400, 'no link replies');
+  await f('/api/growth/reply/c2', 'POST', { action: 'approve', draft: 'Hi Neha, DM us on Instagram @sunverse 🙌' });
+  const st2 = await (await f('/api/growth/runner')).json();
+  assert.deepEqual(st2.approved.map((x) => x.cid), ['c2']);
+  assert.ok(st2.seen.includes('c3'));
+  await f('/api/growth/runner/report', 'POST', { posted: [{ cid: 'c2' }] });
+  const g = (await tool(e, 'get_growth_report', {})).structuredContent;
+  assert.equal(g.waiting, 0);
+  assert.equal(g.posted_today, 2);
+  assert.equal((await tool(e, 'set_auto_replies', { on: false })).structuredContent.settings.autoSimple, false);
+});
+
+test('YouTube Short: owner request → runner → published, retry on failure', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const c = (await tool(e, 'create_song_job', { title: 'S' })).structuredContent;
+  const id = c.job_id;
+  assert.equal((await tool(e, 'make_youtube_short', { job_id: id })).isError, true, 'needs a ready video');
+  await worker.fetch(new Request(new URL(c.upload_url).href, { method: 'PUT', headers: { 'content-type': 'audio/mpeg', 'content-length': '5' }, body: new Uint8Array(5) }), e);
+  const claim = async () => (await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e)).json();
+  await claim();
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/analysis`, { method: 'PUT', headers: R, body: JSON.stringify({ durationS: 10, scenes: [{ start: 0, end: 10, image_prompt: 'x' }] }) }), e);
+  await tool(e, 'approve_song_job', { job_id: id });
+  await claim();
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video?part=1&parts=1`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': '1' }, body: new Uint8Array([1]) }), e);
+  assert.equal((await tool(e, 'make_youtube_short', { job_id: id, privacy: 'unlisted' })).structuredContent.short.state, 'requested');
+  let cl = await claim();
+  assert.equal(cl.stage, 'short');
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/fail`, { method: 'POST', headers: R, body: JSON.stringify({ error: 'x', stage: 'short' }) }), e);
+  cl = await claim();
+  assert.equal(cl.stage, 'short', 'retried');
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/short-done`, { method: 'POST', headers: R, body: JSON.stringify({ video_id: 'shortID123' }) }), e);
+  const j = (await tool(e, 'get_song_job', { job_id: id })).structuredContent;
+  assert.equal(j.short.url, 'https://youtube.com/shorts/shortID123');
+  assert.equal(j.status, 'ready');
+});
+
+test('runner auth via GitHub OIDC; free Cloudflare images skip the approval; pending count; image endpoint', async () => {
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const jwk = { ...(await crypto.subtle.exportKey('jwk', kp.publicKey)), kid: 'k1' };
+  const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const sign = async (claims) => { const h = enc({ alg: 'RS256', kid: 'k1' }), p = enc(claims); const sig = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(`${h}.${p}`))).toString('base64url'); return `${h}.${p}.${sig}`; };
+  const now = Math.floor(Date.now() / 1000);
+  const good = await sign({ iss: 'https://token.actions.githubusercontent.com', aud: 'agentverse', repository: 'Connect-Pranav/agentverse', ref: 'refs/heads/main', exp: now + 300, nbf: now - 5 });
+  const other = await sign({ iss: 'https://token.actions.githubusercontent.com', aud: 'agentverse', repository: 'evil/fork', ref: 'refs/heads/main', exp: now + 300 });
+  const branch = await sign({ iss: 'https://token.actions.githubusercontent.com', aud: 'agentverse', repository: 'Connect-Pranav/agentverse', ref: 'refs/heads/x', exp: now + 300 });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u) => String(u).includes('jwks') ? new Response(JSON.stringify({ keys: [jwk] })) : realFetch(u);
+  try {
+    const e = { ...env(), AI: { run: async (m) => ({ image: Buffer.from([0xff, 0xd8, 0xff, 1, 2]).toString('base64') }) } };
+    const R = (t) => ({ authorization: 'Bearer ' + t, 'content-type': 'application/json' });
+    const f = (path, t, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: R(t), body: body ? JSON.stringify(body) : undefined }), e);
+    assert.equal((await f('/api/songvideo/runner/pending', other)).status, 401, 'other repo rejected');
+    assert.equal((await f('/api/songvideo/runner/pending', branch)).status, 401, 'other branch rejected');
+    assert.equal((await f('/api/songvideo/', good)).status, 401, 'OIDC is not owner access');
+    assert.equal((await (await f('/api/songvideo/runner/pending', good)).json()).pending, 0);
+    const c = (await tool(e, 'create_song_job', { title: 'Free' })).structuredContent;
+    await worker.fetch(new Request(c.upload_url, { method: 'PUT', headers: { 'content-type': 'audio/mpeg', 'content-length': '4' }, body: new Uint8Array(4) }), e);
+    assert.equal((await (await f('/api/songvideo/runner/pending', good)).json()).pending, 1);
+    const cl = await (await f('/api/songvideo/runner/claim', good, 'POST', {})).json();
+    assert.equal(cl.stage, 'analyze');
+    await f(`/api/songvideo/runner/${c.job_id}/analysis`, good, 'PUT', { durationS: 20, image_engine: 'cloudflare', scenes: [{ start: 0, end: 20, image_prompt: 'x' }] });
+    const j = (await tool(e, 'get_song_job', { job_id: c.job_id })).structuredContent;
+    assert.equal(j.status, 'approved', 'free plan goes straight to rendering');
+    assert.equal(j.est_cost_usd, 0);
+    assert.equal(j.auto_approved, true);
+    const img = await f(`/api/songvideo/runner/${c.job_id}/image`, good, 'POST', { prompt: 'sunset' });
+    assert.equal(img.headers.get('content-type'), 'image/jpeg');
+    assert.deepEqual([...new Uint8Array(await img.arrayBuffer())], [0xff, 0xd8, 0xff, 1, 2]);
+    assert.equal((await f('/api/brain', other, 'POST', { prompt: 'x' })).status, 401);
+  } finally { globalThis.fetch = realFetch; }
+});

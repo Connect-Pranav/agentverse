@@ -1,11 +1,11 @@
 name: SUNVERSE song → video (MCP renderer)
 
-# Renders songs queued through the sunverse-mcp server (mcp/). Stage 1 (free): Gemini listens and plans.
-# Stage 2 (paid images) runs only after the owner approves in chat (approve_song_job).
-# Repo secrets: GEMINI_API_KEY (billing on, for images), SV_MCP_TOKEN (= the Worker's MCP_TOKEN).
-# Stage 3 posts to YouTube only after the owner presses "Post to YouTube" (secrets YT_CLIENT_ID, YT_CLIENT_SECRET,
-# YT_REFRESH_TOKEN). The Worker starts this workflow instantly when it has GH_DISPATCH_TOKEN; otherwise every 15 min.
-# Repo variable: SV_MCP_URL (e.g. https://agentverse.pravanigroup.workers.dev).
+# Picks up songs uploaded in AGENTVERSE (MCP tile / Claude connector) and makes the video.
+# No repo secrets needed: the runner signs in to the AGENTVERSE Worker with GitHub's OIDC token.
+#   free (default): faster-whisper lyrics + AGENTVERSE cloud brain + Cloudflare FLUX images → no approval needed
+#   GEMINI_API_KEY secret set: Gemini listens and makes the images (paid → waits for the owner's approval)
+# YouTube posting needs YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN.
+# The Worker starts this instantly when it has GH_DISPATCH_TOKEN; otherwise GitHub's schedule (can lag).
 
 on:
   schedule:
@@ -14,10 +14,15 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: songvideo
   cancel-in-progress: false
+
+env:
+  SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
+  SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
 
 jobs:
   run:
@@ -25,36 +30,43 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: Check configuration
+      - name: Anything to do?
         id: cfg
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
-          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
         run: |
-          if [ -z "$GEMINI_API_KEY" ] || [ -z "$SV_MCP_TOKEN" ]; then
-            echo "GEMINI_API_KEY or SV_MCP_TOKEN secret missing — nothing to do."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
+          python3 - <<'PY'
+          import importlib.util, os
+          s = importlib.util.spec_from_file_location("r", "scripts/songvideo-runner.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
+          n = r.ganesha("GET", "/api/songvideo/runner/pending").get("pending", 0)
+          print(f"{n} song job(s) waiting")
+          open(os.environ["GITHUB_OUTPUT"], "a").write(f"pending={n}\n")
+          PY
       - name: Install ffmpeg, fonts, Pillow
-        if: steps.cfg.outputs.ready == 'true'
+        if: steps.cfg.outputs.pending != '0'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-dejavu-core >/dev/null
           python3 -m pip install --quiet pillow
-      - name: Process song jobs
-        if: steps.cfg.outputs.ready == 'true'
+      - name: Install free speech-to-text
+        if: steps.cfg.outputs.pending != '0'
         env:
-          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
-          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then python3 -m pip install --quiet faster-whisper; fi
+      - uses: actions/cache@v4
+        if: steps.cfg.outputs.pending != '0'
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-small-v1
+      - name: Process song jobs
+        if: steps.cfg.outputs.pending != '0'
+        env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_TEXT_MODEL: ${{ vars.GEMINI_TEXT_MODEL }}
           GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
           SONGVIDEO_IMAGE_ENGINE: ${{ vars.SONGVIDEO_IMAGE_ENGINE }}
           SONGVIDEO_IMAGE_USD: ${{ vars.SONGVIDEO_IMAGE_USD }}
+          WHISPER_MODEL: ${{ vars.WHISPER_MODEL }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
