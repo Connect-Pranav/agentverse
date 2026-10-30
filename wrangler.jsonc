@@ -3,6 +3,8 @@
   // Deploy: Cloudflare → Workers & Pages → Import repository → agentverse (root), deploy command `npx wrangler deploy`.
   // Then add the secret MCP_TOKEN (Settings → Variables and Secrets).
   "name": "agentverse",
+  "workers_dev": true,
+  "preview_urls": false,
   "main": "mcp/src/index.mjs",
   "compatibility_date": "2026-10-01",
   "keep_vars": true,
