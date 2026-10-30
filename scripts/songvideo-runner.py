@@ -47,7 +47,8 @@ def redact(t):
 
 
 def http(method, url, body=None, headers=None, timeout=180, want="json"):
-    h = dict(headers or {})
+    h = {"user-agent": "Mozilla/5.0 (compatible; AGENTVERSE-runner/1.3; +https://github.com/Connect-Pranav/agentverse)", "accept": "*/*"}
+    h.update(headers or {})
     data = body
     if isinstance(body, (dict, list)):
         data = json.dumps(body).encode()
