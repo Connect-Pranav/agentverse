@@ -724,6 +724,30 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 .mt-file{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font:600 12px var(--fb);color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:7px 13px;cursor:pointer;min-height:36px}
 .mt-file input{position:absolute;width:1px;height:1px;opacity:0}
 .mt-file .i{width:14px;height:14px}
+/* Foliocraft CRM */
+#crm h6{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--org2);margin:14px 0 6px}
+.crm-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.crm-stats div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:10px}
+.crm-stats b{display:block;font:700 22px var(--fb)}.crm-stats small{font-size:10.5px;color:var(--mut)}
+.crm-set{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;margin-top:10px;color:var(--mut)}
+.crm-set label{color:#fff;display:flex;gap:6px;align-items:center}
+.crm-ab{font-size:11.5px;color:var(--mut);margin:6px 0 0}
+.crm-l{border:1px solid rgba(255,255,255,.14);border-radius:14px;margin-bottom:8px;background:rgba(255,255,255,.06);overflow:hidden}
+.crm-l.open{border-color:rgba(255,255,255,.4)}
+.crm-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;background:none;border:0;color:#fff;text-align:left;font:inherit;cursor:pointer;min-height:48px}
+.crm-sc{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 13px var(--fm);background:rgba(255,255,255,.14)}
+.crm-nm{flex:1;min-width:0}.crm-nm b{display:block;font-size:13.5px;overflow-wrap:anywhere}.crm-nm small{display:block;font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crm-d{padding:0 12px 12px}
+.crm-f{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}.crm-f span{color:var(--mut)}.crm-f b{font-weight:600;overflow-wrap:anywhere}.crm-f a{color:#fff}
+.crm-p{font-size:12.5px;margin:8px 0}.crm-p i{color:var(--mut)}
+.crm-reply{font-size:12.5px;background:rgba(94,240,160,.12);border:1px solid rgba(94,240,160,.4);border-radius:12px;padding:8px 10px;margin:6px 0}
+.crm-reply small{color:var(--mut)}
+.crm-subj,.crm-body{width:100%;box-sizing:border-box;font:13px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 10px;margin-top:8px}
+.crm-body{min-height:150px;resize:vertical}
+.crm-d .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.crm-d .acts a,.crm-d .acts button{display:inline-flex;align-items:center;gap:5px;font:600 12px var(--fb);border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:#fff;border-radius:99px;padding:7px 12px;min-height:36px;text-decoration:none}
+.crm-d .acts .ap{background:#fff;color:#1d1510;border-color:#fff}
+@media(max-width:600px){.crm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 </style>
 </head>
@@ -881,6 +905,14 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
   <span class="d" style="--c:#4fd1e8">Memory / data</span>
   <span class="d" style="--c:#f5a623">Safety net</span>
 </div>
+
+<section class="board stage view-hide" id="crm">
+  <div class="panel">
+    <div class="ph"><h3>Foliocraft · Lead Generation &amp; Outreach</h3><span class="badge run" id="crmBadge">LIVE</span></div>
+    <div class="sub">finds people who need a portfolio site · AI scores and writes a personal email · you approve · Gmail sends, follows up once, stops on reply</div>
+    <div id="crmBody" aria-live="polite"><div class="empty">Loading…</div></div>
+  </div>
+</section>
 
 <section class="board stage view-hide" id="board">
   <div class="panel">
@@ -2041,18 +2073,19 @@ var VIEWS={
   overview:{t:"Overview",s:"Your agent team at a glance",show:["wrap","loop","legend","mcpTile","growthTile"]},
   agents:{t:"Agents",s:"Eight departments and the live feed",show:["wrap"],cls:"v-agents"},
   work:{t:"Work",s:"Everything the team made — approve, reject, copy",show:["board"],tab:"waiting"},
-  leads:{t:"Leads",s:"People who need what you sell",show:["board"],tab:"leads"},
+  leads:{t:"Leads",s:"People who need what you sell",show:["crm","board"],tab:"leads"},
   studio:{t:"MCP · Song → Video",s:"Upload a song — get a finished Sunverse video on YouTube",show:["mcpTile","growthTile","studio"]}
 };
 function greet(){var h=new Date().getHours();return h<12?"Good morning":(h<17?"Good afternoon":"Good evening");}
 function setTitle(v){ $("vtitle").firstChild.nodeValue=(v==="overview"?greet()+", "+CONFIG.owner:VIEWS[v].t); $("vsub").innerHTML=VIEWS[v].s; }
 function applyView(v){
-  var V=VIEWS[v],ids=["wrap","loop","legend","board","mcpTile","growthTile","studio"];
+  var V=VIEWS[v],ids=["wrap","loop","legend","board","crm","mcpTile","growthTile","studio"];
   for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
   $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
   /* each page has its own panel: Work = work board only, Leads = lead radar only */
   var mt=$("mcpTile"),fc=$("pFocus").parentNode;
   var gt=$("growthTile");
+  if(v==="leads")crmLoad();
   if(v==="studio"){ if(mt.nextElementSibling!==$("studio"))$("studio").parentNode.insertBefore(mt,$("studio")); mt.classList.remove("in-col"); $("studio").parentNode.insertBefore(gt,$("studio")); gt.classList.add("board-like"); stuLoad(); grLoad(); }
   else if(mt.parentNode!==fc){ fc.insertBefore(mt,$("pFocus")); fc.insertBefore(gt,$("pFocus")); mt.classList.add("in-col"); gt.classList.remove("board-like"); }
   if(v==="work"){ $("boardTitle").innerHTML="Work Board"; $("tabs").style.display=""; $("tabLeads").style.display="none"; if(boardTab==="leads")boardTab="waiting"; }
@@ -2080,7 +2113,7 @@ function switchView(v){
   if(!VIEWS[v])return;
   if(v===VIEW){ if(v==="work"||v==="leads"){applyView(v);} return; }
   VIEW=v;
-  var stages=[$("wrap"),$("loop"),$("legend"),$("board"),$("mcpTile"),$("studio")];
+  var stages=[$("wrap"),$("loop"),$("legend"),$("board"),$("crm"),$("mcpTile"),$("studio")];
   if(!MOTION){ applyView(v); drawWires(); revealPanels(); return; }
   for(var i=0;i<stages.length;i++)stages[i].classList.add("out");
   gsap.to("#vtitle",{opacity:0,y:-6,filter:"blur(8px)",duration:.25});
@@ -2952,6 +2985,72 @@ if("serviceWorker" in navigator){ var hadCtl=!!navigator.serviceWorker.controlle
   if(isStandalone())document.body.classList.add("is-app");
 })();
 
+/* =====================================================================
+   FOLIOCRAFT CRM — lead generation + outreach (approve → Gmail sends automatically)
+   ===================================================================== */
+var CRM={d:null,open:null};
+function crmLoad(){
+  if(!STU.backend||!SET.mcpToken){ $("crmBody").innerHTML='<div class="empty">'+(STU.backend?"Add your AGENTVERSE token in the MCP tile.":"Runs on the Cloudflare AGENTVERSE.")+'</div>'; return; }
+  stuApi("GET","/api/crm").then(function(d){ CRM.d=d; crmRender(); },function(e){ $("crmBody").innerHTML='<p class="r">'+esc(e.message)+'</p>'; });
+}
+function crmLeadHtml(l){
+  var open=CRM.open===l.id,d=l.draft||{},h="";
+  var pc=l.stage==="new"?"w":(l.stage==="replied"||l.stage==="won"?"r":(["skipped","lost","bounced","unsubscribed","failed"].indexOf(l.stage)>=0?"x":"b"));
+  h+='<div class="crm-l'+(open?' open':'')+'" data-id="'+esc(l.id)+'"><button class="crm-row" data-c="toggle" type="button">'+
+    '<span class="crm-sc">'+(l.score||0)+'</span><span class="crm-nm"><b>'+esc(l.name||"Unknown")+'</b><small>'+esc([l.industry,l.company,l.location].filter(Boolean).join(" · ")||l.source)+'</small></span>'+
+    '<span class="pill '+pc+'">'+esc(l.stage)+'</span></button>';
+  if(open){
+    h+='<div class="crm-d"><div class="crm-f"><span>Email</span><b>'+(l.email?esc(l.email):"—")+'</b><span>Phone</span><b>'+(l.phone?esc(l.phone):"—")+'</b><span>Company</span><b>'+esc(l.company||"—")+'</b><span>Industry</span><b>'+esc(l.industry||"—")+'</b><span>Intent</span><b>'+esc(l.intent||"—")+'</b><span>Source</span><b><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.source||"post")+'</a></b></div>';
+    if(l.persona)h+='<p class="crm-p">'+esc(l.persona)+(l.why?' <i>'+esc(l.why)+'</i>':'')+'</p>';
+    if(l.reply)h+='<div class="crm-reply"><b>Reply</b> '+esc(l.reply.snippet)+'</div>';
+    if(l.stage==="new"||l.stage==="failed"||l.stage==="skipped"){
+      h+='<input class="crm-subj" value="'+esc((l.variant==="B"&&d.subject_b)?d.subject_b:(d.subject||""))+'" aria-label="Subject"><textarea class="crm-body" aria-label="Email">'+esc(d.body||"")+'</textarea>';
+      h+='<div class="acts">'+(l.email?'<button class="ap" data-c="approve" type="button"><span data-i="send"></span>Approve &amp; auto-email</button>':'')+'<button data-c="skip" type="button"><span data-i="x"></span>Skip</button></div>';
+      if(l.error)h+='<p class="r">'+esc(l.error)+'</p>';
+    }
+    var oneTap=[];
+    if(l.email)oneTap.push('<a href="mailto:'+esc(l.email)+'?subject='+encodeURIComponent(d.subject||"")+'&body='+encodeURIComponent(d.body||"")+'"><span data-i="send"></span>Email (1-tap)</a>');
+    if(l.phone)oneTap.push('<a href="https://wa.me/'+esc(String(l.phone).replace(/[^\d]/g,""))+'?text='+encodeURIComponent((d.body||"").slice(0,900))+'" target="_blank" rel="noopener"><span data-i="message-circle"></span>WhatsApp</a>');
+    if(l.linkedin)oneTap.push('<a href="'+esc(l.linkedin)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>LinkedIn</a>');
+    if(l.url)oneTap.push('<a href="'+esc(l.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Reply on post</a>');
+    oneTap.push('<button data-c="copy" type="button"><span data-i="copy"></span>Copy message</button>');
+    if(["sent","followed_up","replied"].indexOf(l.stage)>=0)oneTap.push('<button data-c="won" type="button"><span data-i="check"></span>Won</button><button data-c="lost" type="button"><span data-i="x"></span>Lost</button>');
+    h+='<div class="acts">'+oneTap.join("")+'</div></div>';
+  }
+  return h+'</div>';
+}
+function crmRender(){
+  var d=CRM.d,h="",i;
+  if(!d)return;
+  var c=d.counts||{},s=d.settings||{};
+  h+='<div class="crm-stats"><div><b>'+(c.new||0)+'</b><small>to approve</small></div><div><b>'+(c.sent||0)+'</b><small>emailed</small></div><div><b>'+(c.replied||0)+'</b><small>replied</small></div><div><b>'+(c.won||0)+'</b><small>won</small></div></div>';
+  h+='<div class="crm-set"><label><input type="checkbox" id="crmAuto"'+(s.autoSend?" checked":"")+'> Auto-send approved emails</label><span>'+(d.sent_today||0)+' / '+(s.dailyCap||15)+' today · Mon–Sat 9:30–7:30</span></div>';
+  var ab=d.ab||{},abk=Object.keys(ab);
+  if(abk.length)h+='<p class="crm-ab">A/B subjects: '+abk.map(function(k){var x=ab[k];return k+" "+x.replied+"/"+x.sent+" replied";}).join(" · ")+'</p>';
+  if((d.inbox||[]).length){ h+='<h6>Inbox</h6>'; for(i=0;i<Math.min(5,d.inbox.length);i++){ var m=d.inbox[i]; h+='<div class="crm-reply"><b>'+esc(m.name||m.email)+'</b> '+esc(m.snippet)+' <small>'+ago(Date.parse(m.at))+' ago</small></div>'; } }
+  h+='<h6>Leads</h6>';
+  var ls=(d.leads||[]).slice(0,40);
+  if(!ls.length)h+='<div class="empty">No leads yet. The lead agent searches every 6 hours.</div>';
+  for(i=0;i<ls.length;i++)h+=crmLeadHtml(ls[i]);
+  h+='<p class="gr-note">'+(d.last_run?'Agent ran '+ago(Date.parse(d.last_run))+' ago':'Agent has not run yet')+(d.last_error?' · <span class="r">'+esc(d.last_error.message)+'</span>':'')+'</p>';
+  $("crmBody").innerHTML=h;
+  var els=$("crmBody").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
+  $("crmBadge").textContent=(c.new||0)?(c.new+" NEW"):"LIVE";
+  var au=$("crmAuto"); if(au)au.onchange=function(){ stuApi("POST","/api/crm/settings",{autoSend:au.checked}).then(function(x){CRM.d=x;crmRender();},function(e){toast(e.message,false);}); };
+}
+$("crmBody").onclick=function(e){
+  var b=e.target.closest?e.target.closest("[data-c]"):null; if(!b)return;
+  var box=b.closest(".crm-l"),id=box&&box.getAttribute("data-id"),a=b.getAttribute("data-c"),l=null,i;
+  for(i=0;i<((CRM.d&&CRM.d.leads)||[]).length;i++)if(CRM.d.leads[i].id===id)l=CRM.d.leads[i];
+  if(a==="toggle"){ CRM.open=CRM.open===id?null:id; crmRender(); return; }
+  if(a==="copy"){ var bd=box.querySelector(".crm-body"); copyText(bd?bd.value:((l&&l.draft&&l.draft.body)||"")); return; }
+  var body={action:a};
+  if(a==="approve"){ body.subject=box.querySelector(".crm-subj").value; body.body=box.querySelector(".crm-body").value; }
+  b.disabled=true;
+  stuApi("POST","/api/crm/lead/"+encodeURIComponent(id),body).then(function(x){ CRM.d=x; toast(a==="approve"?"Approved — the agent emails it in the next sending window":(a==="skip"?"Skipped":"Saved"),true); crmRender(); },function(e2){ toast(e2.message,false); b.disabled=false; });
+};
+setInterval(function(){ if(VIEW==="leads"&&STU.backend&&SET.mcpToken&&!document.hidden&&!(document.activeElement&&/crm-/.test(document.activeElement.className||"")))crmLoad(); },60000);
+
 /* ---------------- render all ---------------- */
 function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();updateBrain();}
 
@@ -2959,6 +3058,7 @@ function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();
 function startLoops(){
   setTitle("overview");
   if(location.hash==="#studio")setTimeout(function(){go("studio");},600);
+  if(location.hash==="#leads")setTimeout(function(){go("leads");},600);
   setTimeout(function(){document.body.classList.add("ready");},1200);
   drawWires(); renderAll(); loadLeads(); setInterval(loadLeads,10*60000); loadWork(); setInterval(loadWork,10*60000);
   setInterval(glowIcons,1300);setInterval(stepCycle,1300);

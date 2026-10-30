@@ -40,3 +40,16 @@ faster-whisper + the cloud brain + Cloudflare FLUX images and skips the spend ap
 
 Optional instant start: add Cloudflare Worker secret `GH_DISPATCH_TOKEN` (GitHub fine-grained token for this repo with
 **Actions: read and write**). Without it the renderer runs every 15 minutes and the time estimate includes that wait.
+
+## Foliocraft lead generation + outreach
+
+Leads page → **Foliocraft · Lead Generation & Outreach**. Every 6 h `scripts/leadgen.py` finds people who need a
+portfolio site and published contact details (HN "Who wants to be hired?", HN "Seeking freelancer" portfolio
+requests, Foliocraft posts from the lead radar), and the cloud brain scores them and writes a personal email
+(A/B subjects + one follow-up). You approve; the agent sends from your Gmail (daily cap, Mon–Sat 9:30–19:30 IST,
+unsubscribe line, one follow-up after 4 days, stops on reply/unsubscribe/bounce) and shows replies in the inbox.
+Personal data is kept only in the Worker's private KV.
+
+Gmail: in the same Google Cloud project as YouTube enable the **Gmail API**, then in the OAuth Playground authorize
+`https://www.googleapis.com/auth/gmail.send` and `https://www.googleapis.com/auth/gmail.readonly` with your own
+client, exchange, and save the refresh token as repo secret `GMAIL_REFRESH_TOKEN` (plus `YT_CLIENT_ID`, `YT_CLIENT_SECRET`).

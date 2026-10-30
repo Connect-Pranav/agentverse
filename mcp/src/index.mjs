@@ -18,6 +18,7 @@
 
 import * as growth from './growth.mjs';
 import * as push from './push.mjs';
+import * as crm from './crm.mjs';
 
 const VERSION = '1.3.0';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -382,6 +383,9 @@ const TOOLS = [
   { name: 'decide_comment_reply', title: 'Approve or skip a comment reply', description: 'Owner decision on an AI reply waiting for approval. action approve (optionally with edited reply text) or reject. Only call after the owner decides.',
     inputSchema: { type: 'object', properties: { comment_id: { type: 'string' }, action: { type: 'string', enum: ['approve', 'reject'] }, reply: { type: 'string' } }, required: ['comment_id', 'action'], additionalProperties: false } },
   { name: 'set_auto_replies', title: 'Auto-send simple replies', description: 'Turn automatic sending of simple comment replies (thanks, greetings, praise) on or off. Other replies always wait for approval.', inputSchema: { type: 'object', properties: { on: { type: 'boolean' } }, required: ['on'], additionalProperties: false } },
+  { name: 'get_foliocraft_leads', title: 'Foliocraft leads (CRM)', description: 'Lead pipeline for Foliocraft: name, email, phone, company, industry, score, intent, persona, stage, email draft, replies inbox and A/B results.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'decide_lead', title: 'Approve / skip / edit a lead', description: 'Owner decision on a lead. approve = the outreach agent emails it automatically from Gmail (daily cap, unsubscribe line, one follow-up). Only call after the owner says so.',
+    inputSchema: { type: 'object', properties: { lead_id: { type: 'string' }, action: { type: 'string', enum: ['approve', 'skip', 'edit', 'won', 'lost', 'unsubscribe'] }, subject: { type: 'string' }, body: { type: 'string' } }, required: ['lead_id', 'action'], additionalProperties: false } },
   { name: 'delete_song_job', title: 'Delete song job', description: 'Delete a job and its files.', inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: true } },
 ];
 async function callTool(env, request, name, a = {}) {
@@ -404,6 +408,8 @@ async function callTool(env, request, name, a = {}) {
     case 'get_growth_report': return growth.ownerView(await growth.load(kv(env)));
     case 'decide_comment_reply': return growth.ownerView(await growth.decideReply(kv(env), a.comment_id, { action: a.action, draft: a.reply }));
     case 'set_auto_replies': return growth.ownerView(await growth.setSettings(kv(env), { autoSimple: Boolean(a.on) }));
+    case 'get_foliocraft_leads': return crm.ownerView(await crm.load(kv(env)), 60);
+    case 'decide_lead': return crm.ownerView(await crm.decide(kv(env), a.lead_id, a), 60);
     case 'delete_song_job': { const j = await jobOf(env, a.job_id); await removeJob(env, j); return { deleted: j.id }; }
     default: throw Object.assign(new Error(`Unknown tool: ${name}`), { rpc: -32602 });
   }
@@ -622,6 +628,26 @@ async function route(request, env) {
     if (seg[2] === 'test' && method === 'POST') return json({ sent: await push.notify(kv(env), { title: 'AGENTVERSE', body: 'Notifications are on ✓', url: '/', tag: 'test' }) });
     throw new HttpError(404, 'Not found');
   }
+  if (seg[0] === 'api' && seg[1] === 'crm') {
+    const k = kv(env);
+    if (seg[2] === 'runner') {
+      await runner(request, env);
+      if (!seg[3] && method === 'GET') return json(await crm.runnerState(k));
+      if (seg[3] === 'report' && method === 'POST') {
+        const before = crm.ownerView(await crm.load(k), 0).counts;
+        const v = crm.ownerView(await crm.runnerReport(k, await readJson(request, 1024 * 1024)), 0);
+        if (v.counts.new > before.new) ping(env, request, { title: 'New Foliocraft leads', body: `${v.counts.new - before.new} new lead${v.counts.new - before.new > 1 ? 's' : ''} ready to approve.`, url: '/#leads', tag: 'crm-new' });
+        if (v.counts.replied > before.replied) ping(env, request, { title: 'A lead replied 💬', body: `${v.counts.replied - before.replied} new repl${v.counts.replied - before.replied > 1 ? 'ies' : 'y'} in the Foliocraft inbox.`, url: '/#leads', tag: 'crm-reply' });
+        return json(v);
+      }
+      throw new HttpError(404, 'Not found');
+    }
+    owner(request, env);
+    if (!seg[2] && method === 'GET') return json(crm.ownerView(await crm.load(k)));
+    if (seg[2] === 'settings' && method === 'POST') return json(crm.ownerView(await crm.setSettings(k, await readJson(request))));
+    if (seg[2] === 'lead' && seg[3] && method === 'POST') return json(crm.ownerView(await crm.decide(k, decodeURIComponent(seg[3]), await readJson(request))));
+    throw new HttpError(404, 'Not found');
+  }
   if (seg[0] === 'api' && seg[1] === 'growth') {
     if (seg[2] === 'runner') await runner(request, env); else owner(request, env);
     const k = kv(env);
@@ -728,7 +754,7 @@ export default {
     try {
       return await route(request, env);
     } catch (e) {
-      if (e instanceof HttpError || e instanceof growth.GrowthError) return json({ error: e.message }, e.status);
+      if (e instanceof HttpError || e instanceof growth.GrowthError || e instanceof crm.CrmError) return json({ error: e.message }, e.status);
       console.error('error', e?.stack ?? e);
       return json({ error: `Internal error: ${String(e?.message ?? e).slice(0, 300)}` }, 500);
     }

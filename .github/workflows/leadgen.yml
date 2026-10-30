@@ -1,0 +1,40 @@
+name: Foliocraft lead generation + outreach
+
+# Hourly: finds Foliocraft leads (every 6 h), enriches them with the AGENTVERSE cloud brain, emails ONLY the leads
+# the owner approved (Gmail, daily cap, Mon–Sat 9:30–19:30 IST, unsubscribe line, one follow-up), and reads replies.
+# Personal data goes only to the Worker's private store, never to this repository.
+# Gmail secrets: YT_CLIENT_ID, YT_CLIENT_SECRET, GMAIL_REFRESH_TOKEN (scopes gmail.send + gmail.readonly).
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+    inputs:
+      find:
+        description: "Search for new leads now (1 = yes)"
+        required: false
+        default: "1"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: leadgen
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leads + outreach
+        env:
+          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          FIND: ${{ github.event.inputs.find }}
+        run: python3 scripts/leadgen.py

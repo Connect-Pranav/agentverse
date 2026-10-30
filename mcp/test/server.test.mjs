@@ -349,3 +349,35 @@ test('Gemini free-tier image plan costs nothing and needs no approval', async ()
   assert.equal(j.est_cost_usd, 0);
   assert.equal(j.status, 'approved');
 });
+
+test('CRM: runner upserts leads, owner approves, runner sends, follow-up, replies, suppression', async () => {
+  const e = env();
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body, h = H) => worker.fetch(new Request(B + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined }), e);
+  assert.equal((await f('/api/crm', 'GET', null, {})).status, 401);
+  let v = await (await f('/api/crm/runner/report', 'POST', { upserts: [
+    { id: 'hn_1', name: 'Asha', email: 'Asha@Example.com', score: 82, intent: 'high', subject: 'Your portfolio', subject_b: 'Quick idea', body: 'Hi Asha...', followup: 'Just checking' },
+    { id: 'rd_2', name: 'u/someone', score: 60, body: 'reply text' },
+  ] })).json();
+  assert.equal(v.counts.new, 2);
+  assert.equal((await f('/api/crm/lead/rd_2', 'POST', { action: 'approve' })).status, 400, 'no email → no auto-send');
+  v = await (await f('/api/crm/lead/hn_1', 'POST', { action: 'approve', body: 'Hi Asha, edited.' })).json();
+  assert.equal(v.counts.approved, 1);
+  let st = await (await f('/api/crm/runner')).json();
+  assert.deepEqual(st.to_send.map((x) => x.id), ['hn_1']);
+  assert.equal(st.to_send[0].draft.body, 'Hi Asha, edited.');
+  assert.equal(st.to_send[0].email, 'asha@example.com');
+  await f('/api/crm/runner/report', 'POST', { sent: [{ id: 'hn_1', threadId: 't1', messageId: '<m1>' }] });
+  st = await (await f('/api/crm/runner')).json();
+  assert.equal(st.to_send.length, 0);
+  assert.deepEqual(st.watch.map((x) => x.threadId), ['t1']);
+  assert.equal(st.followups.length, 0, 'follow-up only after the wait');
+  await f('/api/crm/settings', 'POST', { dailyCap: 1 });
+  assert.equal((await (await f('/api/crm')).json()).sent_today, 1);
+  v = await (await f('/api/crm/runner/report', 'POST', { replies: [{ id: 'hn_1', snippet: 'Please stop emailing me', unsubscribe: true }] })).json();
+  assert.equal(v.inbox[0].snippet, 'Please stop emailing me');
+  await f('/api/crm/runner/report', 'POST', { upserts: [{ id: 'hn_9', email: 'asha@example.com', body: 'x' }] });
+  assert.equal((await (await f('/api/crm')).json()).leads.some((l) => l.id === 'hn_9'), false, 'suppressed address is never re-added');
+  const m = (await tool(e, 'get_foliocraft_leads', {})).structuredContent;
+  assert.ok(m.counts.total >= 2);
+});
