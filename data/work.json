@@ -1,1 +1,83 @@
-{"items":[],"cycles":0,"topics":[]}
+{
+ "items": [
+  {
+   "id": "sv_gcmnak",
+   "brand": "Foliocraft",
+   "dept": "Content Engine",
+   "title": "Blog Post",
+   "body": "A portfolio showcases your work and skills, while a resume lists your experience. Having both can increase your chances of getting hired. Learn how to create a portfolio that complements your resume and helps you stand out in a competitive job market.",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Portfolio vs Resume",
+   "ts": 1793341496867,
+   "server": true,
+   "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
+  {
+   "id": "sv_muhqxm",
+   "brand": "Foliocraft",
+   "dept": "Creative Studio",
+   "title": "Reel Script",
+   "body": "Scene 1: Intro to portfolios. Scene 2: Benefits of having a portfolio. Scene 3: Call-to-action to visit Foliocraft website. Script: 'Make your work shine with a professional portfolio. Get hired faster and grow your career.',",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Portfolio vs Resume",
+   "ts": 1793341496867,
+   "server": true,
+   "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
+  {
+   "id": "sv_o3nayn",
+   "brand": "Foliocraft",
+   "dept": "Publishing & Social",
+   "title": "Instagram Post",
+   "body": "Ditch the ordinary resume! Create a stunning portfolio that showcases your skills and experience. #portfolio #careergoals #gethired",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Portfolio vs Resume",
+   "ts": 1793341496867,
+   "server": true,
+   "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
+  {
+   "id": "sv_37797u",
+   "brand": "Foliocraft",
+   "dept": "Search Visibility",
+   "title": "SEO Keywords",
+   "body": "portfolio website, professional portfolio, get hired faster, portfolio vs resume",
+   "status": "ready",
+   "lead_id": null,
+   "topic": "Portfolio vs Resume",
+   "ts": 1793341496867,
+   "server": true,
+   "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
+  {
+   "id": "sv_83cq6l",
+   "brand": "Foliocraft",
+   "dept": "Leads & Conversations",
+   "title": "Lead Reply",
+   "body": "Hi [Lead Name], a portfolio can definitely help you stand out in the job market. It's a great way to showcase your skills and experience. I'd be happy to help you get started on creating one.",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Portfolio vs Resume",
+   "ts": 1793341496867,
+   "server": true,
+   "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
+  }
+ ],
+ "cycles": 1,
+ "topics": [
+  "Portfolio vs Resume"
+ ],
+ "updated": "2026-10-30T06:24:56.867Z",
+ "last": {
+  "brand": "Foliocraft",
+  "topic": "Portfolio vs Resume",
+  "why": "Stand out in job market",
+  "summary": "Portfolio vs Resume content",
+  "brain": "cloud",
+  "model": "cloudflare/meta/llama-3.3-70b-instruct-fp8-fast",
+  "count": 5
+ }
+}
