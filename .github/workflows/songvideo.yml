@@ -39,7 +39,11 @@ jobs:
           try:
               n = r.ganesha("GET", "/api/songvideo/runner/pending").get("pending", 0)
           except Exception as e:
-              print(f"::error title=AGENTVERSE runner sign-in::{r.redact(e)}")
+              print("::error title=AGENTVERSE runner sign-in::" + " ".join(r.redact(e).split())[:500])
+              try:
+                  print("::warning title=health::" + str(r.http("GET", r.env("SV_MCP_URL") + "/health")))
+              except Exception as e2:
+                  print("::warning title=health::" + " ".join(str(e2).split())[:400])
               raise
           print(f"{n} song job(s) waiting")
           open(os.environ["GITHUB_OUTPUT"], "a").write(f"pending={n}\n")
