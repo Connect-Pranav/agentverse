@@ -268,7 +268,7 @@ async function claim(env) {
     const stale = ['analyzing', 'rendering'].includes(j.status) && !(j.leaseUntil && Date.parse(j.leaseUntil) > now);
     // jobs that failed only because a free daily AI allowance ran out are retried automatically
     if (quotaRetry(j)) {
-      Object.assign(j, { status: j.analysis ? 'approved' : 'queued', attempts: 0, autoRetries: (j.autoRetries ?? 0) + 1 });
+      Object.assign(j, { status: j.analysis ? 'approved' : 'queued', attempts: 0, autoRetries: (j.autoRetries ?? 0) + (QUOTA_RE.test(j.error || '') ? 0 : 1) });
     }
     if (j.status === 'queued' || (stale && j.status === 'analyzing')) {
       Object.assign(j, { status: 'analyzing', leaseUntil: isoIn(LEASE_MS), attempts: (j.attempts ?? 0) + 1 });
@@ -583,7 +583,13 @@ async function runner(request, env) {
 }
 // failed only because a free daily AI allowance ran out → retry after a short cool-down (no tight loops)
 // any failed song is retried automatically up to 3 times (5 min apart) before it needs the owner
-const quotaRetry = (j) => j.status === 'failed' && j.audioBytes && (j.autoRetries ?? 0) < 3 && Date.now() - Date.parse(j.updatedAt || 0) > 5 * 60e3;
+// a free daily AI allowance ran out → wait for the reset (00:00 UTC = 05:30 IST); this doesn't use up retries
+const QUOTA_RE = /4006|daily free allocation|daily limit|neurons|HTTP 402|quota/i;
+const quotaRetry = (j) => {
+  if (j.status !== 'failed' || !j.audioBytes) return false;
+  if (QUOTA_RE.test(j.error || '')) return new Date().toISOString().slice(0, 10) > String(j.updatedAt || '').slice(0, 10);
+  return (j.autoRetries ?? 0) < 3 && Date.now() - Date.parse(j.updatedAt || 0) > 5 * 60e3;
+};
 async function pending(env) {
   const now = Date.now();
   let n = 0;

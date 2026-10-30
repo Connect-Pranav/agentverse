@@ -2763,7 +2763,10 @@ function mtRender(){
         (pub&&pub.error?'<p class="r">Last try failed: '+esc(String(pub.error).slice(0,200))+'</p>':'')+'</div>';
     }
   }
-  if(j.error&&(j.status==="failed"||j.status==="queued"||j.status==="approved"))h+='<p class="r">'+(j.status==="failed"?"Failed: ":"Retrying after: ")+esc(String(j.error).slice(0,220))+'</p>';
+  if(j.error&&(j.status==="failed"||j.status==="queued"||j.status==="approved")){
+    if(j.status==="failed"&&/4006|daily free allocation|daily limit|neurons|HTTP 402|quota/i.test(j.error))h+='<p class="mt-sh">Today\'s free AI image allowance is used up. This song continues automatically after 5:30 AM IST (or right away once a free Gemini key is added).</p>';
+    else h+='<p class="r">'+(j.status==="failed"?"Failed: ":"Retrying after: ")+esc(String(j.error).replace(/https?:\/\/\S+/g,"").slice(0,220))+'</p>';
+  }
   if(["queued","needs_approval","approved","ready","failed","rejected"].indexOf(j.status)>=0&&!(j.publish&&j.publish.state==="publishing")){
     h+='<details class="mt-redo"><summary>Redo with a new theme</summary><textarea id="mtRedoT" aria-label="New theme">'+esc(j.theme_hint||"")+'</textarea>'+
       '<input id="mtRedoS" aria-label="Visual style" placeholder="Visual style (optional), e.g. Indian epic painting, dramatic, golden light">'+
