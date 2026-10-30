@@ -22,7 +22,8 @@ import base64, json, math, os, re, shutil, subprocess, sys, tempfile, time, urll
 
 GL = "https://generativelanguage.googleapis.com"
 PART = 22 * 1024 * 1024
-W, H, FPS = 1920, 1080, 30
+W, H, FPS = 1920, 1080, 24
+CAPTIONS = (os.environ.get("SONGVIDEO_CAPTIONS") or "").lower() in ("on", "1", "true", "yes")
 INTRO_S, CREDITS_S, OUTRO_S = 5.0, 4.0, 5.0
 
 
@@ -193,6 +194,11 @@ def gemini_json(model, parts):
     if a < 0:
         raise RuntimeError(f"Gemini returned no JSON ({model})")
     return json.loads(text[a:b + 1])
+
+
+def paid_gemini():
+    """Gemini images are treated as paid (cost estimate + owner approval) only when GEMINI_BILLING=on."""
+    return (os.environ.get("GEMINI_BILLING") or "").lower() in ("on", "1", "true", "yes")
 
 
 def gemini_image(models, prompt, out):
@@ -386,7 +392,7 @@ def analyze_free(job, work, audio, dur, jid):
 
 def analyze(job, work):
     jid = job["id"]
-    if not os.environ.get("GEMINI_API_KEY"):
+    if not os.environ.get("GEMINI_API_KEY") or os.environ.get("SV_FORCE_FREE_ANALYSIS"):
         audio = os.path.join(work, "song")
         progress(jid, "analyze", "Downloading the song", 1, 4, 150)
         raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/audio", want="raw", timeout=600)
@@ -403,8 +409,16 @@ def analyze(job, work):
     dur = probe_duration(audio)
     progress(jid, "analyze", "Sending the song to Gemini", 2, 4, 100)
     n = max(6, min(16, round(dur / 15)))
-    models = gemini_models()
-    f = gemini_upload(audio, job.get("audioMime") or "audio/mpeg")
+    try:
+        models = gemini_models()
+        f = gemini_upload(audio, job.get("audioMime") or "audio/mpeg")
+    except Exception as e:
+        if paid_gemini():
+            raise
+        log(f"[{jid}] Gemini not reachable on the free tier, using the free path: {redact(e)}")
+        a = analyze_free(job, work, audio, dur, jid)
+        ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
+        return
     cr = job.get("credits") or {}
     lyrics = (job.get("lyrics") or "").strip()
     prompt = ANALYZE.format(dur=dur, n=n, style=job.get("style") or "watercolor anime", title=job.get("title") or "", hint=(job.get("hint") or "none").replace('"', "'"),
@@ -420,7 +434,7 @@ def analyze(job, work):
             lrc = parse_lrc(job.get("lyrics") or "", dur)
             if lrc:  # owner's .lrc timings beat any guess
                 a["lyrics_lines"] = [{**l, "text": to_roman(l["text"]) or l["text"]} for l in lrc]
-            a["image_engine"] = (os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "gemini").lower()
+            a["image_engine"] = (os.environ.get("SONGVIDEO_IMAGE_ENGINE") or ("gemini" if paid_gemini() else "gemini-free")).lower()
             a["source"] = model
             # make scenes contiguous and inside the song
             sc = sorted([s for s in a.get("scenes", []) if s.get("image_prompt")], key=lambda s: float(s.get("start", 0)))[:16]
@@ -436,7 +450,12 @@ def analyze(job, work):
         except Exception as e:  # try the next free model
             last = e
             log(f"[{jid}] {model} failed: {redact(e)}")
-    raise last
+    if paid_gemini():
+        raise last
+    # free Gemini quota/limits hit → free path (speech-to-text + cloud brain)
+    log(f"[{jid}] Gemini analysis unavailable, using the free path: {redact(last)}")
+    a = analyze_free(job, work, audio, dur, jid)
+    ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
 
 
 # ---------------- graphics (Pillow) ----------------
@@ -637,12 +656,19 @@ def render(job, work):
     raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/audio", want="raw", timeout=600)
     open(audio, "wb").write(raw)
     dur = probe_duration(audio)
-    engine = (a.get("imageEngine") or os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "gemini").lower()
-    if engine == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+    engine = (a.get("imageEngine") or os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "cloudflare").lower()
+    if engine.startswith("gemini") and not os.environ.get("GEMINI_API_KEY"):
         engine = "cloudflare"
-    per = 0.0 if (a.get("imageEngine") == "cloudflare" or not os.environ.get("GEMINI_API_KEY")) else float(os.environ.get("SONGVIDEO_IMAGE_USD") or 0.067)
+    per = float(os.environ.get("SONGVIDEO_IMAGE_USD") or 0.067) if engine == "gemini" else 0.0
     imgs, used = [], None
-    models = pick_image_models(gemini_models()) if engine == "gemini" else None
+    models = None
+    if engine.startswith("gemini"):
+        try:
+            models = pick_image_models(gemini_models())
+        except Exception as e:
+            log(f"[{jid}] Gemini image models unavailable, using Cloudflare: {redact(e)}")
+            engine = "cloudflare"
+    gem_off = False  # set when the free Gemini quota runs out → rest of the images from Cloudflare
     n_sc = len(scenes)
     enc_est = 40 + dur * 0.9  # ffmpeg on a 2-core runner, 1080p30
     up_est = 25
@@ -653,12 +679,21 @@ def render(job, work):
         out = os.path.join(work, f"img{i:02d}.png")
         lock = " ".join(x for x in [a.get("styleLock") or a.get("style_lock") or (job.get("style") or ""), a.get("characters") or ""] if x).strip()
         p = (lock[:800] + " Scene: " if lock else "") + s["image_prompt"][:950] + " Same art style and same character designs as every other scene. Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
-        if engine == "cloudflare":
+        used = None
+        if engine.startswith("gemini") and not gem_off:
+            try:
+                used = gemini_image(models, p, out)
+            except Exception as e:
+                if engine == "gemini":  # paid mode: owner approved Gemini, so report the failure
+                    raise
+                gem_off = True
+                log(f"[{jid}] Gemini free tier unavailable ({redact(e)[:120]}) — switching to free Cloudflare images")
+        elif engine == "openai":
+            used = openai_image(p, out)
+        if not used:
             img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
             open(out, "wb").write(img)
             used = "cloudflare/flux-1-schnell"
-        else:
-            used = openai_image(p, out) if engine == "openai" else gemini_image(models, p, out)
         norm = os.path.join(work, f"scene{i:02d}.png")
         # whole artwork, never cropped: sharp image centred on a soft blurred copy of itself (16:9 images fill the frame)
         run(["ffmpeg", "-y", "-v", "error", "-i", out, "-filter_complex",
@@ -712,7 +747,7 @@ def render(job, work):
         off += float(scenes[i]["end"]) - float(scenes[i]["start"])
     total = dur + OUTRO_S
     ass = os.path.join(work, "lyrics.ass")
-    write_ass(a.get("lyrics_lines") or [], ass, INTRO_S + CREDITS_S - 0.5)
+    write_ass(a.get("lyrics_lines") if CAPTIONS else [], ass, INTRO_S + CREDITS_S - 0.5)  # owner brief: no lyrics on screen
     n = len(imgs)
     inputs += ["-framerate", str(FPS), "-i", os.path.join(work, "intro", "%04d.png"),
                "-framerate", str(FPS), "-i", os.path.join(work, "outro", "%04d.png"), "-i", audio]

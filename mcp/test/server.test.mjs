@@ -336,3 +336,16 @@ test('video plays across stored parts: Range requests return 206 per part; full 
   assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.match((await worker.fetch(new Request(url + '?dl=1'), e)).headers.get('content-disposition'), /^attachment/);
 });
+
+test('Gemini free-tier image plan costs nothing and needs no approval', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const c = (await tool(e, 'create_song_job', { title: 'G' })).structuredContent;
+  await worker.fetch(new Request(c.upload_url, { method: 'PUT', headers: { 'content-type': 'audio/mpeg', 'content-length': '2' }, body: new Uint8Array(2) }), e);
+  await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e);
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${c.job_id}/analysis`, { method: 'PUT', headers: R, body: JSON.stringify({ durationS: 9, image_engine: 'gemini-free', scenes: [{ start: 0, end: 9, image_prompt: 'x' }] }) }), e);
+  const j = (await tool(e, 'get_song_job', { job_id: c.job_id })).structuredContent;
+  assert.equal(j.image_engine, 'gemini-free');
+  assert.equal(j.est_cost_usd, 0);
+  assert.equal(j.status, 'approved');
+});

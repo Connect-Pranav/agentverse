@@ -3,7 +3,8 @@ name: SUNVERSE song → video (MCP renderer)
 # Picks up songs uploaded in AGENTVERSE (MCP tile / Claude connector) and makes the video.
 # No repo secrets needed: the runner signs in to the AGENTVERSE Worker with GitHub's OIDC token.
 #   free (default): faster-whisper lyrics + AGENTVERSE cloud brain + Cloudflare FLUX images → no approval needed
-#   GEMINI_API_KEY secret set: Gemini listens and makes the images (paid → waits for the owner's approval)
+#   GEMINI_API_KEY secret set: Gemini (free tier) listens and makes the images; when its free quota runs out the
+#   rest falls back to free Cloudflare images. Only repo variable GEMINI_BILLING=on treats Gemini as paid (approval).
 # YouTube posting needs YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN.
 # The Worker starts this instantly when it has GH_DISPATCH_TOKEN; otherwise GitHub's schedule (can lag).
 
@@ -53,10 +54,7 @@ jobs:
           python3 -m pip install --quiet pillow
       - name: Install free speech-to-text
         if: steps.cfg.outputs.pending != '0'
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then python3 -m pip install --quiet faster-whisper indic_transliteration; fi
+        run: python3 -m pip install --quiet faster-whisper indic_transliteration
       - uses: actions/cache@v4
         if: steps.cfg.outputs.pending != '0'
         with:
@@ -71,6 +69,8 @@ jobs:
           GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
           SONGVIDEO_IMAGE_ENGINE: ${{ vars.SONGVIDEO_IMAGE_ENGINE }}
           SONGVIDEO_IMAGE_USD: ${{ vars.SONGVIDEO_IMAGE_USD }}
+          GEMINI_BILLING: ${{ vars.GEMINI_BILLING }}
+          SONGVIDEO_CAPTIONS: ${{ vars.SONGVIDEO_CAPTIONS }}
           WHISPER_MODEL: ${{ vars.WHISPER_MODEL }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}

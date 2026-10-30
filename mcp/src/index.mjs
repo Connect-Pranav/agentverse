@@ -284,9 +284,9 @@ async function saveAnalysis(env, j, a) {
   const yt = a.youtube ?? {};
   j.youtube = { title: clean(yt.title, 100) || j.title, description: clean(yt.description, 4800), tags: (Array.isArray(yt.tags) ? yt.tags : []).map((t) => clean(t, 40)).filter(Boolean).slice(0, 25) };
   if (!j.title) j.title = j.youtube.title;
-  j.analysis.imageEngine = ['cloudflare', 'gemini', 'openai'].includes(a.image_engine) ? a.image_engine : 'gemini';
+  j.analysis.imageEngine = ['cloudflare', 'gemini', 'gemini-free', 'openai'].includes(a.image_engine) ? a.image_engine : 'gemini';
   j.analysis.source = clean(a.source, 60) || null;
-  const per = j.analysis.imageEngine === 'cloudflare' ? 0 : (Number(env.SONGVIDEO_IMAGE_USD) > 0 ? Number(env.SONGVIDEO_IMAGE_USD) : 0.067);
+  const per = ['cloudflare', 'gemini-free'].includes(j.analysis.imageEngine) ? 0 : (Number(env.SONGVIDEO_IMAGE_USD) > 0 ? Number(env.SONGVIDEO_IMAGE_USD) : 0.067);
   j.imageCount = scenes.length;
   j.estCostUsd = Math.round(scenes.length * per * 1000) / 1000;
   j.estCostInr = Number(env.INR_PER_USD) > 0 ? Math.round(j.estCostUsd * Number(env.INR_PER_USD)) : null;
