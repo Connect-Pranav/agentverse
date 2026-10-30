@@ -84,11 +84,33 @@ def runner_token():
     return _TOK["v"]
 
 
+WORKER_URLS = ["https://agentverse.pravanigroup.workers.dev", "https://agentverse.aistudio09.workers.dev"]
+_BASE = {"v": None}
+
+
+def worker_url():
+    """SV_MCP_URL if set; otherwise the first known AGENTVERSE Worker that answers /health (pravanigroup preferred)."""
+    u = (os.environ.get("SV_MCP_URL") or "").strip().rstrip("/")
+    if u:
+        return u
+    if _BASE["v"]:
+        return _BASE["v"]
+    for c in WORKER_URLS:
+        try:
+            if http("GET", c + "/health", None, None, 20).get("app") == "agentverse":
+                _BASE["v"] = c
+                log("worker:", c)
+                return c
+        except Exception as e:
+            log("worker not at", c, "-", str(e)[:80])
+    raise RuntimeError("no AGENTVERSE Worker reachable at " + ", ".join(WORKER_URLS))
+
+
 def ganesha(method, path, body=None, headers=None, timeout=300, want="json"):
     """Call the AGENTVERSE Worker (name kept for the shared runner code)."""
     h = {"authorization": f"Bearer {runner_token()}"}
     h.update(headers or {})
-    return http(method, env("SV_MCP_URL").rstrip("/") + path, body, h, timeout, want)
+    return http(method, worker_url() + path, body, h, timeout, want)
 
 
 def progress(jid, stage, step, done=0, total=0, eta=0):

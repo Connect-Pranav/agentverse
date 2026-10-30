@@ -2548,7 +2548,8 @@ function openUrl(u){ var a=document.createElement("a"); a.href=u; a.target="_bla
    ===================================================================== */
 var STU={jobs:[],seen:{},backend:null,cur:null,deadline:0,etaLabel:"",file:null,busy:false};
 var STU_LABEL={uploading:"waiting for upload",queued:"queued",analyzing:"Gemini is listening",needs_approval:"needs your approval",approved:"approved",rendering:"making the video",ready:"video ready",failed:"failed",rejected:"rejected"};
-var SV_CF="https://agentverse.pravanigroup.workers.dev";
+var SV_URLS=["https://agentverse.pravanigroup.workers.dev","https://agentverse.aistudio09.workers.dev"], SV_CF=SV_URLS[0];
+(function(){ if(/\.workers\.dev$/.test(location.hostname)){SV_CF=location.origin;return;} var i=0; (function nx(){ if(i>=SV_URLS.length)return; var u=SV_URLS[i++]; fetch(u+"/health",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){ if(j&&j.app==="agentverse"){SV_CF=u; if(typeof mtSetup==="function"&&STU.backend===false)mtSetup(false);} else nx(); },nx); })(); })();
 function stuProbe(cb){
   if(STU.backend!==null){cb(STU.backend);return;}
   fetch("/health",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){STU.backend=!!(j&&j.songStudio);STU.health=j||{};updateBrain();if(SET.autopilot&&!autopilot&&provider()!=="none")setAutopilot(true);cb(STU.backend);}).catch(function(){STU.backend=false;cb(false);});

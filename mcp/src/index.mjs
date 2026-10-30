@@ -544,7 +544,7 @@ async function route(request, env) {
   const method = request.method;
   const len = Number(request.headers.get('content-length') ?? 0);
 
-  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI) });
+  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI) }, 200, { 'access-control-allow-origin': '*' });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1]);
   if (seg[0] === 'u' && seg[1]) {

@@ -27,7 +27,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
-          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
           BRAND: ${{ github.event.inputs.brand }}
       - name: Save work
         run: |

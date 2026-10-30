@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Growth cycle
         env:
-          SV_MCP_URL: ${{ vars.SV_MCP_URL || 'https://agentverse.pravanigroup.workers.dev' }}
+          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
           SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
