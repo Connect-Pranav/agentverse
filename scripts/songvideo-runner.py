@@ -837,6 +837,8 @@ def main():
             {"analyze": analyze, "render": render, "publish": publish, "short": make_short}[c["stage"]](job, work)
         except Exception as e:
             log(f"[{job['id']}] {c['stage']} failed: {redact(e)}")
+            if os.environ.get("GITHUB_ACTIONS"):
+                print(f"::error title=song {c['stage']} failed::" + " ".join(redact(e).split())[:600], flush=True)
             try:
                 ganesha("POST", f"/api/songvideo/runner/{job['id']}/fail", {"error": redact(e), "stage": c["stage"]})
             except Exception as e2:
