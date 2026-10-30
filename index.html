@@ -684,6 +684,18 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
 .gr-auto{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:12px}
 #growthTile .r,.mt-sh{font-size:12px}#growthTile .r{color:#ffb3c9}
 .mt-free{font-size:12px;margin:8px 0 0;color:#b8f5d0}
+/* Images step → gallery */
+button.mt-step{font:inherit;cursor:pointer;position:relative}
+.mt-click:hover,.mt-click:focus-visible{border-color:#fff;outline:none;transform:translateY(-1px)}
+.mt-badge{position:absolute;top:5px;right:6px;font-style:normal;font:700 9.5px var(--fm);background:#fff;color:#1d1510;border-radius:99px;padding:1px 6px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;max-height:68vh;overflow:auto;padding-right:4px}
+.gal figure{margin:0;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:14px;overflow:hidden}
+.gal img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#111}
+.gal figcaption{font-size:12px;padding:8px 10px;line-height:1.4;overflow-wrap:anywhere}
+.gal-wait div{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--mut)}
+.gal-h{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--org2);margin:12px 0 6px}
+.gal-plan{font-size:12.5px;margin:0;padding-left:20px;line-height:1.6}
+@media(max-width:600px){.gal{grid-template-columns:1fr 1fr;gap:8px}.gal figcaption{font-size:11px;padding:6px}}
 
 </style>
 </head>
@@ -2644,6 +2656,8 @@ function mtRender(){
   h+='<div class="mt-head"><div><small>'+esc((j.status==="ready"&&pub&&pub.state==="published")?"live on YouTube":(STU_LABEL[j.status]||j.status))+(j.duration_s?' &middot; '+Math.round(j.duration_s)+' s song':'')+'</small><h4>'+esc((j.youtube&&j.youtube.title)||j.title||"Untitled song")+'</h4></div><button class="mt-all" data-go="studio" type="button">All songs</button></div>';
   h+='<div class="mt-steps">';
   for(i=0;i<6;i++){ var lbl=MT_STEPS[i][1]; if(i===3&&j.status==="rendering"&&p&&p.stage==="render"&&p.total)lbl="Images "+Math.min(p.done,p.total)+"/"+p.total; else if(i===3&&j.image_count)lbl=j.image_count+" images";
+    if(i===3){ var ni=(j.images||[]).length; if(ni&&!(j.status==="rendering"&&p&&p.stage==="render"))lbl=ni+(j.image_total&&ni<j.image_total?"/"+j.image_total:"")+" images";
+      h+='<button type="button" class="mt-step mt-click '+st[i]+'" data-mt="gallery" aria-label="Show generated images"><span data-i="'+MT_STEPS[i][0]+'"></span>'+esc(lbl)+(ni?'<i class="mt-badge">'+ni+'</i>':'')+'</button>'; continue; }
     h+='<div class="mt-step '+st[i]+'"><span data-i="'+MT_STEPS[i][0]+'"></span>'+esc(lbl)+'</div>'; }
   h+='</div>';
   if(e.s!==null){ STU.deadline=Date.now()+e.s*1000; STU.etaLabel=e.label;
@@ -2684,6 +2698,7 @@ function mtRender(){
   $("mtJob").innerHTML=h;
   var els=$("mtJob").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
   var ga=$("mtJob").querySelector("[data-go]"); if(ga)ga.onclick=function(){go("studio");};
+  mtGallery(j,false);
   if(pub&&pub.privacy&&$("mtYtP"))$("mtYtP").value=pub.privacy;
 }
 setInterval(function(){
@@ -2694,6 +2709,7 @@ setInterval(function(){
 $("mtJob").onclick=function(e){
   var b=e.target.closest?e.target.closest("button[data-mt]"):null; if(!b||!STU.cur)return;
   var a=b.getAttribute("data-mt"),id=STU.cur.job_id;
+  if(a==="gallery"){ mtGallery(STU.cur,true); return; }
   if(a==="start"){
     b.disabled=true;
     stuApi("POST","/api/songvideo/start",{}).then(function(){ STU.startMsg="Renderer started — first update in about 1–2 minutes."; STU.health=STU.health||{}; STU.health.instantStart=true; toast("Renderer started",true); mtRender(); },function(e2){ STU.startMsg=e2.message; toast(/GH_DISPATCH_TOKEN/.test(e2.message)?"One-time setup needed for Start now":e2.message,false); mtRender(); });
@@ -2717,6 +2733,27 @@ $("mtJob").onclick=function(e){
   stuApi("POST","/api/songvideo/"+id+"/"+a,{}).then(function(r){ toast(a==="approve"?"Approved — Gemini is making the images":"Rejected — nothing spent",a==="approve"); upd(r.job); }).catch(function(e2){ toast(e2.message,false); b.disabled=false; });
   function upd(nj){ for(var i=0;i<STU.jobs.length;i++)if(STU.jobs[i].job_id===nj.job_id)STU.jobs[i]=nj; mtRender(); }
 };
+/* images the renderer made for the current song — opens from the Images step, refreshes live */
+function mtGallery(j,open){
+  if(!j)return;
+  if(!open&&!(STU.gal===j.job_id&&$("sig").className.indexOf("open")>=0))return;
+  STU.gal=j.job_id;
+  var im=j.images||[],sc=(j.plan&&j.plan.scenes)||[],total=j.image_total||sc.length,h="",i;
+  var making=j.status==="rendering"&&im.length<total;
+  if(!im.length){
+    h='<div class="empty"><b>'+(j.status==="needs_approval"?"Images start after you approve.":(j.status==="approved"?"Images start when the renderer runs.":(j.status==="rendering"?"First image is being made…":"No images yet.")))+'</b></div>';
+    if(sc.length){ h+='<h6 class="gal-h">Planned scenes</h6><ol class="gal-plan">'; for(i=0;i<sc.length;i++)h+='<li><b>'+fmtDur(sc[i].start)+'</b> '+esc(sc[i].summary||"")+'</li>'; h+='</ol>'; }
+  } else {
+    h='<div class="gal">';
+    for(i=0;i<im.length;i++){ var s2=sc[im[i].n-1]; h+='<figure><a href="'+esc(im[i].url)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+esc(im[i].url)+'" alt="Scene '+im[i].n+': '+esc(im[i].summary||"")+'"></a><figcaption><b>'+im[i].n+'</b>'+(s2?' · '+fmtDur(s2.start):'')+' — '+esc(im[i].summary||"")+'</figcaption></figure>'; }
+    for(i=im.length;i<total&&making;i++)h+='<figure class="gal-wait"><div><span class="mt-dot"></span>making…</div><figcaption><b>'+(i+1)+'</b> — '+esc((sc[i]&&sc[i].summary)||"")+'</figcaption></figure>';
+    h+='</div>';
+  }
+  var sub=(j.youtube&&j.youtube.title)||j.title||"Song";
+  sub=esc(sub)+' · '+im.length+(total?' of '+total:'')+' images'+(j.image_engine==="cloudflare"?' · free Cloudflare images':(j.image_engine?' · '+esc(j.image_engine):''))+(making?' · updating live':'');
+  if(open)sigOpen("Generated images",sub,h);
+  else { $("sigS").innerHTML=sub; $("sigB").innerHTML=h; }
+}
 function mtPick(f){ if(!f)return; STU.file=f; $("mtFileName").textContent=f.name+" · "+(f.size/1048576).toFixed(1)+" MB"; $("mtDrop").classList.add("on"); if(!$("mtTitle").value)$("mtTitle").value=f.name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").slice(0,100); }
 $("mtFile").onchange=function(){ mtPick(this.files&&this.files[0]); };
 ["dragenter","dragover"].forEach(function(ev){ $("mtDrop").addEventListener(ev,function(e){e.preventDefault();$("mtDrop").classList.add("on");}); });

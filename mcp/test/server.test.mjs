@@ -240,3 +240,23 @@ test('Start now: owner-only, needs GH_DISPATCH_TOKEN, dispatches the renderer', 
   try { const ok = await go({ ...env(), GH_DISPATCH_TOKEN: 'g' }); assert.equal((await ok.json()).started, true); assert.match(calls[0], /songvideo\.yml\/dispatches/); }
   finally { globalThis.fetch = realFetch; }
 });
+
+test('scene image previews: runner uploads, owner sees them by unguessable link', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok' };
+  const c = (await tool(e, 'create_song_job', { title: 'G' })).structuredContent;
+  const id = c.job_id;
+  const put = (n, body, summary) => worker.fetch(new Request(B + `/api/songvideo/runner/${id}/img/${n}?summary=${encodeURIComponent(summary)}`, { method: 'PUT', headers: { ...R, 'content-length': String(body.length) }, body }), e);
+  assert.equal((await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/img/1`, { method: 'PUT', headers: { 'content-length': '2' }, body: new Uint8Array(2) }), e)).status, 401);
+  assert.equal((await put(99, new Uint8Array(2), 'x')).status, 400);
+  await put(2, new Uint8Array([9, 9]), 'Moon over the river');
+  await put(1, new Uint8Array([1, 2, 3]), 'Sunset on the rooftop');
+  const j = (await tool(e, 'get_song_job', { job_id: id })).structuredContent;
+  assert.deepEqual(j.images.map((x) => x.summary), ['Sunset on the rooftop', 'Moon over the river']);
+  const r = await worker.fetch(new Request(j.images[0].url), e);
+  assert.equal(r.headers.get('content-type'), 'image/jpeg');
+  assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [1, 2, 3]);
+  assert.equal((await worker.fetch(new Request(B + '/sv/' + 'a'.repeat(32) + '/1.jpg'), e)).status, 404);
+  await tool(e, 'delete_song_job', { job_id: id });
+  assert.equal((await worker.fetch(new Request(j.images[0].url), e)).status, 404);
+});

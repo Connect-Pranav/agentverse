@@ -93,6 +93,8 @@ function view(env, request, j) {
     lyrics_lines_count: (j.analysis?.lyrics_lines ?? []).length,
     progress: j.progress ?? null,
     publish: j.publish ? { state: j.publish.state, privacy: j.publish.privacy, url: j.publish.url ?? null, video_id: j.publish.videoId ?? null, privacy_effective: j.publish.privacyEffective ?? null, error: j.publish.error ?? null, requested_at: j.publish.requestedAt ?? null, at: j.publish.at ?? null } : null,
+    images: j.imgTicket ? (j.images ?? []).slice().sort((x, y) => x.n - y.n).map((i) => ({ n: i.n, summary: i.summary, url: `${b}/sv/${j.imgTicket}/${i.n}.jpg?v=${encodeURIComponent(i.at || '')}` })) : [],
+    image_total: j.analysis?.scenes?.length ?? null,
     short: j.short ? { state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
     instant_start: Boolean(env.GH_DISPATCH_TOKEN), queued_at: j.queuedAt ?? null, decided_at: j.decidedAt ?? null,
     video_url: j.status === 'ready' && j.ticket ? `${b}/sv/${j.ticket}.mp4` : null,
@@ -177,6 +179,7 @@ async function removeJob(env, j) {
   await k.delete(`sv/audio/${j.id}`);
   for (let n = 1; n <= MAX_PARTS; n++) await k.delete(`sv/video/${j.id}/${n}`);
   await k.delete(`sv/thumb/${j.id}`);
+  for (let n = 1; n <= MAX_IMAGES; n++) await k.delete(`sv/img/${j.id}/${n}`);
   await k.delete(jobKey(j.id));
   await k.put(INDEX, JSON.stringify((await index(env)).filter((x) => x !== j.id)));
 }
@@ -546,6 +549,12 @@ async function route(request, env) {
 
   if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI) }, 200, { 'access-control-allow-origin': '*' });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
+  if (seg[0] === 'sv' && seg[1] && seg[2] && method === 'GET') {
+    const m = /^(\d{1,2})\.jpg$/.exec(seg[2]);
+    const j = m && /^[0-9a-f]{32}$/.test(seg[1]) ? await jobByTicket(env, 'imgTicket', seg[1]) : null;
+    const img = j ? await kv(env).get(`sv/img/${j.id}/${Number(m[1])}`, 'stream') : null;
+    return img ? new Response(img, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex' } }) : new Response('Not found', { status: 404 });
+  }
   if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1]);
   if (seg[0] === 'u' && seg[1]) {
     const j = /^[0-9a-f]{32}$/.test(seg[1]) ? await jobByTicket(env, 'uploadTicket', seg[1]) : null;
@@ -614,6 +623,17 @@ async function route(request, env) {
       j.thumb = true;
       await saveJob(env, j);
       return json({ ok: true });
+    }
+    if (seg[4] === 'img' && seg[5] && method === 'PUT') {
+      const n = Number(seg[5]);
+      if (!(Number.isInteger(n) && n >= 1 && n <= MAX_IMAGES)) throw new HttpError(400, `image number must be 1–${MAX_IMAGES}`);
+      if (!(len > 0) || len > 1024 * 1024) throw new HttpError(413, 'Preview image must be ≤ 1 MB');
+      await kv(env).put(`sv/img/${j.id}/${n}`, request.body);
+      j.imgTicket = j.imgTicket || hex(16);
+      const at = nowIso();
+      j.images = (j.images ?? []).filter((x) => x.n !== n).concat([{ n, summary: clean(url.searchParams.get('summary'), 300), at }]);
+      await saveJob(env, j);
+      return json({ ok: true, n });
     }
     if (seg[4] === 'image' && method === 'POST') return cloudImage(env, (await readJson(request)).prompt);
     if (seg[4] === 'short-done' && method === 'POST') { const r = await markShort(env, j, await readJson(request)); return json({ job: { id: r.id, short: r.short } }); }

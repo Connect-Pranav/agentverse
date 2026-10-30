@@ -565,7 +565,7 @@ def render(job, work):
     up_est = 25
     per_img = 20.0
     t0 = time.time()
-    progress(jid, "render", f"Gemini image 1 of {n_sc}", 0, n_sc, n_sc * per_img + enc_est + up_est)
+    progress(jid, "render", f"Making image 1 of {n_sc}", 0, n_sc, n_sc * per_img + enc_est + up_est)
     for i, s in enumerate(scenes):
         out = os.path.join(work, f"img{i:02d}.png")
         p = s["image_prompt"] + " Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
@@ -579,9 +579,16 @@ def render(job, work):
         run(["ffmpeg", "-y", "-v", "error", "-i", out, "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}", norm])
         imgs.append(norm)
         log(f"[{jid}] image {i + 1}/{len(scenes)} via {used}")
+        try:  # small preview so the owner can watch the images arrive in AGENTVERSE
+            pv = os.path.join(work, f"pv{i:02d}.jpg")
+            run(["ffmpeg", "-y", "-v", "error", "-i", norm, "-vf", "scale=960:-2", "-q:v", "5", pv])
+            q = urllib.parse.urlencode({"summary": s.get("summary") or f"Scene {i + 1}"})
+            ganesha("PUT", f"/api/songvideo/runner/{jid}/img/{i + 1}?{q}", open(pv, "rb").read(), {"content-type": "image/jpeg"}, timeout=60)
+        except Exception as e:
+            log(f"[{jid}] preview {i + 1} not shared: {redact(e)}")
         per_img = (time.time() - t0) / (i + 1)
         left = n_sc - i - 1
-        progress(jid, "render", f"Gemini image {i + 2} of {n_sc}" if left else "Images done, building the video", i + 1, n_sc, left * per_img + enc_est + up_est)
+        progress(jid, "render", f"Making image {i + 2} of {n_sc}" if left else "Images done, building the video", i + 1, n_sc, left * per_img + enc_est + up_est)
     cost = round(len(imgs) * per, 3)
 
     # logo from the studio (Sunverse brand asset)
