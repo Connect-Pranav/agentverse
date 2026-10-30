@@ -714,6 +714,12 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 .dock .home-logo.on img{filter:drop-shadow(0 0 8px rgba(120,160,255,.8))}
 .mt-push{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:600 12.5px var(--fb);color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:9px 14px;min-height:40px}
 .mt-push .i{width:15px;height:15px}
+.mt-redo{margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:8px}
+.mt-redo summary{cursor:pointer;font-size:12.5px;font-weight:600;padding:4px 0}
+.mt-redo[open]{display:flex;flex-direction:column;gap:8px}
+.mt-redo textarea,.mt-redo input{width:100%;box-sizing:border-box;font:13px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:9px 11px}
+.mt-redo textarea{min-height:64px}
+.mt-up #mtTheme{width:100%;box-sizing:border-box}
 
 </style>
 </head>
@@ -819,6 +825,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
       <div class="mt-up">
         <label class="mt-drop" id="mtDrop"><input id="mtFile" type="file" accept="audio/*,.mp3,.m4a,.wav"><span data-i="upload"></span><b id="mtFileName">Tap to choose your MP3</b><small>or drop it here &middot; MP3, M4A or WAV &middot; max 24 MB</small></label>
         <input id="mtTitle" placeholder="Song title (optional)" aria-label="Song title">
+        <input id="mtTheme" placeholder="Story / theme, e.g. Ramayana — Angad challenges Ravana" aria-label="Story or theme">
         <details class="mt-more"><summary>Lyrics, style &amp; credits (optional)</summary>
           <textarea id="mtLyrics" placeholder="Lyrics in English letters, one line per row (better caption timing)" aria-label="Lyrics"></textarea>
           <input id="mtStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text" aria-label="Visual style">
@@ -2715,6 +2722,11 @@ function mtRender(){
     }
   }
   if(j.error&&(j.status==="failed"||j.status==="queued"||j.status==="approved"))h+='<p class="r">'+(j.status==="failed"?"Failed: ":"Retrying after: ")+esc(String(j.error).slice(0,220))+'</p>';
+  if(["queued","needs_approval","approved","ready","failed","rejected"].indexOf(j.status)>=0&&!(j.publish&&j.publish.state==="publishing")){
+    h+='<details class="mt-redo"><summary>Redo with a new theme</summary><textarea id="mtRedoT" aria-label="New theme">'+esc(j.theme_hint||"")+'</textarea>'+
+      '<input id="mtRedoS" aria-label="Visual style" placeholder="Visual style (optional), e.g. Indian epic painting, dramatic, golden light">'+
+      '<div class="acts"><button class="ap" data-mt="redo" type="button"><span data-i="rotate-ccw"></span>Redo video</button></div><p class="mt-sh">Same MP3, new plan, new images, new video. Old images are replaced.</p></details>';
+  }
   if(j.status==="uploading"&&j.upload_url)h+='<p>Upload not finished. <a style="color:#fff;text-decoration:underline" href="'+esc(j.upload_url)+'" target="_blank" rel="noopener">Open upload page</a></p>';
   $("mtJob").innerHTML=h;
   var els=$("mtJob").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
@@ -2734,6 +2746,12 @@ $("mtJob").onclick=function(e){
   if(a==="start"){
     b.disabled=true;
     stuApi("POST","/api/songvideo/start",{}).then(function(){ STU.startMsg="Renderer started — first update in about 1–2 minutes."; STU.health=STU.health||{}; STU.health.instantStart=true; toast("Renderer started",true); mtRender(); },function(e2){ STU.startMsg=e2.message; toast(/GH_DISPATCH_TOKEN/.test(e2.message)?"One-time setup needed for Start now":e2.message,false); mtRender(); });
+    return;
+  }
+  if(a==="redo"){
+    var th=$("mtRedoT").value.trim(); if(!th){ toast("Write the theme first, e.g. Ramayana — Angad in Ravana's court",false); return; }
+    b.disabled=true;
+    stuApi("POST","/api/songvideo/"+id+"/redo",{theme:th,style:$("mtRedoS").value.trim()}).then(function(r){ toast("Redoing with the new theme",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
     return;
   }
   if(a==="short"){
@@ -2787,10 +2805,10 @@ $("mtGo").onclick=function(){
   if(f.size>24*1024*1024){toast("File is over 24 MB — export a 192 kbps MP3",false);return;}
   var btn=this; btn.disabled=true; STU.busy=true; $("mtMsg").textContent="Creating the job…";
   var fin=function(msg,ok){ btn.disabled=false; STU.busy=false; $("mtMsg").textContent=msg; if(ok!==undefined)toast(msg,ok); };
-  stuApi("POST","/api/songvideo",{title:$("mtTitle").value,lyrics:$("mtLyrics").value,style:$("mtStyle").value,lyricist:$("mtLyr").value,singer:$("mtSing").value}).then(function(r){
+  stuApi("POST","/api/songvideo",{title:$("mtTitle").value,theme:$("mtTheme").value,lyrics:$("mtLyrics").value,style:$("mtStyle").value,lyricist:$("mtLyr").value,singer:$("mtSing").value}).then(function(r){
     var x=new XMLHttpRequest(); x.open("PUT","/api/songvideo/"+r.job.job_id+"/audio"); x.setRequestHeader("Authorization","Bearer "+SET.mcpToken); x.setRequestHeader("Content-Type",f.type||"audio/mpeg");
     x.upload.onprogress=function(ev){ if(ev.lengthComputable){ var pc=Math.round(ev.loaded/ev.total*100); $("mtBar").style.width=pc+"%"; $("mtMsg").textContent="Uploading "+pc+"%"; } };
-    x.onload=function(){ if(x.status>=200&&x.status<300){ fin("Uploaded ✓ — analysis starts automatically",true); STU.file=null; $("mtFile").value=""; $("mtFileName").textContent="Tap to choose your MP3"; $("mtDrop").classList.remove("on"); $("mtTitle").value=""; $("mtLyrics").value=""; setTimeout(function(){$("mtBar").style.width="0";},1500); stuLoad(); } else { var m="Upload failed"; try{m=JSON.parse(x.responseText).error||m;}catch(e){} fin(m,false);} };
+    x.onload=function(){ if(x.status>=200&&x.status<300){ fin("Uploaded ✓ — analysis starts automatically",true); STU.file=null; $("mtFile").value=""; $("mtFileName").textContent="Tap to choose your MP3"; $("mtDrop").classList.remove("on"); $("mtTitle").value=""; $("mtTheme").value=""; $("mtLyrics").value=""; setTimeout(function(){$("mtBar").style.width="0";},1500); stuLoad(); } else { var m="Upload failed"; try{m=JSON.parse(x.responseText).error||m;}catch(e){} fin(m,false);} };
     x.onerror=function(){ fin("Network error — try again",false); };
     x.send(f);
   }).catch(function(e){ fin(e.message,false); });

@@ -286,3 +286,26 @@ test('push: VAPID key, subscribe, inbox, wake-up push with ES256 VAPID JWT', asy
   assert.equal(msgs[0].body, 'Notifications are on ✓');
   assert.equal((await f('/api/push/inbox/nope', 'GET', null, {})).status, 404);
 });
+
+test('redo with a new theme: same MP3, plan and images cleared, queued again', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const c = (await tool(e, 'create_song_job', { title: "Angad's LalKaar", theme: '' })).structuredContent;
+  const id = c.job_id;
+  assert.equal((await tool(e, 'redo_song_job', { job_id: id, theme: 'x' })).isError, true, 'needs an uploaded song');
+  await worker.fetch(new Request(c.upload_url, { method: 'PUT', headers: { 'content-type': 'audio/mpeg', 'content-length': '3' }, body: new Uint8Array(3) }), e);
+  await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e);
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/analysis`, { method: 'PUT', headers: R, body: JSON.stringify({ durationS: 10, image_engine: 'cloudflare', mood: 'love', style_lock: 'anime', scenes: [{ start: 0, end: 10, image_prompt: 'couple' }] }) }), e);
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/img/1`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': '1' }, body: new Uint8Array([1]) }), e);
+  await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e);
+  assert.equal((await tool(e, 'redo_song_job', { job_id: id, theme: 'x' })).isError, true, 'not while rendering');
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/fail`, { method: 'POST', headers: R, body: JSON.stringify({ error: 'stop' }) }), e);
+  const r = (await tool(e, 'redo_song_job', { job_id: id, theme: 'Ramayana — Angad challenges Ravana' })).structuredContent;
+  assert.equal(r.status, 'queued');
+  assert.equal(r.theme_hint, 'Ramayana — Angad challenges Ravana');
+  assert.equal(r.plan, null);
+  assert.deepEqual(r.images, []);
+  const cl = await (await worker.fetch(new Request(B + '/api/songvideo/runner/claim', { method: 'POST', headers: R, body: '{}' }), e)).json();
+  assert.equal(cl.stage, 'analyze');
+  assert.equal(cl.job.hint, 'Ramayana — Angad challenges Ravana');
+});

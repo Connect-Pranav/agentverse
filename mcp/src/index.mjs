@@ -86,7 +86,7 @@ function view(env, request, j) {
     job_id: j.id, title: j.title, status: j.status, status_text: STATUS_TEXT[j.status] ?? j.status, credits: j.credits, style: j.style,
     upload_url: j.status === 'uploading' || j.status === 'failed' ? `${b}/u/${j.uploadTicket}` : undefined,
     duration_s: j.analysis?.durationS ?? null,
-    image_engine: j.analysis?.imageEngine ?? null, auto_approved: Boolean(j.autoApproved),
+    image_engine: j.analysis?.imageEngine ?? null, theme_hint: j.hint || '', auto_approved: Boolean(j.autoApproved),
     plan: j.analysis ? { mood: j.analysis.mood, theme: j.analysis.theme, language: j.analysis.language, scenes: (j.analysis.scenes ?? []).map((s) => ({ start: s.start, end: s.end, summary: s.summary })) } : null,
     image_count: j.imageCount ?? null, est_cost_usd: j.estCostUsd ?? null, est_cost_inr: j.estCostInr ?? null, cost_usd: j.costUsd ?? null,
     youtube: j.youtube ?? null,
@@ -108,7 +108,7 @@ function view(env, request, j) {
 async function createJob(env, a) {
   const id = `sv_${hex(6)}`;
   const job = {
-    id, title: clean(a.title, 120), lyrics: clean(a.lyrics, 20_000),
+    id, title: clean(a.title, 120), lyrics: clean(a.lyrics, 20_000), hint: clean(a.theme, 600),
     style: clean(a.style, 300) || 'soft watercolor anime scenes, cinematic light, emotional, no text',
     credits: { lyrics: clean(a.lyricist, 60) || 'COCO', singer: clean(a.singer, 60) || 'KoBhit' },
     status: 'uploading', uploadTicket: hex(16), attempts: 0, createdAt: nowIso(),
@@ -175,6 +175,18 @@ async function requestShort(env, j, a = {}) {
   j.progress = null;
   return saveJob(env, j);
 }
+async function redoJob(env, j, a = {}) {
+  if (['uploading', 'analyzing', 'rendering'].includes(j.status)) throw new HttpError(409, `Job is ${j.status}; wait until it finishes`);
+  if (!j.audioBytes) throw new HttpError(409, 'No song uploaded for this job');
+  const k = kv(env);
+  for (let n = 1; n <= MAX_IMAGES; n++) await k.delete(`sv/img/${j.id}/${n}`);
+  if (a.theme !== undefined) j.hint = clean(a.theme, 600);
+  if (a.style) j.style = clean(a.style, 300);
+  if (a.lyrics) j.lyrics = clean(a.lyrics, 20_000);
+  Object.assign(j, { status: 'queued', analysis: null, images: [], youtube: null, ticket: null, thumb: false, videoParts: null, videoPartsDone: [], videoPartBytes: {}, videoBytes: null,
+    publish: null, short: null, attempts: 0, error: null, leaseUntil: null, progress: null, autoApproved: false, queuedAt: nowIso(), imageCount: null, estCostUsd: null, estCostInr: null });
+  return saveJob(env, j);
+}
 async function removeJob(env, j) {
   const k = kv(env);
   await k.delete(`sv/audio/${j.id}`);
@@ -226,7 +238,7 @@ async function cloudBrain(env, a) {
 }
 
 /* ---------------- runner API ---------------- */
-const runnerView = (j) => ({ id: j.id, title: j.title, style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb), short: j.short ?? null });
+const runnerView = (j) => ({ id: j.id, title: j.title, hint: j.hint ?? '', style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb), short: j.short ?? null });
 async function claim(env) {
   const now = Date.now();
   for (const id of await index(env)) {
@@ -264,6 +276,7 @@ async function saveAnalysis(env, j, a) {
   if (!scenes.length) throw new HttpError(400, 'analysis.scenes must list at least one scene');
   for (const s of scenes) if (!(Number(s.end) > Number(s.start)) || !clean(s.image_prompt, 1500)) throw new HttpError(400, 'every scene needs start < end and an image_prompt');
   j.analysis = {
+    styleLock: clean(a.style_lock, 700), characters: clean(a.characters, 700),
     durationS: Number(a.durationS) || null, mood: clean(a.mood, 200), theme: clean(a.theme, 500), language: clean(a.language, 40),
     scenes: scenes.map((s) => ({ start: Number(s.start), end: Number(s.end), summary: clean(s.summary, 300), image_prompt: clean(s.image_prompt, 1500) })),
     lyrics_lines: (Array.isArray(a.lyrics_lines) ? a.lyrics_lines.slice(0, 400) : []).map((l) => ({ start: Number(l.start) || 0, end: Number(l.end) || 0, text: clean(l.text, 200) })).filter((l) => l.text && l.end > l.start),
@@ -349,7 +362,7 @@ async function failJob(env, j, error, stage) {
 /* ---------------- MCP ---------------- */
 const TOOLS = [
   { name: 'create_song_job', title: 'Create song job', description: 'Start a Sunverse music video from a song. Returns job_id and an upload_url: open it to upload the MP3 (or call import_song_from_url). Credits default to Lyrics: COCO, Singer: KoBhit.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string', description: 'Song title' }, lyrics: { type: 'string', description: 'Optional lyrics in English/Roman letters — improves caption timing' }, style: { type: 'string', description: 'Visual style for the images' }, lyricist: { type: 'string' }, singer: { type: 'string' } }, additionalProperties: false } },
+    inputSchema: { type: 'object', properties: { title: { type: 'string', description: 'Song title' }, theme: { type: 'string', description: 'Optional story/theme hint, e.g. "Ramayana — Angad challenges Ravana"' }, lyrics: { type: 'string', description: 'Optional lyrics in English/Roman letters — improves caption timing' }, style: { type: 'string', description: 'Visual style for the images' }, lyricist: { type: 'string' }, singer: { type: 'string' } }, additionalProperties: false } },
   { name: 'import_song_from_url', title: 'Import song from link', description: 'Download the song for a job from a public https link (Google Drive "anyone with the link", Dropbox, direct MP3).',
     inputSchema: { type: 'object', properties: { job_id: { type: 'string' }, url: { type: 'string' } }, required: ['job_id', 'url'], additionalProperties: false } },
   { name: 'list_song_jobs', title: 'List song jobs', description: 'List recent song jobs with their status.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -363,6 +376,8 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { job_id: { type: 'string' }, privacy: { type: 'string', enum: PRIVACY }, title: { type: 'string' }, description: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: false, openWorldHint: true } },
   { name: 'make_youtube_short', title: 'Make & post a YouTube Short', description: 'Owner approval to cut a ~40 s vertical Short (chorus) from a finished song video and post it on the Sunverse channel, linking to the full song. Only call after the owner says yes.',
     inputSchema: { type: 'object', properties: { job_id: { type: 'string' }, privacy: { type: 'string', enum: PRIVACY } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: false, openWorldHint: true } },
+  { name: 'redo_song_job', title: 'Redo a song video', description: 'Make the video again from the same MP3 with a new theme / story hint, style or lyrics (e.g. theme: "Ramayana — Angad challenges Ravana in his court"). Clears the old plan, images and video.',
+    inputSchema: { type: 'object', properties: { job_id: { type: 'string' }, theme: { type: 'string' }, style: { type: 'string' }, lyrics: { type: 'string' } }, required: ['job_id'], additionalProperties: false } },
   { name: 'get_growth_report', title: 'Sunverse growth report', description: 'YouTube channel stats, subscriber change, newest public subscribers, and AI comment replies (posted and waiting for approval).', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'decide_comment_reply', title: 'Approve or skip a comment reply', description: 'Owner decision on an AI reply waiting for approval. action approve (optionally with edited reply text) or reject. Only call after the owner decides.',
     inputSchema: { type: 'object', properties: { comment_id: { type: 'string' }, action: { type: 'string', enum: ['approve', 'reject'] }, reply: { type: 'string' } }, required: ['comment_id', 'action'], additionalProperties: false } },
@@ -385,6 +400,7 @@ async function callTool(env, request, name, a = {}) {
     case 'get_youtube_metadata': { const j = await jobOf(env, a.job_id); if (!j.youtube) throw new HttpError(409, 'No metadata yet — the song has not been analysed'); return { ...j.youtube, upload_page: 'https://www.youtube.com/upload' }; }
     case 'publish_to_youtube': { const j = await requestPublish(env, await jobOf(env, a.job_id), a); kick(env, ctxOf(request)); return { ...v(j), next: 'The renderer uploads it to YouTube (a few minutes). Check get_song_job for the link.' }; }
     case 'make_youtube_short': { const j = await requestShort(env, await jobOf(env, a.job_id), a); kick(env, ctxOf(request)); return { ...v(j), next: 'The renderer cuts and posts the Short (a few minutes after it starts).' }; }
+    case 'redo_song_job': { const j = await redoJob(env, await jobOf(env, a.job_id), a); kick(env, ctxOf(request)); return { ...v(j), next: 'Queued again with the new theme.' }; }
     case 'get_growth_report': return growth.ownerView(await growth.load(kv(env)));
     case 'decide_comment_reply': return growth.ownerView(await growth.decideReply(kv(env), a.comment_id, { action: a.action, draft: a.reply }));
     case 'set_auto_replies': return growth.ownerView(await growth.setSettings(kv(env), { autoSimple: Boolean(a.on) }));
@@ -619,6 +635,7 @@ async function route(request, env) {
     if (seg[3] === 'audio' && method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'import' && method === 'POST') { const r = await importFromUrl(env, j, (await readJson(request)).url); kick(env, ctx); return json({ job: v(r) }); }
     if ((seg[3] === 'approve' || seg[3] === 'reject') && method === 'POST') { const r = await decide(env, j, seg[3]); if (seg[3] === 'approve') kick(env, ctx); return json({ job: v(r) }); }
+    if (seg[3] === 'redo' && method === 'POST') { const r = await redoJob(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'short' && method === 'POST') { const r = await requestShort(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'publish' && method === 'POST') { const r = await requestPublish(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     throw new HttpError(404, 'Not found');

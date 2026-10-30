@@ -250,21 +250,27 @@ Rules:
 - Make exactly {n} scenes that cover 0 → {dur:.1f} s with no gaps, following the song's story and emotion section by section.
 - Every image_prompt: visual style "{style}"; 16:9 cinematic wide shot; keep the same main characters (describe them the same way in every prompt) and colour palette across scenes so the video feels like one story; absolutely no text, letters, words, subtitles, logos or watermarks in the image.
 - Song title given by the owner: "{title}" (if empty, choose one from the lyrics).
+- Owner's theme / story hint (most important, follow it): "{hint}". If the title or hint names a known story, epic, mythology or historical figure (e.g. Angad from the Ramayana), build every scene from that story's real setting, characters, costumes and key moments, shown respectfully — never a generic romance.
+- Also return "characters": one paragraph fixing every recurring character's face, age, build, hair, costume and colours, and "style_lock": one sentence fixing art style, lighting and palette for all images.
 - Write EVERYTHING in English / Roman letters: lyrics_lines, title, description, tags, mood, theme. No Devanagari script anywhere.
 - Never invent facts about the artists beyond the credits given."""
 
 
 FREE_PLAN = """You are the creative director for SUNVERSE, a YouTube music channel (original Hindi songs; lyrics by {lyricist}, singer {singer}).
 Song title from the owner: "{title}". Duration {dur:.0f} s. Visual style: "{style}".
+Owner's theme / story hint (MOST IMPORTANT — follow it exactly): "{hint}"
+If the title or hint names a known story, epic, mythology or historical figure (e.g. Angad, Ram, Hanuman, Ravana from the Ramayana; Mahabharata; a freedom fighter), build the WHOLE video from that story: its real setting, characters, costumes, era and key moments, shown with respect. Never turn such a song into a generic modern romance. The lyrics below are machine-heard and may be rough; use them for emotion and timing, not to override the title/hint.
 LYRICS (numbered lines, may be in Devanagari or rough Hinglish from speech recognition):
 {lines}
 
 Return ONE JSON object:
 {{"roman": ["line 1 rewritten in clean Roman Hinglish", "... exactly {count} items, same order, same meaning"],
  "language": "e.g. Hindi", "mood": "max 12 words", "theme": "max 40 words: what the song is about",
- "scenes": [{{"summary": "max 15 words", "image_prompt": "detailed prompt"}}],
+ "characters": "one paragraph character sheet: every recurring character with fixed face, age, build, hair, costume, colours, ornaments/weapons — reused word for word in every image",
+ "style_lock": "one sentence fixing art style, medium, lighting, colour palette and camera feel for ALL images (must match the visual style above)",
+ "scenes": [{{"summary": "max 15 words", "image_prompt": "what happens in this scene: characters by name, action, setting, composition"}}],
  "youtube": {{"title": "max 70 chars, catchy, includes the song name", "description": "3 short paragraphs: the feeling/story of the song, credits (Lyrics: {lyricist} | Singer: {singer}), an invitation to subscribe to Sunverse; end with 5 hashtags", "tags": ["15-20 search tags, Hindi + English"]}}}}
-Rules: exactly {n} scenes in song order following its story; every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
+Rules: exactly {n} scenes in song order following its story (beginning, rising tension, climax, ending); every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
 
 
 def cloud_json(system, prompt):
@@ -332,7 +338,8 @@ def analyze_free(job, work, audio, dur, jid):
     numbered = "\n".join(f"{i + 1}. {l['text']}" for i, l in enumerate(lines[:120])) or "(instrumental / no clear vocals)"
     a = cloud_json("You are a precise creative director. Reply with one JSON object only.",
                    FREE_PLAN.format(lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"), title=job.get("title") or "",
-                                    dur=dur, style=job.get("style") or "watercolor anime", lines=numbered, count=min(len(lines), 120), n=n))
+                                    dur=dur, style=job.get("style") or "watercolor anime", lines=numbered, count=min(len(lines), 120), n=n,
+                                    hint=(job.get("hint") or "none — infer the story from the title and lyrics").replace('"', "'")))
     roman = a.get("roman") or []
     for i, l in enumerate(lines[:120]):
         if i < len(roman) and str(roman[i]).strip() and not re.search(r"[\u0900-\u097F]", str(roman[i])):
@@ -345,6 +352,7 @@ def analyze_free(job, work, audio, dur, jid):
     scenes = [{"start": round(i * per, 2), "end": round(dur if i == len(sc) - 1 else (i + 1) * per, 2), "summary": x.get("summary", ""), "image_prompt": x["image_prompt"]} for i, x in enumerate(sc)]
     return {"durationS": dur, "language": a.get("language", "Hindi"), "mood": a.get("mood", ""), "theme": a.get("theme", ""),
             "lyrics_lines": lines, "scenes": scenes, "youtube": a.get("youtube") or {}, "image_engine": "cloudflare",
+            "characters": str(a.get("characters") or "")[:700], "style_lock": str(a.get("style_lock") or "")[:700],
             "source": "whisper+cloud-brain"}
 
 
@@ -371,7 +379,7 @@ def analyze(job, work):
     f = gemini_upload(audio, job.get("audioMime") or "audio/mpeg")
     cr = job.get("credits") or {}
     lyrics = (job.get("lyrics") or "").strip()
-    prompt = ANALYZE.format(dur=dur, n=n, style=job.get("style") or "watercolor anime", title=job.get("title") or "",
+    prompt = ANALYZE.format(dur=dur, n=n, style=job.get("style") or "watercolor anime", title=job.get("title") or "", hint=(job.get("hint") or "none").replace('"', "'"),
                             lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"),
                             lyrics_rule=("Use these lyrics from the owner (same words), only add timing. If any line is in Devanagari, transliterate it to Roman/Latin letters (Hinglish):\n" + lyrics[:8000]) if lyrics
                             else "Transcribe the sung lyrics in Roman/Latin letters only (Hindi words written in Hinglish, e.g. 'Shaam ki laali chhaayi hai'). Never use Devanagari.")
@@ -592,7 +600,8 @@ def render(job, work):
     progress(jid, "render", f"Making image 1 of {n_sc}", 0, n_sc, n_sc * per_img + enc_est + up_est)
     for i, s in enumerate(scenes):
         out = os.path.join(work, f"img{i:02d}.png")
-        p = s["image_prompt"] + " Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
+        lock = " ".join(x for x in [a.get("styleLock") or a.get("style_lock") or (job.get("style") or ""), a.get("characters") or ""] if x).strip()
+        p = (lock[:800] + " Scene: " if lock else "") + s["image_prompt"][:950] + " Same art style and same character designs as every other scene. Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
         if engine == "cloudflare":
             img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
             open(out, "wb").write(img)
