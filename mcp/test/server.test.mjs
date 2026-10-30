@@ -227,3 +227,16 @@ test('runner auth via GitHub OIDC; free Cloudflare images skip the approval; pen
     assert.equal((await f('/api/brain', other, 'POST', { prompt: 'x' })).status, 401);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('Start now: owner-only, needs GH_DISPATCH_TOKEN, dispatches the renderer', async () => {
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const go = (e, auth = true) => worker.fetch(new Request(B + '/api/songvideo/start', { method: 'POST', headers: auth ? H : {}, body: '{}' }), e);
+  assert.equal((await go(env(), false)).status, 401);
+  const r = await go(env());
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /GH_DISPATCH_TOKEN/);
+  const realFetch = globalThis.fetch; const calls = [];
+  globalThis.fetch = async (u, o) => { calls.push(String(u)); return new Response(null, { status: 204 }); };
+  try { const ok = await go({ ...env(), GH_DISPATCH_TOKEN: 'g' }); assert.equal((await ok.json()).started, true); assert.match(calls[0], /songvideo\.yml\/dispatches/); }
+  finally { globalThis.fetch = realFetch; }
+});

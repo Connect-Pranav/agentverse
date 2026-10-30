@@ -569,6 +569,15 @@ async function route(request, env) {
   if (seg[0] === 'api' && seg[1] === 'songvideo' && seg[2] !== 'runner') {
     owner(request, env);
     const v = (j) => view(env, request, j);
+    if (seg[2] === 'start' && method === 'POST') {
+      // owner pressed "Start now": run the GitHub renderer immediately instead of waiting for its schedule
+      if (!env.GH_DISPATCH_TOKEN) throw new HttpError(409, 'Start now needs the Cloudflare secret GH_DISPATCH_TOKEN (GitHub token with Actions: read and write on Connect-Pranav/agentverse)');
+      const repo = env.GH_REPO || 'Connect-Pranav/agentverse';
+      const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/songvideo.yml/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main' }),
+        headers: { authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'agentverse-worker', 'content-type': 'application/json' } });
+      if (!r.ok) throw new HttpError(502, `GitHub did not start the renderer (${r.status}${r.status === 401 || r.status === 403 || r.status === 404 ? ': check GH_DISPATCH_TOKEN access to the repo' : ''})`);
+      return json({ started: true, at: nowIso() });
+    }
     if (!seg[2] && method === 'GET') return json(await callTool(env, request, 'list_song_jobs'));
     if (!seg[2] && method === 'POST') return json({ job: v(await createJob(env, await readJson(request))) }, 201);
     const j = await jobOf(env, seg[2]);

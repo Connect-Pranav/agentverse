@@ -2621,7 +2621,7 @@ function mtSetup(ok){
   if(STU.health&&!STU.health.tokenSet){ b.textContent="SERVER LOCKED"; b.className="badge"; $("mtMsg").textContent="Cloudflare secret MCP_TOKEN is not set on the Worker yet."; $("mtGo").disabled=true; return; }
   $("mtTok").style.display="none"; $("mtGo").disabled=STU.busy; b.textContent="LIVE"; b.className="badge run";
 }
-var MT_STEPS=[["upload","Upload"],["ear","Analyse"],["user-check","Your OK"],["image","Images"],["clapperboard","Video"],["send","YouTube"]];
+var MT_STEPS=[["upload","Upload"],["ear","Listen"],["user-check","Your OK"],["image","Images"],["clapperboard","Video"],["send","YouTube"]];
 function mtStepState(j){
   var st=["","","","","",""],a=-1,i,pub=j.publish&&j.publish.state;
   var at={uploading:0,queued:1,analyzing:1,needs_approval:2,approved:3,rendering:(j.progress&&j.progress.stage==="render"&&j.progress.total&&j.progress.done>=j.progress.total)?4:3,ready:5}[j.status];
@@ -2651,6 +2651,8 @@ function mtRender(){
     h+='<div class="mt-eta"><b id="mtEta">≈ '+fmtDur(e.s)+'</b><span id="mtEtaL">'+esc(e.label)+' &middot; about '+fmtClock(STU.deadline)+'</span></div>';
     h+='<div class="mt-now"><span class="mt-dot"></span>'+esc(p&&p.step?p.step:(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")?((STU.health&&STU.health.instantStart)?"Starting the renderer…":"Waiting for the GitHub renderer (scheduled every 15 min — GitHub sometimes starts it late)"):"Working…"))+'</div>';
     h+='<div class="stu-bar"><i style="width:'+(pct||4)+'%"></i></div>';
+    var waitingRunner=(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")||(j.short&&j.short.state==="requested"))&&!p;
+    if(waitingRunner)h+='<div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
   } else STU.deadline=0;
   if(j.plan){
     if(j.auto_approved||j.image_engine==="cloudflare")h+='<p class="mt-free">Free plan: Cloudflare images, no cost — went straight to the video.</p>';
@@ -2692,6 +2694,11 @@ setInterval(function(){
 $("mtJob").onclick=function(e){
   var b=e.target.closest?e.target.closest("button[data-mt]"):null; if(!b||!STU.cur)return;
   var a=b.getAttribute("data-mt"),id=STU.cur.job_id;
+  if(a==="start"){
+    b.disabled=true;
+    stuApi("POST","/api/songvideo/start",{}).then(function(){ STU.startMsg="Renderer started — first update in about 1–2 minutes."; STU.health=STU.health||{}; STU.health.instantStart=true; toast("Renderer started",true); mtRender(); },function(e2){ STU.startMsg=e2.message; toast(/GH_DISPATCH_TOKEN/.test(e2.message)?"One-time setup needed for Start now":e2.message,false); mtRender(); });
+    return;
+  }
   if(a==="short"){
     if(b.getAttribute("data-c")!=="1"){ b.setAttribute("data-c","1"); b.lastChild.nodeValue="Tap again to post the Short"; return; }
     b.disabled=true;
