@@ -213,7 +213,25 @@ function kick(env, ctx) {
 }
 
 /* ---------------- AGENTVERSE cloud brain (Cloudflare Workers AI, free tier) ---------------- */
-const BRAIN_MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct-fast', '@cf/meta/llama-3.1-8b-instruct'];
+// Free-plan text models, best first. Cloudflare retires models (e.g. llama-3.1-8b on 2026-05-30), so the chain
+// skips any model that errors and remembers the last one that worked.
+const BRAIN_MODELS = [
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/zai-org/glm-4.7-flash', '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/qwen/qwen3-30b-a3b-fp8', '@cf/mistralai/mistral-small-3.1-24b-instruct',
+  '@cf/meta/llama-3.1-8b-instruct-fp8', '@cf/meta/llama-3.2-3b-instruct',
+];
+const SMALL_FIRST = ['@cf/zai-org/glm-4.7-flash', '@cf/meta/llama-3.1-8b-instruct-fp8', '@cf/qwen/qwen3-30b-a3b-fp8'];
+let BRAIN_OK = null;
+function aiText(r) {
+  if (typeof r === 'string') return r;
+  if (typeof r?.response === 'string') return r.response;
+  if (r?.response && typeof r.response === 'object') return JSON.stringify(r.response);
+  const c = r?.choices?.[0]?.message?.content ?? r?.choices?.[0]?.text;
+  if (typeof c === 'string') return c;
+  if (typeof r?.output_text === 'string') return r.output_text;
+  const o = r?.output?.flatMap?.((x) => x?.content ?? [])?.map?.((x) => x?.text ?? '')?.join('');
+  return o || '';
+}
 async function cloudBrain(env, a) {
   if (!env.AI) throw new HttpError(503, 'Cloud brain is not enabled on this Worker (AI binding missing)');
   const system = clean(a.system, 12_000), prompt = clean(a.prompt, 24_000);
@@ -224,18 +242,20 @@ async function cloudBrain(env, a) {
   const used = Number(await kv(env).get(key)) || 0;
   if (used >= cap) throw new HttpError(429, `Cloud brain daily limit reached (${cap} calls) — it resets at 05:30 IST`);
   await kv(env).put(key, String(used + 1), { expirationTtl: 3 * 86400 });
-  // big model for the first calls of the day, then the small one (~6× fewer neurons) — stays under 10k neurons/day
-  const big = Number(env.BRAIN_BIG_CALLS) >= 0 && env.BRAIN_BIG_CALLS !== undefined ? Number(env.BRAIN_BIG_CALLS) : 40;
-  const models = a.quick || used >= big ? BRAIN_MODELS.slice(1) : BRAIN_MODELS;
-  let last;
-  for (const model of models) {
+  const big = env.BRAIN_BIG_CALLS !== undefined && Number(env.BRAIN_BIG_CALLS) >= 0 ? Number(env.BRAIN_BIG_CALLS) : 40;
+  let order = a.quick || used >= big ? [...SMALL_FIRST, ...BRAIN_MODELS] : [...BRAIN_MODELS];
+  if (BRAIN_OK && !(a.quick || used >= big)) order = [BRAIN_OK, ...order];
+  order = [...new Set(order)];
+  const errs = [];
+  for (const model of order) {
     try {
-      const r = await env.AI.run(model, { messages: [{ role: 'system', content: system || 'You are a helpful assistant. Reply with JSON only.' }, { role: 'user', content: prompt }], max_tokens: a.quick ? 600 : 2200, temperature: 0.8 });
-      const text = typeof r?.response === 'string' ? r.response : JSON.stringify(r?.response ?? r ?? '');
-      if (text && text !== '""') return { text, model: model.replace('@cf/', ''), used: used + 1, cap };
-    } catch (e) { last = e; console.error('brain', model, e?.message); }
+      const r = await env.AI.run(model, { messages: [{ role: 'system', content: system || 'You are a helpful assistant. Reply with JSON only.' }, { role: 'user', content: prompt }], max_tokens: a.quick ? 700 : 2400, temperature: 0.7 });
+      const text = aiText(r).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      if (text) { BRAIN_OK = model; return { text, model: model.replace('@cf/', ''), used: used + 1, cap }; }
+      errs.push(`${model.split('/').pop()}: empty`);
+    } catch (e) { errs.push(`${model.split('/').pop()}: ${String(e?.message ?? e).slice(0, 80)}`); }
   }
-  throw new HttpError(502, `Cloud brain failed: ${String(last?.message ?? 'no answer').slice(0, 160)}`);
+  throw new HttpError(502, `Cloud brain failed on every model — ${errs.slice(0, 4).join(' | ')}`);
 }
 
 /* ---------------- runner API ---------------- */

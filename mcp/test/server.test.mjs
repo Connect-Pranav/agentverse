@@ -121,13 +121,16 @@ test('owner REST publish needs token and a ready video; instant start dispatch',
 
 test('cloud brain: owner only, Workers AI with fallback, daily cap', async () => {
   const seen = [];
-  const e = { ...env(), BRAIN_DAILY_CALLS: '2', AI: { run: async (m, i) => { seen.push(m); if (m.includes('70b')) throw new Error('busy'); return { response: '{"ok":true}' }; } } };
+  const e = { ...env(), BRAIN_DAILY_CALLS: '3', AI: { run: async (m, i) => { seen.push(m); if (m.includes('70b')) throw new Error('5028: deprecated'); if (m.includes('glm')) return { choices: [{ message: { content: '{"ok":true}' } }] }; return { response: '' }; } } };
   const call = (auth) => worker.fetch(new Request(B + '/api/brain', { method: 'POST', headers: { 'content-type': 'application/json', ...(auth ? { authorization: 'Bearer tok' } : {}) }, body: JSON.stringify({ system: 's', prompt: 'p' }) }), e);
   assert.equal((await call(false)).status, 401);
   const r = await (await call(true)).json();
-  assert.equal(r.text, '{"ok":true}');
-  assert.match(r.model, /8b/);
+  assert.equal(r.text, '{"ok":true}', 'OpenAI-style choices are read');
+  assert.match(r.model, /glm/, 'retired model skipped, next one used');
   assert.equal(seen[0], '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+  seen.length = 0;
+  assert.equal((await call(true)).status, 200);
+  assert.equal(seen[0], '@cf/zai-org/glm-4.7-flash', 'remembers the model that worked');
   assert.equal((await call(true)).status, 200);
   assert.equal((await call(true)).status, 429, 'daily cap protects the free allowance');
   assert.equal((await (await worker.fetch(new Request(B + '/health'), e)).json()).brain, true);
