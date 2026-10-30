@@ -1,0 +1,23 @@
+{
+  "name": "AGENTVERSE",
+  "short_name": "AGENTVERSE",
+  "description": "Your AI agent team, VANI voice agent, song-to-video MCP and growth agent.",
+  "id": "./",
+  "start_url": "./?source=app",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#140c28",
+  "theme_color": "#140c28",
+  "categories": ["productivity", "business", "music"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Song → Video (MCP)", "short_name": "MCP", "url": "./#studio", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
