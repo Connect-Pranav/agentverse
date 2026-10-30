@@ -281,9 +281,30 @@ House look for devotional / mythological songs (the owner's approved reference):
 Rules: exactly {n} scenes in song order following its story (beginning, rising tension, climax, ending); mix wide establishing shots with a few medium hero shots; every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
 
 
+def pollinations_text(system, prompt):
+    """Free backup brain (no key) for when the Cloudflare daily allowance is used up."""
+    r = http("POST", "https://text.pollinations.ai/openai", {"model": "openai", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                                                           "temperature": 0.7, "response_format": {"type": "json_object"}}, None, 180)
+    return ((r.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+
+
+def pollinations_image(prompt, out, seed=7):
+    """Free backup images (no key), natively 16:9."""
+    q = urllib.parse.quote(prompt[:1400])
+    raw, _ = http("GET", f"https://image.pollinations.ai/prompt/{q}?width=1344&height=768&nologo=true&model=flux&seed={seed}", None, None, 240, "raw")
+    if len(raw) < 5000:
+        raise RuntimeError("backup image service returned no image")
+    open(out, "wb").write(raw)
+
+
 def cloud_json(system, prompt):
-    r = ganesha("POST", "/api/brain", {"system": system, "prompt": prompt}, timeout=180)
-    t = re.sub(r"```(json)?", "", str(r.get("text") or ""))
+    try:
+        r = ganesha("POST", "/api/brain", {"system": system, "prompt": prompt}, timeout=180)
+        txt = str(r.get("text") or "")
+    except Exception as e:
+        log("cloud brain unavailable, using the free backup brain:", redact(e)[:160])
+        txt = pollinations_text(system, prompt)
+    t = re.sub(r"```(json)?", "", txt)
     a, b = t.find("{"), t.rfind("}")
     if a < 0 or b < a:
         raise RuntimeError("cloud brain did not return JSON")
@@ -741,10 +762,19 @@ def render(job, work):
                             state["gem_off"] = True
                 elif engine == "openai":
                     used = openai_image(p, out)
+                if not used and not state.get("cf_off"):
+                    try:
+                        img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
+                        open(out, "wb").write(img)
+                        used = "cloudflare/flux-1-schnell"
+                    except Exception as e:
+                        if not re.search(r"4006|daily|limit|429|neurons", str(e), re.I):
+                            raise
+                        state["cf_off"] = True
+                        log(f"[{jid}] Cloudflare free images used up today — switching to the free backup")
                 if not used:
-                    img, _ = ganesha("POST", f"/api/songvideo/runner/{jid}/image", {"prompt": p}, timeout=180, want="raw")
-                    open(out, "wb").write(img)
-                    used = "cloudflare/flux-1-schnell"
+                    pollinations_image(p, out, seed=100 + i)
+                    used = "pollinations/flux (free backup)"
                 break
             except Exception as e:
                 if attempt:

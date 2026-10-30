@@ -266,6 +266,10 @@ async function claim(env) {
     const j = await kv(env).get(jobKey(id), 'json');
     if (!j) continue;
     const stale = ['analyzing', 'rendering'].includes(j.status) && !(j.leaseUntil && Date.parse(j.leaseUntil) > now);
+    // jobs that failed only because a free daily AI allowance ran out are retried automatically
+    if (quotaRetry(j)) {
+      Object.assign(j, { status: j.analysis ? 'approved' : 'queued', attempts: 0 });
+    }
     if (j.status === 'queued' || (stale && j.status === 'analyzing')) {
       Object.assign(j, { status: 'analyzing', leaseUntil: isoIn(LEASE_MS), attempts: (j.attempts ?? 0) + 1 });
       await saveJob(env, j);
@@ -577,6 +581,8 @@ async function runner(request, env) {
   if (!env.MCP_TOKEN) throw new HttpError(503, 'Server locked: secret MCP_TOKEN is not set on the Worker');
   throw new HttpError(401, 'Missing or invalid runner token');
 }
+// failed only because a free daily AI allowance ran out → retry after a short cool-down (no tight loops)
+const quotaRetry = (j) => j.status === 'failed' && j.audioBytes && /4006|daily free allocation|daily limit|neurons/i.test(j.error || '') && Date.now() - Date.parse(j.updatedAt || 0) > 5 * 60e3;
 async function pending(env) {
   const now = Date.now();
   let n = 0;
@@ -584,7 +590,7 @@ async function pending(env) {
     const j = await kv(env).get(jobKey(id), 'json');
     if (!j) continue;
     const stale = (x) => !(x?.leaseUntil && Date.parse(x.leaseUntil) > now);
-    if (['queued', 'approved'].includes(j.status) || (['analyzing', 'rendering'].includes(j.status) && stale(j))
+    if (['queued', 'approved'].includes(j.status) || quotaRetry(j) || (['analyzing', 'rendering'].includes(j.status) && stale(j))
       || (j.status === 'ready' && ((j.publish && (j.publish.state === 'requested' || (j.publish.state === 'publishing' && stale(j.publish)))) || (j.short && (j.short.state === 'requested' || (j.short.state === 'making' && stale(j.short))))))) n++;
   }
   return n;
@@ -596,7 +602,7 @@ async function cloudImage(env, prompt) {
   const used = Number(await kv(env).get(key)) || 0;
   if (used >= cap) throw new HttpError(429, `Free image limit for today reached (${cap})`);
   await kv(env).put(key, String(used + 1), { expirationTtl: 3 * 86400 });
-  const r = await env.AI.run(IMAGE_MODEL, { prompt: clean(prompt, 2000), steps: 8 });
+  const r = await env.AI.run(IMAGE_MODEL, { prompt: clean(prompt, 2000), steps: 6 });
   if (!r?.image) throw new HttpError(502, 'Image model returned nothing');
   return new Response(b64u(r.image.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store' } });
 }
