@@ -322,17 +322,41 @@ def to_roman(t):
     return x[:1].upper() + x[1:]
 
 
+LRC = re.compile(r"\[(\d{1,2}):(\d{2}(?:[.:]\d{1,3})?)\]")
+
+
+def parse_lrc(text, dur):
+    """Timed lyrics from an .lrc file ([mm:ss.xx] line). Returns [] when the text has no timestamps."""
+    rows = []
+    for raw in text.splitlines():
+        stamps = LRC.findall(raw)
+        words = LRC.sub("", raw).strip()
+        if not stamps or not words or re.match(r"^\[?(ti|ar|al|by|offset|length):", words, re.I):
+            continue
+        for mm, ss in stamps:
+            rows.append((int(mm) * 60 + float(ss.replace(":", ".")), words))
+    rows.sort()
+    out = []
+    for i, (st, w) in enumerate(rows):
+        en = rows[i + 1][0] - 0.15 if i + 1 < len(rows) else min(dur, st + 6)
+        if en > st:
+            out.append({"start": round(st, 2), "end": round(min(en, st + 9), 2), "text": w[:200]})
+    return out
+
+
 def analyze_free(job, work, audio, dur, jid):
     n = max(6, min(12, round(dur / 18)))
     cr = job.get("credits") or {}
-    owner_lines = [l.strip() for l in (job.get("lyrics") or "").splitlines() if l.strip()]
+    timed = parse_lrc(job.get("lyrics") or "", dur)
+    owner_lines = [] if timed else [LRC.sub("", l).strip() for l in (job.get("lyrics") or "").splitlines() if LRC.sub("", l).strip()]
     progress(jid, "analyze", "Listening to the lyrics (free speech-to-text)", 2, 4, max(60, dur * 0.6))
     heard = []
-    try:
-        heard = transcribe(audio, jid)
-    except Exception as e:
-        log(f"[{jid}] transcription failed: {redact(e)}")
-    lines = heard
+    if not timed:
+        try:
+            heard = transcribe(audio, jid)
+        except Exception as e:
+            log(f"[{jid}] transcription failed: {redact(e)}")
+    lines = timed or heard
     if owner_lines:  # owner lyrics are the truth; spread them over the sung parts
         sung = [(h["start"], h["end"]) for h in heard] or [(INTRO_S, dur - 2)]
         a0, a1 = sung[0][0], sung[-1][1]
@@ -393,6 +417,9 @@ def analyze(job, work):
         try:
             a = gemini_json(model, [{"file_data": {"mime_type": f.get("mimeType") or "audio/mpeg", "file_uri": f["uri"]}}, {"text": prompt}])
             a["durationS"] = dur
+            lrc = parse_lrc(job.get("lyrics") or "", dur)
+            if lrc:  # owner's .lrc timings beat any guess
+                a["lyrics_lines"] = [{**l, "text": to_roman(l["text"]) or l["text"]} for l in lrc]
             a["image_engine"] = (os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "gemini").lower()
             a["source"] = model
             # make scenes contiguous and inside the song

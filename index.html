@@ -720,6 +720,10 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 .mt-redo textarea,.mt-redo input{width:100%;box-sizing:border-box;font:13px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:9px 11px}
 .mt-redo textarea{min-height:64px}
 .mt-up #mtTheme{width:100%;box-sizing:border-box}
+.mt-lyrbox{display:flex;flex-direction:column;gap:6px}
+.mt-file{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font:600 12px var(--fb);color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:7px 13px;cursor:pointer;min-height:36px}
+.mt-file input{position:absolute;width:1px;height:1px;opacity:0}
+.mt-file .i{width:14px;height:14px}
 
 </style>
 </head>
@@ -826,8 +830,9 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         <label class="mt-drop" id="mtDrop"><input id="mtFile" type="file" accept="audio/*,.mp3,.m4a,.wav"><span data-i="upload"></span><b id="mtFileName">Tap to choose your MP3</b><small>or drop it here &middot; MP3, M4A or WAV &middot; max 24 MB</small></label>
         <input id="mtTitle" placeholder="Song title (optional)" aria-label="Song title">
         <input id="mtTheme" placeholder="Story / theme, e.g. Ramayana — Angad challenges Ravana" aria-label="Story or theme">
-        <details class="mt-more"><summary>Lyrics, style &amp; credits (optional)</summary>
-          <textarea id="mtLyrics" placeholder="Lyrics in English letters, one line per row (better caption timing)" aria-label="Lyrics"></textarea>
+        <div class="mt-lyrbox"><textarea id="mtLyrics" placeholder="Lyrics (optional) — paste, or upload a .txt / .lrc file. .lrc = exact timing for every line" aria-label="Lyrics"></textarea>
+          <label class="mt-file"><input type="file" id="mtLyrFile" accept=".txt,.lrc,text/plain"><span data-i="upload"></span> Upload lyrics file</label></div>
+        <details class="mt-more"><summary>Style &amp; credits (optional)</summary>
           <input id="mtStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text" aria-label="Visual style">
           <div class="mt-two"><input id="mtLyr" value="COCO" aria-label="Lyrics by"><input id="mtSing" value="KoBhit" aria-label="Singer"></div>
         </details>
@@ -2725,10 +2730,18 @@ function mtRender(){
   if(["queued","needs_approval","approved","ready","failed","rejected"].indexOf(j.status)>=0&&!(j.publish&&j.publish.state==="publishing")){
     h+='<details class="mt-redo"><summary>Redo with a new theme</summary><textarea id="mtRedoT" aria-label="New theme">'+esc(j.theme_hint||"")+'</textarea>'+
       '<input id="mtRedoS" aria-label="Visual style" placeholder="Visual style (optional), e.g. Indian epic painting, dramatic, golden light">'+
+      '<textarea id="mtRedoL" aria-label="Lyrics" placeholder="Lyrics (optional) — paste, or upload .txt / .lrc"></textarea>'+
+      '<label class="mt-file"><input type="file" id="mtRedoLF" accept=".txt,.lrc,text/plain"><span data-i="upload"></span> Upload lyrics file</label>'+
       '<div class="acts"><button class="ap" data-mt="redo" type="button"><span data-i="rotate-ccw"></span>Redo video</button></div><p class="mt-sh">Same MP3, new plan, new images, new video. Old images are replaced.</p></details>';
   }
   if(j.status==="uploading"&&j.upload_url)h+='<p>Upload not finished. <a style="color:#fff;text-decoration:underline" href="'+esc(j.upload_url)+'" target="_blank" rel="noopener">Open upload page</a></p>';
-  $("mtJob").innerHTML=h;
+  /* keep what the owner is typing (redo theme / lyrics / YouTube text) across live refreshes */
+  var keep={},ids=["mtRedoT","mtRedoS","mtRedoL","mtYtT","mtYtD","mtYtG","mtYtP"],act=document.activeElement&&document.activeElement.id,rd=$("mtJob").querySelector(".mt-redo"),wasOpen=rd&&rd.open,sameJob=$("mtJob").getAttribute("data-job")===j.job_id;
+  for(var q=0;q<ids.length;q++){ var el=$(ids[q]); if(el&&sameJob)keep[ids[q]]=el.value; }
+  $("mtJob").innerHTML=h; $("mtJob").setAttribute("data-job",j.job_id);
+  for(var q2 in keep){ if($(q2))$(q2).value=keep[q2]; }
+  if(wasOpen&&sameJob&&$("mtJob").querySelector(".mt-redo"))$("mtJob").querySelector(".mt-redo").open=true;
+  if(act&&$(act)&&sameJob){ try{$(act).focus();}catch(e){} }
   var els=$("mtJob").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
   var ga=$("mtJob").querySelector("[data-go]"); if(ga)ga.onclick=function(){go("studio");};
   mtGallery(j,false);
@@ -2751,7 +2764,7 @@ $("mtJob").onclick=function(e){
   if(a==="redo"){
     var th=$("mtRedoT").value.trim(); if(!th){ toast("Write the theme first, e.g. Ramayana — Angad in Ravana's court",false); return; }
     b.disabled=true;
-    stuApi("POST","/api/songvideo/"+id+"/redo",{theme:th,style:$("mtRedoS").value.trim()}).then(function(r){ toast("Redoing with the new theme",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    stuApi("POST","/api/songvideo/"+id+"/redo",{theme:th,style:$("mtRedoS").value.trim(),lyrics:$("mtRedoL").value.trim()}).then(function(r){ toast("Redoing with the new theme",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
     return;
   }
   if(a==="short"){
@@ -2799,6 +2812,11 @@ $("mtFile").onchange=function(){ mtPick(this.files&&this.files[0]); };
 $("mtDrop").addEventListener("dragleave",function(){ if(!STU.file)$("mtDrop").classList.remove("on"); });
 $("mtDrop").addEventListener("drop",function(e){ e.preventDefault(); mtPick(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]); });
 $("mtPush").onclick=enablePush;
+/* lyrics file (.txt or .lrc with [mm:ss] timings) → textarea */
+function readLyrics(inp,ta){ var f=inp.files&&inp.files[0]; if(!f)return; if(f.size>200*1024){toast("Lyrics file is too big",false);return;}
+  var r=new FileReader(); r.onload=function(){ var t=String(r.result||"").replace(/\r/g,""); ta.value=t; var timed=/\[\d{1,2}:\d{2}/.test(t); toast(timed?"Timed lyrics (.lrc) loaded — captions will follow these times":"Lyrics loaded — "+t.split("\n").filter(function(x){return x.trim();}).length+" lines",true); }; r.readAsText(f); }
+$("mtLyrFile").onchange=function(){ readLyrics(this,$("mtLyrics")); };
+$("mtJob").addEventListener("change",function(e){ if(e.target&&e.target.id==="mtRedoLF")readLyrics(e.target,$("mtRedoL")); });
 $("mtTokSave").onclick=function(){ var t=$("mtTokIn").value.replace(/\s+/g,""); if(!t){toast("Paste the token first",false);return;} SET.mcpToken=t; saveSet(); $("mtTokIn").value=""; toast("Token saved in this browser",true); updateBrain(); if(SET.autopilot&&!autopilot&&provider()!=="none")setAutopilot(true); stuLoad(); };
 $("mtGo").onclick=function(){
   var f=STU.file; if(!f){toast("Choose an MP3 first",false);return;}
