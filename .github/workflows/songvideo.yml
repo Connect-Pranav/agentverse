@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  actions: write
 
 concurrency:
   group: songvideo
@@ -75,3 +76,19 @@ jobs:
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
         run: python3 scripts/songvideo-runner.py
+      - name: More songs waiting? Run again right away
+        if: always() && steps.cfg.outputs.pending != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(python3 - <<'PY'
+          import importlib.util
+          s = importlib.util.spec_from_file_location("r", "scripts/songvideo-runner.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
+          try:
+              print(r.ganesha("GET", "/api/songvideo/runner/pending").get("pending", 0))
+          except Exception:
+              print(0)
+          PY
+          )
+          echo "$n job(s) still waiting"
+          if [ "$n" != "0" ]; then gh workflow run songvideo.yml --ref main -R "$GITHUB_REPOSITORY"; fi
