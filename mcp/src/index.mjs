@@ -185,7 +185,7 @@ async function redoJob(env, j, a = {}) {
   if (a.style) j.style = clean(a.style, 300);
   if (a.lyrics) j.lyrics = clean(a.lyrics, 20_000);
   Object.assign(j, { status: 'queued', analysis: null, images: [], youtube: null, ticket: null, thumb: false, videoParts: null, videoPartsDone: [], videoPartBytes: {}, videoBytes: null,
-    publish: null, short: null, attempts: 0, error: null, leaseUntil: null, progress: null, autoApproved: false, queuedAt: nowIso(), imageCount: null, estCostUsd: null, estCostInr: null });
+    publish: null, short: null, attempts: 0, autoRetries: 0, error: null, leaseUntil: null, progress: null, autoApproved: false, queuedAt: nowIso(), imageCount: null, estCostUsd: null, estCostInr: null });
   return saveJob(env, j);
 }
 async function removeJob(env, j) {
@@ -268,7 +268,7 @@ async function claim(env) {
     const stale = ['analyzing', 'rendering'].includes(j.status) && !(j.leaseUntil && Date.parse(j.leaseUntil) > now);
     // jobs that failed only because a free daily AI allowance ran out are retried automatically
     if (quotaRetry(j)) {
-      Object.assign(j, { status: j.analysis ? 'approved' : 'queued', attempts: 0 });
+      Object.assign(j, { status: j.analysis ? 'approved' : 'queued', attempts: 0, autoRetries: (j.autoRetries ?? 0) + 1 });
     }
     if (j.status === 'queued' || (stale && j.status === 'analyzing')) {
       Object.assign(j, { status: 'analyzing', leaseUntil: isoIn(LEASE_MS), attempts: (j.attempts ?? 0) + 1 });
@@ -582,7 +582,8 @@ async function runner(request, env) {
   throw new HttpError(401, 'Missing or invalid runner token');
 }
 // failed only because a free daily AI allowance ran out → retry after a short cool-down (no tight loops)
-const quotaRetry = (j) => j.status === 'failed' && j.audioBytes && /4006|daily free allocation|daily limit|neurons/i.test(j.error || '') && Date.now() - Date.parse(j.updatedAt || 0) > 5 * 60e3;
+// any failed song is retried automatically up to 3 times (5 min apart) before it needs the owner
+const quotaRetry = (j) => j.status === 'failed' && j.audioBytes && (j.autoRetries ?? 0) < 3 && Date.now() - Date.parse(j.updatedAt || 0) > 5 * 60e3;
 async function pending(env) {
   const now = Date.now();
   let n = 0;

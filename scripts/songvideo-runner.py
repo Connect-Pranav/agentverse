@@ -271,14 +271,50 @@ LYRICS (numbered lines, may be in Devanagari or rough Hinglish from speech recog
 {lines}
 
 Return ONE JSON object:
-{{"roman": ["line 1 rewritten in clean Roman Hinglish", "... exactly {count} items, same order, same meaning"],
- "language": "e.g. Hindi", "mood": "max 12 words", "theme": "max 40 words: what the song is about",
+{{"language": "e.g. Hindi", "mood": "max 12 words", "theme": "max 40 words: what the song is about",
  "characters": "one paragraph character sheet: every recurring character with fixed face, age, build, hair, costume, colours, ornaments/weapons — reused word for word in every image",
  "style_lock": "one sentence fixing art style, medium, lighting, colour palette and camera feel for ALL images (must match the visual style above)",
  "scenes": [{{"summary": "max 15 words", "image_prompt": "what happens in this scene: characters by name, action, setting, composition"}}],
  "youtube": {{"title": "max 70 chars, catchy, includes the song name", "description": "3 short paragraphs: the feeling/story of the song, credits (Lyrics: {lyricist} | Singer: {singer}), an invitation to subscribe to Sunverse; end with 5 hashtags", "tags": ["15-20 search tags, Hindi + English"]}}}}
 House look for devotional / mythological songs (the owner's approved reference): premium cinematic Indian devotional matte painting, ultra detailed, epic scale, golden-hour or night-lamp lighting with god rays and volumetric clouds, warm saffron-gold-crimson palette against deep blue, temples, ghats, diyas, mountains and skies; heroes shown mostly in wide heroic shots, silhouettes or from behind/three-quarter so they stay consistent; reverent, never cartoonish. Other genres: choose an equally premium cinematic look that fits the song.
 Rules: exactly {n} scenes in song order following its story (beginning, rising tension, climax, ending); mix wide establishing shots with a few medium hero shots; every image_prompt in the style above, cinematic wide shot, same main characters described the same way in every prompt, same colour palette, absolutely no text, letters, logos or watermarks. Everything in English / Roman letters, never Devanagari. Do not invent facts about the artists."""
+
+
+def _json_obj(t):
+    a, b = t.find("{"), t.rfind("}")
+    if a < 0 or b < a:
+        raise RuntimeError("brain did not return JSON")
+    return json.loads(t[a:b + 1])
+
+
+def _repair_json(t):
+    """Close a cut-off JSON answer: drop the unfinished tail, then close open strings/arrays/objects."""
+    a = t.find("{")
+    if a < 0:
+        return None
+    t = t[a:]
+    for cut in range(len(t), max(0, len(t) - 4000), -1):
+        if t[cut - 1] not in "}]\"0123456789el":
+            continue
+        frag, stack, ins, esc = t[:cut], [], False, False
+        for ch in frag:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = ins
+            elif ch == '"':
+                ins = not ins
+            elif not ins and ch in "{[":
+                stack.append("}" if ch == "{" else "]")
+            elif not ins and ch in "}]" and stack:
+                stack.pop()
+        if ins:
+            continue
+        try:
+            return json.loads(re.sub(r",\s*$", "", frag) + "".join(reversed(stack)))
+        except Exception:
+            continue
+    return None
 
 
 def pollinations_text(system, prompt):
@@ -297,6 +333,27 @@ def pollinations_image(prompt, out, seed=7):
     open(out, "wb").write(raw)
 
 
+BEATS = ["establishing wide shot of the world of the story at dawn", "the hero appears, heroic wide shot, seen from behind",
+         "the hero's journey across a vast landscape", "arrival at the grand setting where the conflict happens",
+         "tense confrontation, the hero stands firm", "the decisive moment of the story, dramatic light",
+         "the turning point, everyone reacts in awe", "the climax, epic scale, god rays and dust",
+         "triumph, the hero silhouetted against the sky", "calm after the storm, golden light",
+         "reverent closing image, temple and sky", "final wide shot fading into light"]
+
+
+def fallback_plan(job, n, hint):
+    """Plan without any AI: built from the owner's title/theme and the house look, so the video is always made."""
+    subject = (hint if hint and not hint.startswith("none") else job.get("title") or "an Indian epic song")
+    style = job.get("style") or ("premium cinematic Indian devotional matte painting, ultra detailed, golden-hour god rays, volumetric clouds, "
+                                 "warm saffron-gold palette against deep blue, epic scale, reverent")
+    sc = [{"summary": BEATS[i % len(BEATS)].split(",")[0][:60], "image_prompt": f"{subject}. {BEATS[i % len(BEATS)]}. {style}."} for i in range(n)]
+    title = job.get("title") or "Sunverse"
+    cr = job.get("credits") or {}
+    return {"language": "Hindi", "mood": "epic, devotional", "theme": subject[:200], "scenes": sc, "style_lock": style, "characters": "",
+            "youtube": {"title": f"{title} | Sunverse", "description": f"{title} — an original Sunverse song.\n\nLyrics: {cr.get('lyrics', 'COCO')} | Singer: {cr.get('singer', 'KoBhit')}\n\nSubscribe to SUNVERSE for more music.",
+                        "tags": [title, "Sunverse", "Hindi song", "devotional", "KoBhit", "COCO"]}}
+
+
 def cloud_json(system, prompt):
     try:
         r = ganesha("POST", "/api/brain", {"system": system, "prompt": prompt}, timeout=180)
@@ -305,6 +362,13 @@ def cloud_json(system, prompt):
         log("cloud brain unavailable, using the free backup brain:", redact(e)[:160])
         txt = pollinations_text(system, prompt)
     t = re.sub(r"```(json)?", "", txt)
+    try:
+        return _json_obj(t)
+    except Exception:
+        fixed = _repair_json(t)
+        if fixed is not None:
+            return fixed
+    t = t
     a, b = t.find("{"), t.rfind("}")
     if a < 0 or b < a:
         raise RuntimeError("cloud brain did not return JSON")
@@ -392,19 +456,32 @@ def analyze_free(job, work, audio, dur, jid):
         step = max(1.5, (a1 - a0) / max(1, len(owner_lines)))
         lines = [{"start": round(a0 + i * step, 2), "end": round(a0 + (i + 1) * step - 0.2, 2), "text": t} for i, t in enumerate(owner_lines)]
     progress(jid, "analyze", "Reading mood, theme and story", 3, 4, 40)
-    numbered = "\n".join(f"{i + 1}. {l['text']}" for i, l in enumerate(lines[:120])) or "(instrumental / no clear vocals)"
-    a = cloud_json("You are a precise creative director. Reply with one JSON object only.",
-                   FREE_PLAN.format(lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"), title=job.get("title") or "",
-                                    dur=dur, style=job.get("style") or "watercolor anime", lines=numbered, count=min(len(lines), 120), n=n,
-                                    hint=(job.get("hint") or "none — infer the story from the title and lyrics").replace('"', "'")))
-    roman = a.get("roman") or []
-    for i, l in enumerate(lines[:120]):
-        if i < len(roman) and str(roman[i]).strip() and not re.search(r"[\u0900-\u097F]", str(roman[i])):
-            l["text"] = str(roman[i]).strip()[:200]
+    for l in lines[:120]:
+        l["text"] = to_roman(l["text"]) or l["text"]
+    numbered = "\n".join(f"{i + 1}. {l['text']}" for i, l in enumerate(lines[:60])) or "(instrumental / no clear vocals)"
+    hint = (job.get("hint") or "none — infer the story from the title and lyrics").replace('"', "'")
+    a = None
+    for k, nn in enumerate((n, min(n, 7))):  # second try: fewer scenes so a short answer still fits
+        try:
+            a = cloud_json("You are a precise creative director. Reply with one compact JSON object only. Keep every image_prompt under 60 words.",
+                           FREE_PLAN.format(lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"), title=job.get("title") or "",
+                                            dur=dur, style=job.get("style") or "watercolor anime", lines=numbered if not k else numbered[:1500], count=0, n=nn, hint=hint))
+            if a.get("scenes"):
+                break
+        except Exception as e:
+            log(f"[{jid}] plan attempt {k + 1} failed: {redact(e)[:160]}")
+    if not a or not a.get("scenes"):
+        a = fallback_plan(job, n, hint)
+        log(f"[{jid}] using the built-in plan (brain unavailable)")
     for l in lines[:120]:
         l["text"] = to_roman(l["text"])
     lines = [l for l in lines[:120] if l["text"] and not re.search(r"[\u0900-\u097F]", l["text"])]  # never show Devanagari
-    sc = [x for x in (a.get("scenes") or []) if x.get("image_prompt")][:n] or [{"summary": "song", "image_prompt": job.get("style") or "cinematic watercolor scene"}]
+    sc = [x for x in (a.get("scenes") or []) if x.get("image_prompt")][:n]
+    if len(sc) < max(4, n // 2):  # a cut-off answer: complete the story with built-in beats
+        extra = fallback_plan(job, n, hint)["scenes"]
+        sc = sc + extra[len(sc):n]
+        if not a.get("style_lock"):
+            a["style_lock"] = fallback_plan(job, n, hint)["style_lock"]
     per = dur / len(sc)
     scenes = [{"start": round(i * per, 2), "end": round(dur if i == len(sc) - 1 else (i + 1) * per, 2), "summary": x.get("summary", ""), "image_prompt": x["image_prompt"]} for i, x in enumerate(sc)]
     return {"durationS": dur, "language": a.get("language", "Hindi"), "mood": a.get("mood", ""), "theme": a.get("theme", ""),
