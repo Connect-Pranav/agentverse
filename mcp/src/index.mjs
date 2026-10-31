@@ -232,6 +232,16 @@ function aiText(r) {
   const o = r?.output?.flatMap?.((x) => x?.content ?? [])?.map?.((x) => x?.text ?? '')?.join('');
   return o || '';
 }
+async function pollinationsBrain(system, prompt, quick) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), quick ? 45e3 : 90e3);
+  try {
+    const r = await fetch('https://text.pollinations.ai/openai', { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', 'user-agent': 'agentverse-worker/1.0' },
+      body: JSON.stringify({ model: 'openai', messages: [{ role: 'system', content: system || 'You are a helpful assistant. Reply with JSON only.' }, { role: 'user', content: prompt }], temperature: 0.7 }) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    return aiText(j).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  } finally { clearTimeout(t); }
+}
 async function cloudBrain(env, a) {
   if (!env.AI) throw new HttpError(503, 'Cloud brain is not enabled on this Worker (AI binding missing)');
   const system = clean(a.system, 12_000), prompt = clean(a.prompt, 24_000);
@@ -242,14 +252,25 @@ async function cloudBrain(env, a) {
   const used = Number(await kv(env).get(key)) || 0;
   if (used >= cap) throw new HttpError(429, `Cloud brain daily limit reached (${cap} calls) — it resets at 05:30 IST`);
   await kv(env).put(key, String(used + 1), { expirationTtl: 3 * 86400 });
-  const big = env.BRAIN_BIG_CALLS !== undefined && Number(env.BRAIN_BIG_CALLS) >= 0 ? Number(env.BRAIN_BIG_CALLS) : 40;
-  let order = a.quick || used >= big ? [...SMALL_FIRST, ...BRAIN_MODELS] : [...BRAIN_MODELS];
-  if (BRAIN_OK && !(a.quick || used >= big)) order = [BRAIN_OK, ...order];
-  order = [...new Set(order)];
   const errs = [];
+  // Free text brain first, so the Workers AI daily allowance (10k neurons) stays for song images.
+  if (env.BRAIN_POLLINATIONS !== 'off') {
+    try {
+      const text = await pollinationsBrain(system, prompt, a.quick);
+      if (text) return { text, model: 'pollinations-openai', used: used + 1, cap };
+      errs.push('pollinations: empty');
+    } catch (e) { errs.push(`pollinations: ${String(e?.message ?? e).slice(0, 80)}`); }
+  }
+  // Workers AI fallback: small models only, and a few calls a day, so images keep their budget.
+  const waiCap = Number(env.BRAIN_WAI_CALLS) >= 0 && env.BRAIN_WAI_CALLS !== undefined ? Number(env.BRAIN_WAI_CALLS) : 25;
+  const wkey = `brain/wai/${new Date().toISOString().slice(0, 10)}`;
+  const wused = Number(await kv(env).get(wkey)) || 0;
+  if (wused >= waiCap) throw new HttpError(429, `Cloud brain busy — free backup brain failed (${errs.join(' | ')}) and the Workers AI share for today (${waiCap}) is kept for song images. Resets at 05:30 IST`);
+  await kv(env).put(wkey, String(wused + 1), { expirationTtl: 3 * 86400 });
+  const order = [...new Set(SMALL_FIRST)];
   for (const model of order) {
     try {
-      const r = await env.AI.run(model, { messages: [{ role: 'system', content: system || 'You are a helpful assistant. Reply with JSON only.' }, { role: 'user', content: prompt }], max_tokens: a.quick ? 700 : 2400, temperature: 0.7 });
+      const r = await env.AI.run(model, { messages: [{ role: 'system', content: system || 'You are a helpful assistant. Reply with JSON only.' }, { role: 'user', content: prompt }], max_tokens: a.quick ? 700 : 1600, temperature: 0.7 });
       const text = aiText(r).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       if (text) { BRAIN_OK = model; return { text, model: model.replace('@cf/', ''), used: used + 1, cap }; }
       errs.push(`${model.split('/').pop()}: empty`);

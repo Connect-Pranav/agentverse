@@ -119,21 +119,30 @@ test('owner REST publish needs token and a ready video; instant start dispatch',
   } finally { globalThis.fetch = realFetch; }
 });
 
-test('cloud brain: owner only, Workers AI with fallback, daily cap', async () => {
-  const seen = [];
-  const e = { ...env(), BRAIN_DAILY_CALLS: '3', AI: { run: async (m, i) => { seen.push(m); if (m.includes('70b')) throw new Error('5028: deprecated'); if (m.includes('glm')) return { choices: [{ message: { content: '{"ok":true}' } }] }; return { response: '' }; } } };
-  const call = (auth) => worker.fetch(new Request(B + '/api/brain', { method: 'POST', headers: { 'content-type': 'application/json', ...(auth ? { authorization: 'Bearer tok' } : {}) }, body: JSON.stringify({ system: 's', prompt: 'p' }) }), e);
-  assert.equal((await call(false)).status, 401);
-  const r = await (await call(true)).json();
-  assert.equal(r.text, '{"ok":true}', 'OpenAI-style choices are read');
-  assert.match(r.model, /glm/, 'retired model skipped, next one used');
-  assert.equal(seen[0], '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
-  seen.length = 0;
-  assert.equal((await call(true)).status, 200);
-  assert.equal(seen[0], '@cf/zai-org/glm-4.7-flash', 'remembers the model that worked');
-  assert.equal((await call(true)).status, 200);
-  assert.equal((await call(true)).status, 429, 'daily cap protects the free allowance');
-  assert.equal((await (await worker.fetch(new Request(B + '/health'), e)).json()).brain, true);
+test('cloud brain: free text brain first, Workers AI small-model fallback, caps keep image budget', async () => {
+  const seen = []; const realFetch = globalThis.fetch; let polOk = true;
+  globalThis.fetch = async (u, init) => {
+    if (String(u).includes('text.pollinations.ai')) return polOk ? new Response(JSON.stringify({ choices: [{ message: { content: '{"src":"pol"}' } }] }), { headers: { 'content-type': 'application/json' } }) : new Response('pay', { status: 402 });
+    return realFetch(u, init);
+  };
+  try {
+    const e = { ...env(), BRAIN_DAILY_CALLS: '5', BRAIN_WAI_CALLS: '1', AI: { run: async (m) => { seen.push(m); if (m.includes('glm')) throw new Error('5028: deprecated'); if (m.includes('8b')) return { choices: [{ message: { content: '{"ok":true}' } }] }; return { response: '' }; } } };
+    const call = (auth) => worker.fetch(new Request(B + '/api/brain', { method: 'POST', headers: { 'content-type': 'application/json', ...(auth ? { authorization: 'Bearer tok' } : {}) }, body: JSON.stringify({ system: 's', prompt: 'p' }) }), e);
+    assert.equal((await call(false)).status, 401);
+    const r = await (await call(true)).json();
+    assert.equal(r.text, '{"src":"pol"}'); assert.equal(r.model, 'pollinations-openai');
+    assert.equal(seen.length, 0, 'Workers AI untouched while the free text brain works');
+    polOk = false;
+    const r2 = await (await call(true)).json();
+    assert.equal(r2.text, '{"ok":true}', 'falls back to Workers AI');
+    assert.ok(!seen.some((m) => m.includes('70b')), 'no big models on the shared allowance');
+    assert.equal((await call(true)).status, 429, 'Workers AI share is capped so images keep budget');
+    polOk = true;
+    assert.equal((await call(true)).status, 200);
+    assert.equal((await call(true)).status, 200);
+    assert.equal((await call(true)).status, 429, 'overall daily cap');
+    assert.equal((await (await worker.fetch(new Request(B + '/health'), e)).json()).brain, true);
+  } finally { globalThis.fetch = realFetch; }
 });
 
 test('growth: runner reports, simple auto vs approval, owner decisions, MCP tools', async () => {
