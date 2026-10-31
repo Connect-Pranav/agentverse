@@ -848,7 +848,9 @@ def render(job, work):
                         if not re.search(r"4006|daily|limit|429|neurons", str(e), re.I):
                             raise
                         state["cf_off"] = True
-                        log(f"[{jid}] Cloudflare free images used up today — switching to the free backup")
+                        log(f"[{jid}] Cloudflare images unavailable ({redact(e)[:200]}) — switching to the free backup")
+                        if os.environ.get("GITHUB_ACTIONS"):
+                            print("::warning title=cloudflare image::" + " ".join(redact(e).split())[:400], flush=True)
                 if not used:
                     pollinations_image(p, out, seed=100 + i)
                     used = "pollinations/flux (free backup)"

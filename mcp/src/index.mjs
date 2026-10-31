@@ -587,7 +587,7 @@ async function runner(request, env) {
 const QUOTA_RE = /4006|daily free allocation|daily limit|neurons|HTTP 402|quota/i;
 const quotaRetry = (j) => {
   if (j.status !== 'failed' || !j.audioBytes) return false;
-  if (QUOTA_RE.test(j.error || '')) return new Date().toISOString().slice(0, 10) > String(j.updatedAt || '').slice(0, 10);
+  if (QUOTA_RE.test(j.error || '')) return new Date().toISOString().slice(0, 10) > String(j.updatedAt || '').slice(0, 10) || Date.now() - Date.parse(j.updatedAt || 0) > 10 * 60e3;
   return (j.autoRetries ?? 0) < 3 && Date.now() - Date.parse(j.updatedAt || 0) > 5 * 60e3;
 };
 async function pending(env) {
