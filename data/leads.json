@@ -1,6 +1,6 @@
 {
- "updated": "2026-10-30T22:17:02.336Z",
- "count": 0,
+ "updated": "2026-10-31T05:37:51.199Z",
+ "count": 1,
  "health": {
   "reddit": {
    "ok": 0,
@@ -29,5 +29,24 @@
   }
  },
  "reddit": "public",
- "leads": []
+ "leads": [
+  {
+   "id": "md_117533744122247357",
+   "source": "mastodon #hiring",
+   "title": "🚀 Now Hiring! | Web Research Specialist (AI Evaluation) Remote contract, 8 weeks, 40 hrs/week with 4 hours PS",
+   "text": "🚀 Now Hiring! | Web Research Specialist (AI Evaluation) Remote contract, 8 weeks, 40 hrs/week with 4 hours PST overlap. Pay discussed during screening. ✅ Building research questions a browsing AI cannot solve ✅ Evidence trails citing exact pages and tables What's the strangest primary source you've ever tracked down? 👉 Apply here: https:// nearskill.in/jobs/web-research -specialist-102276?utm_source=mastodon&utm_medium=social # Hiring # LLM # AIJobs # RemoteJobs",
+   "url": "https://mastodon.social/@nearskill/117533744122247357",
+   "author": "nearskill",
+   "created": "2026-10-31T04:56:49.291Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 6,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-10-31T05:37:51.199Z"
+  }
+ ]
 }
