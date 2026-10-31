@@ -1,6 +1,58 @@
 {
  "items": [
   {
+   "id": "sv_w8nrmv",
+   "brand": "Sunverse",
+   "dept": "Publishing & Social",
+   "title": "Instagram Reel Caption",
+   "body": "🎨 Dive into the heart of our latest track! \n\nHear how the melody was born and why every line matters. \n\n🔗 Link in bio for full story. \n\n#Sunverse #KoBhit #OriginalHindiSong #LofiMusic #RomanticHits #WatercolorAnime #BehindTheLyrics #MusicStory #HindiMusic",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Song lyric story reveal",
+   "ts": 1793490201855,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
+   "id": "sv_h3wxed",
+   "brand": "Sunverse",
+   "dept": "Search Visibility",
+   "title": "YouTube Video Title & Description",
+   "body": "Title: Behind the Lyrics: [Song Title] – Sunverse Story\n\nDescription: Explore the inspiration behind [Song Title], from the first chord to the final verse. KoBhit shares the moments that shaped the music, while COCO explains the poetic choices in the lyrics. Watch till the end for a special visual reveal of the watercolor anime cover. Don’t forget to like, subscribe, and hit the bell for more behind‑the‑scenes content! \n\nTags: Hindi lofi music, romantic Hindi songs, original Hindi track, Sunverse music, KoBhit singer, watercolor anime cover, music story",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Song lyric story reveal",
+   "ts": 1793490201855,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
+   "id": "sv_imlaub",
+   "brand": "Sunverse",
+   "dept": "Creative Studio",
+   "title": "30‑Second Reel Script",
+   "body": "Scene 1 (10s): Close‑up of the watercolor anime cover, gentle zoom. Voiceover: \"Every brushstroke tells a story…\"\nScene 2 (10s): KoBhit humming the chorus, quick cuts of lyric sheets. Voiceover: \"…and every lyric is a heartbeat.\"\nScene 3 (10s): Text overlay with song title and a call‑to‑action. Voiceover: \"Discover the story behind the song – link in bio.\"",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Song lyric story reveal",
+   "ts": 1793490201855,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
+   "id": "sv_u8pxg3",
+   "brand": "Sunverse",
+   "dept": "Content Engine",
+   "title": "SEO Keywords",
+   "body": "Hindi lofi music, romantic Hindi songs, original Hindi track, Sunverse music channel, KoBhit singer, COCO lyrics, watercolor anime cover art, behind the lyrics, Hindi song stories, music video release",
+   "status": "ready",
+   "lead_id": null,
+   "topic": "Song lyric story reveal",
+   "ts": 1793490201855,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
    "id": "sv_gcmnak",
    "brand": "Foliocraft",
    "dept": "Content Engine",
@@ -66,18 +118,19 @@
    "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
   }
  ],
- "cycles": 1,
+ "cycles": 2,
  "topics": [
+  "Song lyric story reveal",
   "Portfolio vs Resume"
  ],
- "updated": "2026-10-30T06:24:56.867Z",
+ "updated": "2026-10-31T23:43:21.855Z",
  "last": {
-  "brand": "Foliocraft",
-  "topic": "Portfolio vs Resume",
-  "why": "Stand out in job market",
-  "summary": "Portfolio vs Resume content",
+  "brand": "Sunverse",
+  "topic": "Song lyric story reveal",
+  "why": "Deepens fan connection, boosts engagement",
+  "summary": "Story behind lyrics boosts engagement",
   "brain": "cloud",
-  "model": "cloudflare/meta/llama-3.3-70b-instruct-fp8-fast",
-  "count": 5
+  "model": "cloudflare/pollinations-openai",
+  "count": 4
  }
 }
