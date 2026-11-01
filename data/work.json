@@ -1,6 +1,58 @@
 {
  "items": [
   {
+   "id": "sv_2sdzv0",
+   "brand": "LittleLoop",
+   "dept": "Content Engine",
+   "title": "Instagram Caption with Call-to-Share",
+   "body": "It's bedtime battle time! 🛑 Watch how LittleLoop turns the chaos into calm with our gentle bedtime stories. Save this for the next night! 🌙✨ #LittleLoop #BedtimeRoutine #KidsStories #ParentingHacks",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "The Cozy Bedtime Habit",
+   "ts": 1793515764104,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
+   "id": "sv_x8ou69",
+   "brand": "LittleLoop",
+   "dept": "Creative Studio",
+   "title": "30-Second Reel Script",
+   "body": "Scene 1: A cute animated kid is jumping on the bed, looking tired but energetic. Text overlay: 'When bedtime feels like a party...'\nScene 2: LittleLoop the character floats in, holding a glowing book, and waves gently. Text overlay: '...LittleLoop brings the cozy vibes.'\nScene 3: The kid snuggles under covers, reading the book with a big smile. Text overlay: 'Sweet dreams! 🌙'",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "The Cozy Bedtime Habit",
+   "ts": 1793515764104,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
+   "id": "sv_wdx1h4",
+   "brand": "LittleLoop",
+   "dept": "Search Visibility",
+   "title": "Optimized Reel Keywords",
+   "body": "bedtime stories for toddlers, kids bedtime routine, animated stories for kids, gentle parenting, sleep training for babies, calm bedtime music, LittleLoop stories",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "The Cozy Bedtime Habit",
+   "ts": 1793515764104,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
+   "id": "sv_sfrc0a",
+   "brand": "LittleLoop",
+   "dept": "Publishing & Social",
+   "title": "YouTube Video Title & Description",
+   "body": "Title: The Starry Night Snuggle (A LittleLoop Story)\nDescription: A gentle, animated bedtime story to help your little one settle down for sleep. Relax, unwind, and drift off to dreamland with LittleLoop. Subscribe for more wholesome content! #BedtimeStory #KidsAnimation",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "The Cozy Bedtime Habit",
+   "ts": 1793515764104,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
    "id": "sv_w8nrmv",
    "brand": "Sunverse",
    "dept": "Publishing & Social",
@@ -118,19 +170,20 @@
    "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
   }
  ],
- "cycles": 2,
+ "cycles": 3,
  "topics": [
+  "The Cozy Bedtime Habit",
   "Song lyric story reveal",
   "Portfolio vs Resume"
  ],
- "updated": "2026-10-31T23:43:21.855Z",
+ "updated": "2026-11-01T06:49:24.104Z",
  "last": {
-  "brand": "Sunverse",
-  "topic": "Song lyric story reveal",
-  "why": "Deepens fan connection, boosts engagement",
-  "summary": "Story behind lyrics boosts engagement",
+  "brand": "LittleLoop",
+  "topic": "The Cozy Bedtime Habit",
+  "why": "Parents share relatable stories that solve daily parenting struggles.",
+  "summary": "High-viral potential content addressing the 'bedtime routine' pain point.",
   "brain": "cloud",
-  "model": "cloudflare/pollinations-openai",
+  "model": "cloudflare/zai-org/glm-4.7-flash",
   "count": 4
  }
 }
