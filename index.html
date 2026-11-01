@@ -754,6 +754,8 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 .mt-redo textarea{min-height:64px}
 .mt-up #mtTheme{width:100%;box-sizing:border-box}
 .mt-lyrbox{display:flex;flex-direction:column;gap:6px}
+.mt-imgbox{display:flex;flex-direction:column;gap:5px}.mt-imgbox small{font-size:11.5px;color:var(--mut)}
+.mt-thumbs{display:flex;gap:4px;flex-wrap:wrap}.mt-thumbs img{width:44px;height:25px;object-fit:cover;border-radius:5px;border:1px solid rgba(255,255,255,.3)}
 .mt-file{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font:600 12px var(--fb);color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:7px 13px;cursor:pointer;min-height:36px}
 .mt-file input{position:absolute;width:1px;height:1px;opacity:0}
 .mt-file .i{width:14px;height:14px}
@@ -890,6 +892,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         <input id="mtTheme" placeholder="Story / theme, e.g. Ramayana — Angad challenges Ravana" aria-label="Story or theme">
         <div class="mt-lyrbox"><textarea id="mtLyrics" placeholder="Lyrics (optional) — paste, or upload a .txt / .lrc file. .lrc = exact timing for every line" aria-label="Lyrics"></textarea>
           <label class="mt-file"><input type="file" id="mtLyrFile" accept=".txt,.lrc,text/plain"><span data-i="upload"></span> Upload lyrics file</label></div>
+        <div class="mt-imgbox"><label class="mt-file"><input type="file" id="mtImgs" multiple accept="image/jpeg,image/png,image/webp"><span data-i="image"></span> Use my images (optional)</label><small id="mtImgsN">No images → AI makes them. Add yours → they're used in this order, no AI images.</small></div>
         <details class="mt-more"><summary>Style &amp; credits (optional)</summary>
           <input id="mtStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text" aria-label="Visual style">
           <div class="mt-two"><input id="mtLyr" value="COCO" aria-label="Lyrics by"><input id="mtSing" value="KoBhit" aria-label="Singer"></div>
@@ -2783,7 +2786,8 @@ function mtRender(){
     if(e.label==="overdue")h+='<div class="mt-now"><span class="mt-dot" style="background:#f5a623;box-shadow:0 0 8px #f5a623"></span>GitHub has not started the renderer yet (its schedule is running late). Tap <b>Start now</b> to begin immediately.</div><div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
   }
   if(j.plan){
-    if(j.auto_approved||j.image_engine==="cloudflare")h+='<p class="mt-free">Free plan: Cloudflare images, no cost — went straight to the video.</p>';
+    if(j.image_engine==="owner")h+='<p class="mt-free">Your '+(j.image_total||j.own_images||"")+' images — no AI image generation, no cost.</p>';
+    else if(j.auto_approved||j.image_engine==="cloudflare")h+='<p class="mt-free">Free plan: Cloudflare images, no cost — went straight to the video.</p>';
     h+='<div class="mt-info"><div><h6>Mood</h6><p>'+esc(j.plan.mood||"—")+'</p><h6>Theme</h6><p>'+esc(j.plan.theme||"—")+'</p></div><div><h6>Lyrics'+(j.lyrics_lines_count?' &middot; '+j.lyrics_lines_count+' lines':'')+'</h6><div class="mt-lyr">'+esc((j.lyrics_preview||[]).join("\n")||"—")+((j.lyrics_lines_count||0)>8?"\n…":"")+'</div></div></div>';
   }
   if(!(pub&&pub.state==="published")&&["failed","rejected"].indexOf(j.status)<0){
@@ -2821,6 +2825,8 @@ function mtRender(){
     var fa=STU.fixAreas[j.job_id]||[],lc=(j.corrections||[]).slice(-1)[0];
     h+='<details class="mt-redo"><summary>Fix something &mdash; tell me what to change</summary>'+
       '<div class="fx-chips">'+FIX_AREAS.map(function(x){ return '<button type="button" class="fx-chip'+(fa.indexOf(x[0])>=0?' on':'')+'" data-fx="'+x[0]+'">'+esc(x[1])+'</button>'; }).join("")+'</div>'+
+ '<div class="mt-imgbox"><label class="mt-file"><input type="file" id="mtFixImgs" multiple accept="image/jpeg,image/png,image/webp"><span data-i="image"></span> '+(j.own_images?'Replace my images':'Use my images instead of AI')+'</label><small id="mtFixImgsN">'+(j.own_images?esc(j.own_images+" of your images are in this video."):"Up to 16 images, used in this order.")+'</small>'+
+      (j.own_images?'<label class="mt-chk"><input type="checkbox" id="mtFixAI"> Go back to AI images</label>':'')+'</div>'+
       '<textarea id="mtFixT" aria-label="What should change" placeholder="What should change? e.g. Lyrics are missing; show Angad planting his foot in the chorus; less dark, more gold"></textarea>'+
       '<div class="fx-row"><input id="mtFixShift" type="number" step="0.5" min="-15" max="15" value="'+(j.lyric_shift_s||0)+'" aria-label="Lyrics timing shift in seconds"><span>lyrics timing, seconds (&minus; earlier, + later)</span></div>'+
       '<textarea id="mtRedoT" aria-label="Theme / story" placeholder="Story / theme (optional), e.g. Ramayana — Angad challenges Ravana">'+esc(j.theme_hint||"")+'</textarea>'+
@@ -2864,9 +2870,12 @@ $("mtJob").onclick=function(e){
   }
   if(a==="redo"){
     var fx=$("mtFixT").value.trim(),ar=STU.fixAreas[id]||[],sh=parseFloat($("mtFixShift").value)||0,th=$("mtRedoT").value.trim(),ly=$("mtRedoL").value.trim(),sy=$("mtRedoS").value.trim();
-    if(!fx&&!ar.length&&!ly&&!sy&&sh===(STU.cur.lyric_shift_s||0)&&th===(STU.cur.theme_hint||"")){ toast("Tap what's wrong or write what should change",false); return; }
+    var fim=STU.fixImgs[id]||[],toAI=$("mtFixAI")&&$("mtFixAI").checked;
+    if(!fx&&!ar.length&&!ly&&!sy&&!fim.length&&!toAI&&sh===(STU.cur.lyric_shift_s||0)&&th===(STU.cur.theme_hint||"")){ toast("Tap what's wrong or write what should change",false); return; }
     b.disabled=true;
-    stuApi("POST","/api/songvideo/"+id+"/redo",{corrections:fx,areas:ar,lyric_shift:sh,theme:th,style:sy,lyrics:ly}).then(function(r){ STU.fixAreas[id]=[]; STU.redoOpen=null; toast("Re-engineering with your notes",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    var redo=function(){ return stuApi("POST","/api/songvideo/"+id+"/redo",{corrections:fx,areas:ar,lyric_shift:sh,theme:th,style:sy,lyrics:ly}); };
+    var pre=(fim.length||toAI)?stuApi("DELETE","/api/songvideo/"+id+"/own").then(function(){ return fim.length?ownUpload(id,fim,function(k,n){ b.lastChild.nodeValue="Uploading image "+k+"/"+n; }):null; }):Promise.resolve();
+    pre.then(redo).then(function(r){ STU.fixAreas[id]=[]; STU.fixImgs[id]=[]; STU.redoOpen=null; toast(fim.length?"Re-engineering with your "+fim.length+" images":"Re-engineering with your notes",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
     return;
   }
   if(a==="sch-save"||a==="sch-del"){
@@ -2915,6 +2924,39 @@ function mtGallery(j,open){
   if(open)sigOpen("Generated images",sub,h);
   else { $("sigS").innerHTML=sub; $("sigB").innerHTML=h; }
 }
+/* owner's own scene images: shrink big photos in the browser, then upload in order (1..n) */
+STU.fixImgs=STU.fixImgs||{}; STU.imgs=[];
+function shrinkImg(f,cb){
+  if(!/^image\/(jpeg|png|webp)$/.test(f.type)){ cb(null); return; }
+  if(f.size<1.5*1048576){ cb(f); return; }
+  var url=URL.createObjectURL(f),im=new Image();
+  im.onload=function(){ var k=Math.min(1,2400/Math.max(im.width,im.height)),c=document.createElement("canvas"); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+    c.getContext("2d").drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url); c.toBlob(function(b){ cb(b||f); },"image/jpeg",0.9); };
+  im.onerror=function(){ URL.revokeObjectURL(url); cb(f); };
+  im.src=url;
+}
+function ownUpload(id,files,onStep){
+  return new Promise(function(res,rej){
+    var i=0,n=Math.min(files.length,16);
+    (function nx(){
+      if(i>=n){ res(); return; }
+      if(onStep)onStep(i+1,n);
+      shrinkImg(files[i],function(bl){
+        if(!bl){ i++; nx(); return; }
+        var x=new XMLHttpRequest(); x.open("PUT","/api/songvideo/"+id+"/own/"+(i+1)); x.setRequestHeader("Authorization","Bearer "+SET.mcpToken); x.setRequestHeader("Content-Type",bl.type||"image/jpeg");
+        x.onload=function(){ if(x.status>=200&&x.status<300){ i++; nx(); } else { var m="Image upload failed"; try{m=JSON.parse(x.responseText).error||m;}catch(e){} rej(new Error(files[i].name+": "+m)); } };
+        x.onerror=function(){ rej(new Error("Network error while uploading images")); };
+        x.send(bl);
+      });
+    })();
+  });
+}
+function imgList(fl){ var a=[],i; for(i=0;i<(fl?fl.length:0);i++)if(/^image\//.test(fl[i].type))a.push(fl[i]); a.sort(function(p,q){ return p.name.localeCompare(q.name,undefined,{numeric:true}); }); return a.slice(0,16); }
+function imgNote(el,list,empty){ if(!list.length){ el.textContent=empty; return; }
+  var h=list.length+" image"+(list.length>1?"s":"")+" — used in this order (sorted by file name), no AI images:<div class=\"mt-thumbs\">";
+  for(var i=0;i<list.length;i++)h+='<img alt="" src="'+URL.createObjectURL(list[i])+'">'; el.innerHTML=h+"</div>"; }
+$("mtImgs").onchange=function(){ STU.imgs=imgList(this.files); imgNote($("mtImgsN"),STU.imgs,"No images → AI makes them. Add yours → they're used in this order, no AI images."); };
+$("mtJob").addEventListener("change",function(e){ if(e.target&&e.target.id==="mtFixImgs"&&STU.cur){ STU.fixImgs[STU.cur.job_id]=imgList(e.target.files); imgNote($("mtFixImgsN"),STU.fixImgs[STU.cur.job_id],"Up to 16 images, used in this order."); } });
 var FIX_AREAS=[["lyrics","Lyrics missing / wrong"],["timing","Lyrics timing"],["images","Images / scenes"],["story","Story / characters"],["style","Look & colours"],["text","Title & YouTube text"]];
 STU.fixAreas=STU.fixAreas||{};
 function pad2(n){return (n<10?"0":"")+n;}
@@ -2945,8 +2987,8 @@ function mtPick(list){
   STU.files=fs; STU.file=fs[0];
   $("mtFileName").textContent=fs.length>1?fs.length+" songs · "+(fs.reduce(function(a,f){return a+f.size;},0)/1048576).toFixed(1)+" MB":fs[0].name+" · "+(fs[0].size/1048576).toFixed(1)+" MB";
   $("mtDrop").classList.add("on");
-  if(fs.length===1){ if(!$("mtTitle").value)$("mtTitle").value=songBase(fs[0].name); $("mtTitle").disabled=false; $("mtLyrics").disabled=false; }
-  else { $("mtTitle").value=""; $("mtTitle").placeholder="Titles come from the file names"; $("mtTitle").disabled=true; $("mtLyrics").value=""; $("mtLyrics").placeholder="Lyrics are read from each MP3 (Suno puts them inside the file)"; $("mtLyrics").disabled=true; $("mtPlanBox").open=true; $("mtPlanOn").checked=true; }
+  if(fs.length===1){ if(!$("mtTitle").value)$("mtTitle").value=songBase(fs[0].name); $("mtTitle").disabled=false; $("mtLyrics").disabled=false; $("mtImgs").disabled=false; }
+  else { STU.imgs=[]; $("mtImgs").value=""; $("mtImgs").disabled=true; $("mtImgsN").textContent="Own images work one song at a time — add them later from each song's Fix box."; $("mtTitle").value=""; $("mtTitle").placeholder="Titles come from the file names"; $("mtTitle").disabled=true; $("mtLyrics").value=""; $("mtLyrics").placeholder="Lyrics are read from each MP3 (Suno puts them inside the file)"; $("mtLyrics").disabled=true; $("mtPlanBox").open=true; $("mtPlanOn").checked=true; }
   $("mtGo").textContent=fs.length>1?"Upload "+fs.length+" songs & plan the week":"Upload & start";
   planPreview();
 }
@@ -2972,6 +3014,7 @@ $("mtGo").onclick=function(){
   var reset=function(){ STU.file=null; STU.files=null; $("mtFile").value=""; $("mtFileName").textContent="Tap to choose your MP3 (or several)"; $("mtDrop").classList.remove("on");
     $("mtTitle").value=""; $("mtTitle").disabled=false; $("mtTitle").placeholder="Song title (optional)"; $("mtTheme").value=""; $("mtLyrics").value=""; $("mtLyrics").disabled=false;
     $("mtLyrics").placeholder="Lyrics (optional) — paste, or upload a .txt / .lrc file. .lrc = exact timing for every line"; $("mtGo").textContent="Upload & start"; $("mtPlanOn").checked=false; $("mtPlanDate").value=""; planPreview();
+    STU.imgs=[]; $("mtImgs").value=""; $("mtImgs").disabled=false; $("mtImgsN").textContent="No images → AI makes them. Add yours → they're used in this order, no AI images.";
     setTimeout(function(){$("mtBar").style.width="0";},1500); stuLoad(); };
   function next(){
     if(i>=fs.length){ fin(fs.length>1?ok+" of "+fs.length+" songs uploaded ✓ — "+(plan?"on the calendar, videos start automatically":"videos start automatically"):"Uploaded ✓ — analysis starts automatically",ok===fs.length); reset(); return; }
@@ -2979,6 +3022,8 @@ $("mtGo").onclick=function(){
     if(plan){ body.publish_at=dates[i].toISOString(); body.privacy=$("mtPlanPriv").value; body.auto_post=$("mtPlanAuto").checked; }
     $("mtMsg").textContent=(fs.length>1?"Song "+(i+1)+"/"+fs.length+": ":"")+"Creating the job…";
     stuApi("POST","/api/songvideo",body).then(function(r){
+      return (one&&STU.imgs.length?ownUpload(r.job.job_id,STU.imgs,function(k,n){ $("mtMsg").textContent="Uploading your image "+k+"/"+n+"…"; }):Promise.resolve()).then(function(){ return r; });
+    }).then(function(r){
       var x=new XMLHttpRequest(); x.open("PUT","/api/songvideo/"+r.job.job_id+"/audio"); x.setRequestHeader("Authorization","Bearer "+SET.mcpToken); x.setRequestHeader("Content-Type",f.type||"audio/mpeg");
       x.upload.onprogress=function(ev){ if(ev.lengthComputable){ var pc=Math.round(((i+ev.loaded/ev.total)/fs.length)*100); $("mtBar").style.width=pc+"%"; $("mtMsg").textContent=(fs.length>1?"Song "+(i+1)+"/"+fs.length+" · ":"")+"Uploading "+Math.round(ev.loaded/ev.total*100)+"%"; } };
       x.onload=function(){ if(x.status>=200&&x.status<300)ok++; else { var m="Upload failed"; try{m=JSON.parse(x.responseText).error||m;}catch(e){} toast(f.name+": "+m,false); } i++; next(); };

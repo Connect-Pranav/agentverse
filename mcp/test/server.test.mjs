@@ -452,3 +452,27 @@ test('weekly planner: auto-approve, post only when due, corrections reach the ru
   const cleared = await (await f(`/api/songvideo/${id2}/schedule`, 'POST', { publish_at: null })).json();
   assert.equal(cleared.job.schedule, null);
 });
+
+test('owner images: upload, free plan, runner fetches them, clear', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body, h = R) => worker.fetch(new Request(B + path, { method, headers: h, body }), e);
+  const id = (await (await f('/api/songvideo', 'POST', JSON.stringify({ title: 'Mine' }))).json()).job.job_id;
+  assert.equal((await f(`/api/songvideo/${id}/own/1`, 'PUT', new Uint8Array(4), { authorization: 'Bearer tok', 'content-type': 'text/plain', 'content-length': '4' })).status, 415);
+  await f(`/api/songvideo/${id}/own/1`, 'PUT', new Uint8Array([1, 1]), { authorization: 'Bearer tok', 'content-type': 'image/jpeg', 'content-length': '2' });
+  const up = await (await f(`/api/songvideo/${id}/own/3`, 'PUT', new Uint8Array([3]), { authorization: 'Bearer tok', 'content-type': 'image/png', 'content-length': '1' })).json();
+  assert.equal(up.job.own_images, 2);
+  await f(`/api/songvideo/${id}/audio`, 'PUT', new Uint8Array(10), { authorization: 'Bearer tok', 'content-type': 'audio/mpeg', 'content-length': '10' });
+  const cl = await (await f('/api/songvideo/runner/claim', 'POST', '{}')).json();
+  assert.deepEqual(cl.job.ownImages, [1, 3]);
+  await f(`/api/songvideo/runner/${id}/analysis`, 'PUT', JSON.stringify({ durationS: 20, image_engine: 'owner', scenes: [{ start: 0, end: 10, image_prompt: 'owner image 1', own: 1 }, { start: 10, end: 20, image_prompt: 'owner image 3', own: 3 }] }));
+  const j = (await (await f(`/api/songvideo/${id}`)).json()).job;
+  assert.equal(j.status, 'approved', 'own images cost nothing → straight to video');
+  assert.equal(j.est_cost_usd, 0);
+  const rc = await (await f('/api/songvideo/runner/claim', 'POST', '{}')).json();
+  assert.equal(rc.job.analysis.scenes[1].own, 3);
+  const img = await f(`/api/songvideo/runner/${id}/own/3`);
+  assert.equal(img.headers.get('content-type'), 'image/png');
+  assert.deepEqual([...new Uint8Array(await img.arrayBuffer())], [3]);
+  assert.equal((await f(`/api/songvideo/${id}/own`, 'DELETE')).status, 409, 'not while rendering');
+});

@@ -557,6 +557,20 @@ def analyze_free(job, work, audio, dur, jid):
             "source": "whisper+cloud-brain"}
 
 
+def with_owner_images(job, a, dur):
+    own = list(job.get("ownImages") or [])
+    if not own:
+        return a
+    k = len(own)
+    orig = a.get("scenes") or []
+    per = dur / k
+    a["scenes"] = [{"start": round(i * per, 2), "end": round(dur if i == k - 1 else (i + 1) * per, 2), "own": own[i],
+                    "summary": (orig[min(len(orig) - 1, i * len(orig) // k)].get("summary") if orig else "") or f"Your image {i + 1}",
+                    "image_prompt": f"owner image {own[i]}"} for i in range(k)]
+    a["image_engine"] = "owner"
+    return a
+
+
 def analyze(job, work):
     jid = job["id"]
     if not os.environ.get("GEMINI_API_KEY") or os.environ.get("SV_FORCE_FREE_ANALYSIS"):
@@ -567,7 +581,7 @@ def analyze(job, work):
         dur = probe_duration(audio)
         a = analyze_free(job, work, audio, dur, jid)
         log(f"[{jid}] analysed (free): {len(a['scenes'])} scenes, {len(a['lyrics_lines'])} lyric lines")
-        ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
+        ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", with_owner_images(job, a, dur))
         return
     audio = os.path.join(work, "song")
     progress(jid, "analyze", "Downloading the song", 1, 4, 120)
@@ -584,7 +598,7 @@ def analyze(job, work):
             raise
         log(f"[{jid}] Gemini not reachable on the free tier, using the free path: {redact(e)}")
         a = analyze_free(job, work, audio, dur, jid)
-        ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
+        ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", with_owner_images(job, a, dur))
         return
     cr = job.get("credits") or {}
     lyrics = (job.get("lyrics") or "").strip() or "\n".join(lyric_lines_of(embedded_lyrics(audio)))
@@ -612,7 +626,7 @@ def analyze(job, work):
                 s["end"] = dur if i == len(sc) - 1 else max(s["start"] + 2.0, min(dur, float(s.get("end", s["start"] + 10))))
             a["scenes"] = sc
             log(f"[{jid}] analysed with {model}: {len(sc)} scenes, {len(a.get('lyrics_lines', []))} lyric lines")
-            ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
+            ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", with_owner_images(job, a, dur))
             return
         except Exception as e:  # try the next free model
             last = e
@@ -622,7 +636,7 @@ def analyze(job, work):
     # free Gemini quota/limits hit → free path (speech-to-text + cloud brain)
     log(f"[{jid}] Gemini analysis unavailable, using the free path: {redact(last)}")
     a = analyze_free(job, work, audio, dur, jid)
-    ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
+    ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", with_owner_images(job, a, dur))
 
 
 # ---------------- graphics (Pillow) ----------------
@@ -848,6 +862,8 @@ def render(job, work):
     engine = (a.get("imageEngine") or os.environ.get("SONGVIDEO_IMAGE_ENGINE") or "cloudflare").lower()
     if engine.startswith("gemini") and not os.environ.get("GEMINI_API_KEY"):
         engine = "cloudflare"
+    if engine == "owner" and not job.get("ownImages"):  # owner removed their images after planning
+        engine = "cloudflare"
     per = float(os.environ.get("SONGVIDEO_IMAGE_USD") or 0.067) if engine == "gemini" else 0.0
     imgs, used = [], None
     models = None
@@ -892,7 +908,11 @@ def render(job, work):
         lock = " ".join(x for x in [a.get("styleLock") or a.get("style_lock") or (job.get("style") or ""), a.get("characters") or ""] if x).strip()
         p = (lock[:800] + " Scene: " if lock else "") + s["image_prompt"][:950] + " Same art style and same character designs as every other scene. Wide 16:9 cinematic composition. No text, no letters, no logos, no watermark."
         used = None
-        for attempt in range(2):  # a lost "packet" is asked for again once
+        if s.get("own") or engine == "owner":  # owner's own image: no AI generation
+            raw_, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/own/{s.get('own') or (i + 1)}", want="raw", timeout=120)
+            open(out, "wb").write(raw_)
+            used = "your image"
+        for attempt in range(0 if used else 2):  # a lost "packet" is asked for again once
             try:
                 if engine.startswith("gemini") and not state["gem_off"]:
                     try:
@@ -947,7 +967,7 @@ def render(job, work):
             progress(jid, "render", f"Making images in parallel: {k} of {n_sc} done" if k < n_sc else "Images done, building the video", k, n_sc, (n_sc - k) * per_img_ / PAR_IMG + enc_est + up_est)
         return i, norm, used
 
-    PAR_IMG = 2 if engine.startswith("gemini") else 4   # Gemini free tier allows only a few requests per minute
+    PAR_IMG = 2 if engine.startswith("gemini") else (6 if engine == "owner" else 4)   # Gemini free tier allows only a few requests per minute
     with ThreadPoolExecutor(max_workers=PAR_IMG) as ex:
         results = sorted(ex.map(lambda x: make_image(*x), list(enumerate(scenes))))
     imgs = [r[1] for r in results]                        # reassembled in scene order, like numbered packets

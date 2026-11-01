@@ -30,6 +30,7 @@ const MAX_PARTS = 12;
 const LEASE_MS = 40 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 const MAX_IMAGES = 16;
+const MAX_OWN_IMG = 10 * 1024 * 1024;
 const INDEX = 'sv/index';
 
 class HttpError extends Error {
@@ -99,7 +100,7 @@ function view(env, request, j) {
     image_total: j.analysis?.scenes?.length ?? null,
     short: j.short ? { state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
     schedule: j.schedule ? { publish_at: j.schedule.at, auto: Boolean(j.schedule.auto), privacy: j.schedule.privacy } : null,
-    corrections: (j.corrections ?? []).slice(-3), lyric_shift_s: j.lyricShift ?? 0,
+    corrections: (j.corrections ?? []).slice(-3), lyric_shift_s: j.lyricShift ?? 0, own_images: (j.own ?? []).length,
     instant_start: Boolean(env.GH_DISPATCH_TOKEN), queued_at: j.queuedAt ?? null, decided_at: j.decidedAt ?? null,
     video_url: j.status === 'ready' && j.ticket ? `${b}/sv/${j.ticket}.mp4` : null,
     thumbnail_url: j.status === 'ready' && j.ticket && j.thumb ? `${b}/sv/${j.ticket}.jpg` : null,
@@ -137,6 +138,25 @@ async function autopilot(env, j) {
     return true;
   }
   return false;
+}
+
+/* ---------------- owner's own scene images (skip AI image generation) ---------------- */
+async function putOwnImage(env, j, n, body, length, mime) {
+  if (['analyzing', 'rendering'].includes(j.status)) throw new HttpError(409, `Job is ${j.status}; wait until it finishes`);
+  if (!(Number.isInteger(n) && n >= 1 && n <= MAX_IMAGES)) throw new HttpError(400, `image number must be 1–${MAX_IMAGES}`);
+  if (!(length > 0)) throw new HttpError(411, 'content-length is required');
+  if (length > MAX_OWN_IMG) throw new HttpError(413, 'Image is larger than 10 MB');
+  const m = String(mime ?? '').toLowerCase().split(';')[0];
+  if (!/^image\/(jpeg|jpg|png|webp)$/.test(m)) throw new HttpError(415, 'Upload JPG, PNG or WebP images');
+  await kv(env).put(`sv/own/${j.id}/${n}`, body, { metadata: { mime: m } });
+  j.own = [...new Set([...(j.own ?? []), n])].sort((a, b) => a - b);
+  return saveJob(env, j);
+}
+async function clearOwnImages(env, j) {
+  if (['analyzing', 'rendering'].includes(j.status)) throw new HttpError(409, `Job is ${j.status}; wait until it finishes`);
+  for (let n = 1; n <= MAX_IMAGES; n++) await kv(env).delete(`sv/own/${j.id}/${n}`);
+  j.own = [];
+  return saveJob(env, j);
 }
 
 /* ---------------- owner actions (MCP tools) ---------------- */
@@ -233,7 +253,7 @@ async function removeJob(env, j) {
   await k.delete(`sv/audio/${j.id}`);
   for (let n = 1; n <= MAX_PARTS; n++) await k.delete(`sv/video/${j.id}/${n}`);
   await k.delete(`sv/thumb/${j.id}`);
-  for (let n = 1; n <= MAX_IMAGES; n++) await k.delete(`sv/img/${j.id}/${n}`);
+  for (let n = 1; n <= MAX_IMAGES; n++) { await k.delete(`sv/img/${j.id}/${n}`); await k.delete(`sv/own/${j.id}/${n}`); }
   await k.delete(jobKey(j.id));
   await k.put(INDEX, JSON.stringify((await index(env)).filter((x) => x !== j.id)));
 }
@@ -320,7 +340,7 @@ async function cloudBrain(env, a) {
 }
 
 /* ---------------- runner API ---------------- */
-const runnerView = (j) => ({ id: j.id, title: j.title, hint: j.hint ?? '', style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb), short: j.short ?? null, corrections: j.corrections ?? [], lyricShift: j.lyricShift ?? 0 });
+const runnerView = (j) => ({ id: j.id, title: j.title, hint: j.hint ?? '', style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb), short: j.short ?? null, corrections: j.corrections ?? [], lyricShift: j.lyricShift ?? 0, ownImages: j.own ?? [] });
 async function claim(env) {
   const now = Date.now();
   for (const id of await index(env)) {
@@ -364,15 +384,15 @@ async function saveAnalysis(env, j, a) {
   j.analysis = {
     styleLock: clean(a.style_lock, 700), characters: clean(a.characters, 700),
     durationS: Number(a.durationS) || null, mood: clean(a.mood, 200), theme: clean(a.theme, 500), language: clean(a.language, 40),
-    scenes: scenes.map((s) => ({ start: Number(s.start), end: Number(s.end), summary: clean(s.summary, 300), image_prompt: clean(s.image_prompt, 1500) })),
+    scenes: scenes.map((s) => ({ start: Number(s.start), end: Number(s.end), summary: clean(s.summary, 300), image_prompt: clean(s.image_prompt, 1500), ...(Number.isInteger(Number(s.own)) && Number(s.own) > 0 ? { own: Number(s.own) } : {}) })),
     lyrics_lines: (Array.isArray(a.lyrics_lines) ? a.lyrics_lines.slice(0, 400) : []).map((l) => ({ start: Number(l.start) || 0, end: Number(l.end) || 0, text: clean(l.text, 200) })).filter((l) => l.text && l.end > l.start),
   };
   const yt = a.youtube ?? {};
   j.youtube = { title: clean(yt.title, 100) || j.title, description: clean(yt.description, 4800), tags: (Array.isArray(yt.tags) ? yt.tags : []).map((t) => clean(t, 40)).filter(Boolean).slice(0, 25) };
   if (!j.title) j.title = j.youtube.title;
-  j.analysis.imageEngine = ['cloudflare', 'gemini', 'gemini-free', 'openai'].includes(a.image_engine) ? a.image_engine : 'gemini';
+  j.analysis.imageEngine = ['cloudflare', 'gemini', 'gemini-free', 'openai', 'owner'].includes(a.image_engine) ? a.image_engine : 'gemini';
   j.analysis.source = clean(a.source, 60) || null;
-  const per = ['cloudflare', 'gemini-free'].includes(j.analysis.imageEngine) ? 0 : (Number(env.SONGVIDEO_IMAGE_USD) > 0 ? Number(env.SONGVIDEO_IMAGE_USD) : 0.067);
+  const per = ['cloudflare', 'gemini-free', 'owner'].includes(j.analysis.imageEngine) ? 0 : (Number(env.SONGVIDEO_IMAGE_USD) > 0 ? Number(env.SONGVIDEO_IMAGE_USD) : 0.067);
   j.imageCount = scenes.length;
   j.estCostUsd = Math.round(scenes.length * per * 1000) / 1000;
   j.estCostInr = Number(env.INR_PER_USD) > 0 ? Math.round(j.estCostUsd * Number(env.INR_PER_USD)) : null;
@@ -786,6 +806,8 @@ async function route(request, env) {
     if (seg[3] === 'audio' && method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'import' && method === 'POST') { const r = await importFromUrl(env, j, (await readJson(request)).url); kick(env, ctx); return json({ job: v(r) }); }
     if ((seg[3] === 'approve' || seg[3] === 'reject') && method === 'POST') { const r = await decide(env, j, seg[3]); if (seg[3] === 'approve') kick(env, ctx); return json({ job: v(r) }); }
+    if (seg[3] === 'own' && seg[4] && method === 'PUT') return json({ job: v(await putOwnImage(env, j, Number(seg[4]), request.body, len, request.headers.get('content-type'))) });
+    if (seg[3] === 'own' && !seg[4] && method === 'DELETE') return json({ job: v(await clearOwnImages(env, j)) });
     if (seg[3] === 'schedule' && method === 'POST') return json({ job: v(await setSchedule(env, j, await readJson(request))) });
     if (seg[3] === 'redo' && method === 'POST') { const r = await redoJob(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'short' && method === 'POST') { const r = await requestShort(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
@@ -833,6 +855,11 @@ async function route(request, env) {
       j.images = (j.images ?? []).filter((x) => x.n !== n).concat([{ n, summary: clean(url.searchParams.get('summary'), 300), at }]);
       await saveJob(env, j);
       return json({ ok: true, n });
+    }
+    if (seg[4] === 'own' && seg[5] && method === 'GET') {
+      const o = await kv(env).getWithMetadata(`sv/own/${j.id}/${Number(seg[5])}`, 'stream');
+      if (!o?.value) throw new HttpError(404, 'Owner image not found');
+      return new Response(o.value, { headers: { 'content-type': o.metadata?.mime ?? 'image/jpeg', 'cache-control': 'no-store' } });
     }
     if (seg[4] === 'image' && method === 'POST') return cloudImage(env, (await readJson(request)).prompt);
     if (seg[4] === 'short-done' && method === 'POST') { const r = await markShort(env, j, await readJson(request)); ping(env, request, { title: 'Short is live', body: `${songName(r)} Short is on YouTube.`, url: r.short.url, tag: r.id + 's' }); return json({ job: { id: r.id, short: r.short } }); }
