@@ -1,6 +1,59 @@
 {
  "items": [
   {
+   "id": "sv_u7ghkg",
+   "brand": "NIKHILs TECH STUDIO",
+   "dept": "Content Engine",
+   "title": "Claude Research Agent Workflow",
+   "body": "A premium walkthrough of structuring prompts for AI agents that hunt for primary sources and create evidence trails. Focus on precision over speed. Keywords: #Claude #CustomAgents #AIResearch",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Claude Workflow: Building an AI Research Agent",
+   "ts": 1793546849898,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
+   "id": "sv_dfnr1q",
+   "brand": "NIKHILs TECH STUDIO",
+   "dept": "Creative Studio",
+   "title": "Reel: The Evidence-First Workflow",
+   "body": "Scene 1: Close-up on paper clutter. Voiceover: 'Primary sources are the bedrock of truth.' Scene 2: Screen recording of Claude generating citations. Voiceover: 'We build agents that demand evidence, not hallucinations.' Scene 3: Clean desk. Voiceover: 'Precision in every result.'",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Claude Workflow: Building an AI Research Agent",
+   "ts": 1793546849898,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
+   "id": "sv_2tzf71",
+   "brand": "NIKHILs TECH STUDIO",
+   "dept": "Reviews & Reputation",
+   "title": "Lead Reply",
+   "body": "Building agents that cite exact sources is a core skill. At Nikhil's Tech Studio, we teach this workflow to turn web research into verifiable data. This role sounds perfect for someone mastering these evaluation techniques.",
+   "status": "waiting",
+   "lead_id": "md_117533744122247357",
+   "url": "https://mastodon.social/@nearskill/117533744122247357",
+   "topic": "Claude Workflow: Building an AI Research Agent",
+   "ts": 1793546849898,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
+   "id": "sv_1nyhai",
+   "brand": "NIKHILs TECH STUDIO",
+   "dept": "Search Visibility",
+   "title": "SEO Keywords",
+   "body": "Claude prompt engineering, custom AI agents, AI research workflow, web research automation, AI evaluation.",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Claude Workflow: Building an AI Research Agent",
+   "ts": 1793546849898,
+   "server": true,
+   "brain": "cloud · cloudflare/zai-org/glm-4.7-flash"
+  },
+  {
    "id": "sv_2sdzv0",
    "brand": "LittleLoop",
    "dept": "Content Engine",
@@ -170,18 +223,19 @@
    "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
   }
  ],
- "cycles": 3,
+ "cycles": 4,
  "topics": [
+  "Claude Workflow: Building an AI Research Agent",
   "The Cozy Bedtime Habit",
   "Song lyric story reveal",
   "Portfolio vs Resume"
  ],
- "updated": "2026-11-01T06:49:24.104Z",
+ "updated": "2026-11-01T15:27:29.898Z",
  "last": {
-  "brand": "LittleLoop",
-  "topic": "The Cozy Bedtime Habit",
-  "why": "Parents share relatable stories that solve daily parenting struggles.",
-  "summary": "High-viral potential content addressing the 'bedtime routine' pain point.",
+  "brand": "NIKHILs TECH STUDIO",
+  "topic": "Claude Workflow: Building an AI Research Agent",
+  "why": "Directly addresses the fresh lead's requirement for AI evaluation and evidence trails.",
+  "summary": "Focuses on precision AI research workflows to attract skilled learners.",
   "brain": "cloud",
   "model": "cloudflare/zai-org/glm-4.7-flash",
   "count": 4
