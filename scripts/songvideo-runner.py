@@ -378,6 +378,9 @@ def cloud_json(system, prompt):
 def transcribe(audio, jid):
     """Free speech-to-text on the runner (faster-whisper, CPU)."""
     from faster_whisper import WhisperModel
+    import numpy as np
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", audio, "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    audio = np.frombuffer(pcm, np.int16).astype(np.float32) / 32768.0  # decoded here: newer PyAV broke faster-whisper's own loader
     m = WhisperModel(os.environ.get("WHISPER_MODEL") or "small", device="cpu", compute_type="int8")
     segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1,
                            initial_prompt="Hindi song lyrics.")
@@ -415,6 +418,68 @@ def to_roman(t):
     return x[:1].upper() + x[1:]
 
 
+SECTION = re.compile(r"^\s*[\[(][^\])]{0,80}[\])]\s*$")
+
+
+def embedded_lyrics(audio):
+    """Suno and most taggers store the full lyric sheet inside the MP3 (USLT / 'lyrics-eng' / UNSYNCEDLYRICS)."""
+    try:
+        meta = json.loads(run(["ffprobe", "-v", "error", "-show_entries", "format_tags:stream_tags", "-of", "json", audio]))
+    except Exception:
+        return ""
+    tags = dict((meta.get("format") or {}).get("tags") or {})
+    for st in meta.get("streams") or []:
+        tags.update(st.get("tags") or {})
+    best = ""
+    for k, v in tags.items():
+        if re.search(r"lyric", k, re.I) and len(str(v)) > len(best):
+            best = str(v)
+    return best.replace("\r", "").strip()
+
+
+def lyric_lines_of(text):
+    """Owner/embedded lyric sheet → singable lines (drops [INTRO], (Chorus) and blank lines)."""
+    out = []
+    for l in (text or "").splitlines():
+        l = LRC.sub("", l).strip()
+        if not l or SECTION.match(l):
+            continue
+        out.append(l[:200])
+    return out
+
+
+def fit_lines(owner_lines, heard, dur):
+    """Spread the known lyric lines over the parts where the singer is actually heard (not over instrumentals)."""
+    spans = [(h["start"], h["end"]) for h in heard if h["end"] > h["start"]] or [(INTRO_S, max(INTRO_S + 1, dur - 2))]
+    total = sum(b - a for a, b in spans)
+    wts = [len(t) + 8 for t in owner_lines]
+    W_ = float(sum(wts)) or 1.0
+
+    def at(frac):  # position along the voiced timeline → song seconds
+        x = frac * total
+        for a, b in spans:
+            if x <= b - a:
+                return a + x
+            x -= b - a
+        return spans[-1][1]
+    out, acc = [], 0.0
+    for i, t in enumerate(owner_lines):
+        st = at(acc / W_)
+        acc += wts[i]
+        en = min(at(acc / W_), st + 8.0)
+        out.append({"start": round(st, 2), "end": round(max(en - 0.12, st + 1.0), 2), "text": t})
+    return out
+
+
+def corrections_text(job):
+    fx = [c for c in (job.get("corrections") or []) if c.get("text") or c.get("areas")]
+    if not fx:
+        return ""
+    rows = "\n".join(f"- {('[' + ', '.join(c.get('areas') or []) + '] ') if c.get('areas') else ''}{c.get('text') or 'redo this part'}" for c in fx[-3:])
+    return ("\n\nOWNER CORRECTIONS after watching the previous version — these override everything above and must be visibly fixed:\n" + rows +
+            "\nMake clearly different images/story where the owner asks; keep what the owner did not complain about.")
+
+
 LRC = re.compile(r"\[(\d{1,2}):(\d{2}(?:[.:]\d{1,3})?)\]")
 
 
@@ -440,8 +505,13 @@ def parse_lrc(text, dur):
 def analyze_free(job, work, audio, dur, jid):
     n = max(6, min(12, round(dur / 18)))
     cr = job.get("credits") or {}
-    timed = parse_lrc(job.get("lyrics") or "", dur)
-    owner_lines = [] if timed else [LRC.sub("", l).strip() for l in (job.get("lyrics") or "").splitlines() if LRC.sub("", l).strip()]
+    sheet = job.get("lyrics") or ""
+    if not sheet.strip():
+        sheet = embedded_lyrics(audio)
+        if sheet:
+            log(f"[{jid}] using the lyric sheet embedded in the MP3 ({len(lyric_lines_of(sheet))} lines)")
+    timed = parse_lrc(sheet, dur)
+    owner_lines = [] if timed else lyric_lines_of(sheet)
     progress(jid, "analyze", "Listening to the lyrics (free speech-to-text)", 2, 4, max(60, dur * 0.6))
     heard = []
     if not timed:
@@ -450,11 +520,8 @@ def analyze_free(job, work, audio, dur, jid):
         except Exception as e:
             log(f"[{jid}] transcription failed: {redact(e)}")
     lines = timed or heard
-    if owner_lines:  # owner lyrics are the truth; spread them over the sung parts
-        sung = [(h["start"], h["end"]) for h in heard] or [(INTRO_S, dur - 2)]
-        a0, a1 = sung[0][0], sung[-1][1]
-        step = max(1.5, (a1 - a0) / max(1, len(owner_lines)))
-        lines = [{"start": round(a0 + i * step, 2), "end": round(a0 + (i + 1) * step - 0.2, 2), "text": t} for i, t in enumerate(owner_lines)]
+    if owner_lines:  # owner / embedded lyrics are the truth; place them where the singer is heard
+        lines = fit_lines(owner_lines, heard, dur)
     progress(jid, "analyze", "Reading mood, theme and story", 3, 4, 40)
     for l in lines[:120]:
         l["text"] = to_roman(l["text"]) or l["text"]
@@ -465,7 +532,7 @@ def analyze_free(job, work, audio, dur, jid):
         try:
             a = cloud_json("You are a precise creative director. Reply with one compact JSON object only. Keep every image_prompt under 60 words.",
                            FREE_PLAN.format(lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"), title=job.get("title") or "",
-                                            dur=dur, style=job.get("style") or "watercolor anime", lines=numbered if not k else numbered[:1500], count=0, n=nn, hint=hint))
+                                            dur=dur, style=job.get("style") or "watercolor anime", lines=numbered if not k else numbered[:1500], count=0, n=nn, hint=hint) + corrections_text(job))
             if a.get("scenes"):
                 break
         except Exception as e:
@@ -520,11 +587,11 @@ def analyze(job, work):
         ganesha("PUT", f"/api/songvideo/runner/{jid}/analysis", a)
         return
     cr = job.get("credits") or {}
-    lyrics = (job.get("lyrics") or "").strip()
+    lyrics = (job.get("lyrics") or "").strip() or "\n".join(lyric_lines_of(embedded_lyrics(audio)))
     prompt = ANALYZE.format(dur=dur, n=n, style=job.get("style") or "watercolor anime", title=job.get("title") or "", hint=(job.get("hint") or "none").replace('"', "'"),
                             lyricist=cr.get("lyrics", "COCO"), singer=cr.get("singer", "KoBhit"),
                             lyrics_rule=("Use these lyrics from the owner (same words), only add timing. If any line is in Devanagari, transliterate it to Roman/Latin letters (Hinglish):\n" + lyrics[:8000]) if lyrics
-                            else "Transcribe the sung lyrics in Roman/Latin letters only (Hindi words written in Hinglish, e.g. 'Shaam ki laali chhaayi hai'). Never use Devanagari.")
+                            else "Transcribe the sung lyrics in Roman/Latin letters only (Hindi words written in Hinglish, e.g. 'Shaam ki laali chhaayi hai'). Never use Devanagari.") + corrections_text(job)
     last = None
     progress(jid, "analyze", "Gemini is listening: mood, theme, lyrics, scenes", 3, 4, 75)
     for model in pick_text_model(models):
@@ -926,7 +993,9 @@ def render(job, work):
     if CAPTIONS:  # owner's chosen format: katana-strike kinetic lyrics
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import lyrics_katana
-        lyrics_katana.write(a.get("lyrics_lines") or [], ass, W, H, start_after=INTRO_S + CREDITS_S - 0.5)
+        sh = float(job.get("lyricShift") or 0)
+        lyr = [{**l, "start": float(l["start"]) + sh, "end": float(l["end"]) + sh} for l in (a.get("lyrics_lines") or []) if float(l["end"]) + sh > 0.3]
+        lyrics_katana.write(lyr, ass, W, H, start_after=INTRO_S + CREDITS_S - 0.5)
     else:
         write_ass([], ass, INTRO_S + CREDITS_S - 0.5)
     n = len(imgs)

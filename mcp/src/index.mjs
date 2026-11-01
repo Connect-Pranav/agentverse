@@ -98,11 +98,45 @@ function view(env, request, j) {
     images: j.imgTicket ? (j.images ?? []).slice().sort((x, y) => x.n - y.n).map((i) => ({ n: i.n, summary: i.summary, url: `${b}/sv/${j.imgTicket}/${i.n}.jpg?v=${encodeURIComponent(i.at || '')}` })) : [],
     image_total: j.analysis?.scenes?.length ?? null,
     short: j.short ? { state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
+    schedule: j.schedule ? { publish_at: j.schedule.at, auto: Boolean(j.schedule.auto), privacy: j.schedule.privacy } : null,
+    corrections: (j.corrections ?? []).slice(-3), lyric_shift_s: j.lyricShift ?? 0,
     instant_start: Boolean(env.GH_DISPATCH_TOKEN), queued_at: j.queuedAt ?? null, decided_at: j.decidedAt ?? null,
     video_url: j.status === 'ready' && j.ticket ? `${b}/sv/${j.ticket}.mp4` : null,
     thumbnail_url: j.status === 'ready' && j.ticket && j.thumb ? `${b}/sv/${j.ticket}.jpg` : null,
     video_mb: j.videoBytes ? Math.round(j.videoBytes / 1e5) / 10 : null, error: j.error ?? null, created_at: j.createdAt, updated_at: j.updatedAt,
   };
+}
+
+/* ---------------- weekly planner: scheduled auto-posting ---------------- */
+function scheduleOf(a = {}) {
+  const at = a.publish_at ?? a.publishAt;
+  if (!at) return null;
+  const t = Date.parse(String(at));
+  if (!Number.isFinite(t)) throw new HttpError(400, 'publish_at must be a date/time');
+  return { at: new Date(t).toISOString().replace(/\.\d{3}Z$/, 'Z'), auto: a.auto_post !== false && a.auto !== false, privacy: PRIVACY.includes(a.privacy) ? a.privacy : 'public', setAt: nowIso() };
+}
+async function setSchedule(env, j, a = {}) {
+  if (a.publish_at === null || a.clear) { delete j.schedule; return saveJob(env, j); }
+  if (j.publish && ['requested', 'publishing', 'published'].includes(j.publish.state)) throw new HttpError(409, `Already ${j.publish.state} on YouTube`);
+  j.schedule = scheduleOf(a) ?? (j.schedule ? { ...j.schedule, auto: a.auto ?? j.schedule.auto, privacy: PRIVACY.includes(a.privacy) ? a.privacy : j.schedule.privacy } : null);
+  if (!j.schedule) throw new HttpError(400, 'publish_at is required');
+  return saveJob(env, j);
+}
+// runs every time the renderer checks in (~every 15 min): approve planner songs and post the ones that are due
+async function autopilot(env, j) {
+  const s = j.schedule;
+  if (!s?.auto) return false;
+  if (j.status === 'needs_approval') { await decide(env, j, 'approve'); j.autoApproved = true; await saveJob(env, j); return true; }
+  if (j.status === 'ready' && (!j.publish || (j.publish.state === 'failed' && (j.publish.autoTries ?? 0) < 2)) && Date.parse(s.at) <= Date.now()) {
+    const tries = (j.publish?.autoTries ?? 0) + (j.publish ? 1 : 0);
+    j.publish = null;
+    if (!clean(j.youtube?.title, 100)) j.youtube = { ...(j.youtube ?? {}), title: `${j.title || 'New song'} | Sunverse` };
+    await requestPublish(env, j, { privacy: s.privacy });
+    j.publish.auto = true; j.publish.autoTries = tries;
+    await saveJob(env, j);
+    return true;
+  }
+  return false;
 }
 
 /* ---------------- owner actions (MCP tools) ---------------- */
@@ -114,6 +148,8 @@ async function createJob(env, a) {
     credits: { lyrics: clean(a.lyricist, 60) || 'COCO', singer: clean(a.singer, 60) || 'KoBhit' },
     status: 'uploading', uploadTicket: hex(16), attempts: 0, createdAt: nowIso(),
   };
+  const sch = scheduleOf(a);
+  if (sch) job.schedule = sch;
   return saveJob(env, job);
 }
 function checkAudio(length, mime) {
@@ -184,6 +220,10 @@ async function redoJob(env, j, a = {}) {
   if (a.theme !== undefined) j.hint = clean(a.theme, 600);
   if (a.style) j.style = clean(a.style, 300);
   if (a.lyrics) j.lyrics = clean(a.lyrics, 20_000);
+  const fix = clean(a.corrections, 1500);
+  const areas = Array.isArray(a.areas) ? a.areas.map((x) => clean(x, 40)).filter(Boolean).slice(0, 8) : [];
+  if (fix || areas.length) j.corrections = [...(j.corrections ?? []), { text: fix, areas, at: nowIso() }].slice(-5);
+  if (a.lyric_shift !== undefined) { const sh = Number(a.lyric_shift); if (Number.isFinite(sh)) j.lyricShift = Math.max(-15, Math.min(15, Math.round(sh * 10) / 10)); }
   Object.assign(j, { status: 'queued', analysis: null, images: [], youtube: null, ticket: null, thumb: false, videoParts: null, videoPartsDone: [], videoPartBytes: {}, videoBytes: null,
     publish: null, short: null, attempts: 0, autoRetries: 0, error: null, leaseUntil: null, progress: null, autoApproved: false, queuedAt: nowIso(), imageCount: null, estCostUsd: null, estCostInr: null });
   return saveJob(env, j);
@@ -280,7 +320,7 @@ async function cloudBrain(env, a) {
 }
 
 /* ---------------- runner API ---------------- */
-const runnerView = (j) => ({ id: j.id, title: j.title, hint: j.hint ?? '', style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb), short: j.short ?? null });
+const runnerView = (j) => ({ id: j.id, title: j.title, hint: j.hint ?? '', style: j.style, lyrics: j.lyrics, credits: j.credits, audioMime: j.audioMime, analysis: j.analysis ?? null, youtube: j.youtube ?? null, attempts: j.attempts, publish: j.publish ?? null, videoBytes: j.videoBytes ?? null, thumb: Boolean(j.thumb), short: j.short ?? null, corrections: j.corrections ?? [], lyricShift: j.lyricShift ?? 0 });
 async function claim(env) {
   const now = Date.now();
   for (const id of await index(env)) {
@@ -617,6 +657,7 @@ async function pending(env) {
   for (const id of await index(env)) {
     const j = await kv(env).get(jobKey(id), 'json');
     if (!j) continue;
+    try { await autopilot(env, j); } catch (e) { console.error('planner', j.id, e?.message); }
     const stale = (x) => !(x?.leaseUntil && Date.parse(x.leaseUntil) > now);
     if (['queued', 'approved'].includes(j.status) || quotaRetry(j) || (['analyzing', 'rendering'].includes(j.status) && stale(j))
       || (j.status === 'ready' && ((j.publish && (j.publish.state === 'requested' || (j.publish.state === 'publishing' && stale(j.publish)))) || (j.short && (j.short.state === 'requested' || (j.short.state === 'making' && stale(j.short))))))) n++;
@@ -745,6 +786,7 @@ async function route(request, env) {
     if (seg[3] === 'audio' && method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'import' && method === 'POST') { const r = await importFromUrl(env, j, (await readJson(request)).url); kick(env, ctx); return json({ job: v(r) }); }
     if ((seg[3] === 'approve' || seg[3] === 'reject') && method === 'POST') { const r = await decide(env, j, seg[3]); if (seg[3] === 'approve') kick(env, ctx); return json({ job: v(r) }); }
+    if (seg[3] === 'schedule' && method === 'POST') return json({ job: v(await setSchedule(env, j, await readJson(request))) });
     if (seg[3] === 'redo' && method === 'POST') { const r = await redoJob(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'short' && method === 'POST') { const r = await requestShort(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }
     if (seg[3] === 'publish' && method === 'POST') { const r = await requestPublish(env, j, await readJson(request)); kick(env, ctx); return json({ job: v(r) }); }

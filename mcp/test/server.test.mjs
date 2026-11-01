@@ -411,3 +411,44 @@ test('video parts uploaded in parallel / out of order still complete correctly',
   const url = (await tool(e, 'get_song_job', { job_id: id })).structuredContent.video_url;
   assert.deepEqual([...new Uint8Array(await (await worker.fetch(new Request(url), e)).arrayBuffer())], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 });
+
+test('weekly planner: auto-approve, post only when due, corrections reach the runner', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: R, body: body === undefined ? undefined : (body instanceof Uint8Array ? body : JSON.stringify(body)) }), e);
+  const future = new Date(Date.now() + 2 * 86400e3).toISOString();
+  const mk = await (await f('/api/songvideo', 'POST', { title: 'Song A', publish_at: future, privacy: 'unlisted' })).json();
+  const id = mk.job.job_id;
+  assert.equal(mk.job.schedule.auto, true);
+  assert.equal(mk.job.schedule.privacy, 'unlisted');
+  await worker.fetch(new Request(B + `/api/songvideo/${id}/audio`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-type': 'audio/mpeg', 'content-length': '10' }, body: new Uint8Array(10) }), e);
+  assert.equal((await (await f('/api/songvideo/runner/claim', 'POST', {})).json()).stage, 'analyze');
+  await f(`/api/songvideo/runner/${id}/analysis`, 'PUT', { durationS: 20, scenes: [{ start: 0, end: 20, image_prompt: 'x' }], youtube: { title: 'Song A | Sunverse' } });
+  assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.status, 'needs_approval');
+  // planner songs don't wait for the owner: the next renderer check-in approves it
+  assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 1);
+  assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.status, 'approved');
+  await f('/api/songvideo/runner/claim', 'POST', {});
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video?part=1&parts=1`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': '2' }, body: new Uint8Array([1, 2]) }), e);
+  assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 0, 'not due yet → nothing posted');
+  // move the date to now → posted automatically with the planner privacy
+  await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: new Date(Date.now() - 1000).toISOString(), privacy: 'unlisted' });
+  assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 1);
+  const pc = await (await f('/api/songvideo/runner/claim', 'POST', {})).json();
+  assert.equal(pc.stage, 'publish');
+  assert.equal(pc.job.publish.privacy, 'unlisted');
+  // corrections + lyric shift are stored and handed to the runner on redo
+  const mk2 = await (await f('/api/songvideo', 'POST', { title: 'Song B' })).json();
+  const id2 = mk2.job.job_id;
+  await worker.fetch(new Request(B + `/api/songvideo/${id2}/audio`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-type': 'audio/mpeg', 'content-length': '10' }, body: new Uint8Array(10) }), e);
+  const rd = await (await f(`/api/songvideo/${id2}/redo`, 'POST', { corrections: 'Show Angad, not a modern couple', areas: ['images', 'story'], lyric_shift: 1.5 })).json();
+  assert.equal(rd.job.corrections[0].text, 'Show Angad, not a modern couple');
+  assert.equal(rd.job.lyric_shift_s, 1.5);
+  const cl = await (await f('/api/songvideo/runner/claim', 'POST', {})).json();
+  assert.equal(cl.job.id, id2);
+  assert.equal(cl.job.corrections[0].areas[1], 'story');
+  assert.equal(cl.job.lyricShift, 1.5);
+  // clearing the schedule
+  const cleared = await (await f(`/api/songvideo/${id2}/schedule`, 'POST', { publish_at: null })).json();
+  assert.equal(cleared.job.schedule, null);
+});

@@ -135,6 +135,7 @@ h1 .a{color:var(--org);text-shadow:0 0 24px rgba(245,166,35,.5)}
 
 /* focus */
 .focus{display:flex;flex-direction:column;height:100%}
+#pFocus{height:auto;position:relative;z-index:2;min-width:0}
 .fk{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .fk .k{font-family:var(--fm);font-size:10px;color:var(--mut);letter-spacing:.14em}
 .topic{font-family:var(--fm);font-size:10px;color:var(--org);text-align:right;text-transform:uppercase;letter-spacing:.06em}
@@ -461,8 +462,8 @@ body.glass .vtitle{display:block}
 
 /* ===== layout / overlap fixes ===== */
 .wrap>.col:nth-child(2){grid-area:a}.wrap>.col:nth-child(3){grid-area:b}.wrap>.col:nth-child(4){grid-area:c}.wrap>.col:nth-child(5){grid-area:d}
-.wrap{grid-template-areas:"a b c d"}
-.wrap.v-agents{grid-template-areas:"c d"}
+.wrap{grid-template-areas:"a b c d" "a f f d";grid-template-rows:auto 1fr;align-items:start}
+.wrap.v-agents{grid-template-areas:"c f";grid-template-rows:auto}
 .ph{min-width:0}.ph h3{min-width:0;overflow-wrap:anywhere}.ph .badge{flex:none}
 .steps{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
 .step b{flex-wrap:wrap;font-size:13px;line-height:1.2}
@@ -484,18 +485,18 @@ body.glass #vani.min{bottom:20px;right:20px}
 body.glass #vani:not(.min){bottom:84px}
 /* medium screens: 3 columns, Signals+Orchestrator stacked */
 @media(max-width:1800px) and (min-width:1351px){
-  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"a a d" "b c d";align-items:start}
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"a a d" "b c d" "f f d";grid-template-rows:auto auto 1fr;align-items:start}
   .wrap>.col:nth-child(2){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
   .wrap>.col:nth-child(5){align-self:stretch}
   #wires{display:none}
-  .wrap.v-agents{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);grid-template-areas:"c d"}
+  .wrap.v-agents{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);grid-template-areas:"c f";grid-template-rows:auto}
   .col{gap:14px}
 }
 @media(max-width:1350px) and (min-width:761px){
-  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"a b" "c c" "d d"}
-  .wrap.v-agents{grid-template-areas:"c" "d";grid-template-columns:1fr}
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"a b" "c c" "f f" "d d";grid-template-rows:none}
+  .wrap.v-agents{grid-template-areas:"c" "f";grid-template-columns:1fr}
 }
-@media(max-width:760px){.wrap{grid-template-columns:1fr;grid-template-areas:"a" "b" "c" "d"}.wrap.v-agents{grid-template-areas:"c" "d"}}
+@media(max-width:760px){.wrap{grid-template-columns:1fr;grid-template-areas:"a" "b" "c" "f" "d";grid-template-rows:none}.wrap.v-agents{grid-template-areas:"c" "f"}}
 
 #vani.wake .orb{box-shadow:0 0 0 3px rgba(94,240,160,.35),0 0 18px rgba(139,108,255,.7)}
 #vani.wake .orb:after{border-color:rgba(94,240,160,.5);animation:ring 2.4s infinite}
@@ -715,6 +716,38 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 .mt-push{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:600 12.5px var(--fb);color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:9px 14px;min-height:40px}
 .mt-push .i{width:15px;height:15px}
 .mt-redo{margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:8px}
+/* corrections (re-engineer) */
+.fx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.fx-chip{font:600 11.5px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:6px 11px;min-height:32px;cursor:pointer}
+.fx-chip.on{background:#fff;color:#1d1510;border-color:#fff}
+.fx-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+.fx-row input{width:90px!important;flex:none}
+.fx-last{font-size:11.5px;color:var(--mut);margin:4px 0 0}
+/* weekly planner */
+.mt-chk{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer}
+.mt-chk input{width:auto!important;accent-color:#5ef0a0}
+.mt-up select,.sch-ed select,.sch-ed input{width:100%;box-sizing:border-box;font:13px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:9px 11px}
+.mt-up select option,.sch-ed select option{color:#111}
+.mt-sched{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;margin:8px 0 0;padding:8px 10px;border-radius:12px;background:rgba(94,240,160,.1);border:1px solid rgba(94,240,160,.35)}
+.mt-sched b{font-weight:700}
+.sch-ed{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;margin-top:6px}
+.plan{margin-bottom:14px}
+.plan-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:2px 0 8px}
+.plan-h h4{font-size:14px;margin:0}
+.plan-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.pday{min-height:92px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.pday.today{border-color:rgba(94,240,160,.6)}
+.pday>small{font-family:var(--fm);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.pslot{background:rgba(255,255,255,.12);border-radius:10px;padding:6px 7px;font-size:11.5px;line-height:1.3}
+.pslot b{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pslot .pill{display:inline-block;margin-top:3px}
+.plan-un{margin-top:10px;font-size:12px;color:var(--mut)}
+.sitem .sch-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.sitem .sch-row input,.sitem .sch-row select{font:12px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:6px 8px}
+.sitem .sch-row select option{color:#111}
+.sitem .sch-row button{display:inline-flex;align-items:center;gap:5px;font:600 11.5px var(--fb);border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.14);color:#fff;border-radius:99px;padding:5px 11px}
+.sitem .sch-row .i{width:14px;height:14px}
+@media(max-width:900px){.plan-days{grid-template-columns:repeat(2,minmax(0,1fr))}.sch-ed{grid-template-columns:1fr}}
 .mt-redo summary{cursor:pointer;font-size:12.5px;font-weight:600;padding:4px 0}
 .mt-redo[open]{display:flex;flex-direction:column;gap:8px}
 .mt-redo textarea,.mt-redo input{width:100%;box-sizing:border-box;font:13px var(--fb);color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:9px 11px}
@@ -836,22 +869,23 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
     </section>
   </div>
 
-  <div class="col">
+  <div class="col" id="colDeps">
     <section class="panel" id="pDeps">
       <div class="ph"><h3><i>05</i>Departments</h3><span class="badge run">RUNNING</span></div>
       <div class="sub">eight departments · tap one to put it in focus</div>
       <div class="deps" id="deps"></div>
     </section>
+
   </div>
 
-  <div class="col">
+  <div class="col" id="colSong">
 <section class="board stage in-col" id="mcpTile">
   <div class="panel mcpt">
     <div class="ph"><h3><i>MCP</i>Song &rarr; Video &middot; Sunverse</h3><span class="badge" id="mtBadge">CHECKING</span></div>
     <div class="sub">Upload a song &rarr; Gemini reads its mood, theme and lyrics &rarr; Gemini makes the images &rarr; the video is built with your logo intro and credits &rarr; it goes on YouTube when you say post.</div>
     <div class="mt-grid">
       <div class="mt-up">
-        <label class="mt-drop" id="mtDrop"><input id="mtFile" type="file" accept="audio/*,.mp3,.m4a,.wav"><span data-i="upload"></span><b id="mtFileName">Tap to choose your MP3</b><small>or drop it here &middot; MP3, M4A or WAV &middot; max 24 MB</small></label>
+        <label class="mt-drop" id="mtDrop"><input id="mtFile" type="file" multiple accept="audio/*,.mp3,.m4a,.wav"><span data-i="upload"></span><b id="mtFileName">Tap to choose your MP3 (or several)</b><small>or drop them here &middot; MP3, M4A or WAV &middot; max 24 MB each</small></label>
         <input id="mtTitle" placeholder="Song title (optional)" aria-label="Song title">
         <input id="mtTheme" placeholder="Story / theme, e.g. Ramayana — Angad challenges Ravana" aria-label="Story or theme">
         <div class="mt-lyrbox"><textarea id="mtLyrics" placeholder="Lyrics (optional) — paste, or upload a .txt / .lrc file. .lrc = exact timing for every line" aria-label="Lyrics"></textarea>
@@ -859,6 +893,14 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         <details class="mt-more"><summary>Style &amp; credits (optional)</summary>
           <input id="mtStyle" value="soft watercolor anime scenes, cinematic light, emotional, no text" aria-label="Visual style">
           <div class="mt-two"><input id="mtLyr" value="COCO" aria-label="Lyrics by"><input id="mtSing" value="KoBhit" aria-label="Singer"></div>
+        </details>
+        <details class="mt-more" id="mtPlanBox"><summary>Weekly planner &middot; auto-post to YouTube</summary>
+          <label class="mt-chk"><input type="checkbox" id="mtPlanOn"> Put these songs on the posting calendar</label>
+          <div class="mt-two"><input type="date" id="mtPlanDate" aria-label="First post date"><input type="time" id="mtPlanTime" value="19:00" aria-label="Post time"></div>
+          <div class="mt-two"><select id="mtPlanEvery" aria-label="How often"><option value="1">One song every day</option><option value="2">Every 2 days</option><option value="3">Every 3 days</option><option value="7">One a week</option></select>
+            <select id="mtPlanPriv" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>
+          <label class="mt-chk"><input type="checkbox" id="mtPlanAuto" checked> Make and post automatically &mdash; don't ask me</label>
+          <p class="mt-sh" id="mtPlanPrev"></p>
         </details>
         <div class="mt-tok" id="mtTok"><input id="mtTokIn" type="password" autocomplete="off" placeholder="AGENTVERSE token (MCP_TOKEN)" aria-label="AGENTVERSE token"><button id="mtTokSave" type="button">Save</button></div>
         <button class="btnp" id="mtGo" type="button">Upload &amp; start</button>
@@ -875,7 +917,9 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
       <div class="sub">new subscribers &middot; AI replies to comments &middot; Shorts for reach</div>
       <div id="grBody" aria-live="polite"><div class="empty">Loading…</div></div>
     </section>
-    <section class="panel focus" id="pFocus" aria-live="polite">
+
+  </div>
+    <section class="panel focus" id="pFocus" style="grid-area:f" aria-live="polite">
       <div class="fk"><div class="k">AGENT IN FOCUS</div><div class="topic" id="topic">TOPIC · —</div></div>
       <h2 id="focusName">Orchestrator</h2>
       <div class="sub" id="focusSub" style="margin:0">Every event enters here first. Nothing publishes on its own.</div>
@@ -894,7 +938,6 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         <div class="stat wait" id="waitBox"><b id="s5">0</b><small>waiting for you</small></div>
       </div>
     </section>
-  </div>
 </div>
 
 <div class="loop stage" id="loop"><i id="ld1"></i><i id="ld2"></i><span>RESULTS FEED SIGNALS AGAIN</span></div>
@@ -931,6 +974,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 
 <section class="board stage view-hide" id="studio">
   <div class="panel">
+    <div class="plan" id="stuPlan"></div>
     <div class="bhead"><div class="ph"><h3>All songs</h3></div><span class="sub" id="stuNote" style="margin:0"></span></div>
     <div id="stuJobs" class="slist"></div>
   </div>
@@ -2083,11 +2127,11 @@ function applyView(v){
   for(var i=0;i<ids.length;i++){ $(ids[i]).classList.toggle("view-hide",V.show.indexOf(ids[i])<0); }
   $("wrap").classList.toggle("v-agents",V.cls==="v-agents");
   /* each page has its own panel: Work = work board only, Leads = lead radar only */
-  var mt=$("mcpTile"),fc=$("pFocus").parentNode;
+  var mt=$("mcpTile"),fc=$("colSong");
   var gt=$("growthTile");
   if(v==="leads")crmLoad();
   if(v==="studio"){ if(mt.nextElementSibling!==$("studio"))$("studio").parentNode.insertBefore(mt,$("studio")); mt.classList.remove("in-col"); $("studio").parentNode.insertBefore(gt,$("studio")); gt.classList.add("board-like"); stuLoad(); grLoad(); }
-  else if(mt.parentNode!==fc){ fc.insertBefore(mt,$("pFocus")); fc.insertBefore(gt,$("pFocus")); mt.classList.add("in-col"); gt.classList.remove("board-like"); }
+  else if(mt.parentNode!==fc){ fc.insertBefore(gt,fc.firstChild); fc.insertBefore(mt,gt); mt.classList.add("in-col"); gt.classList.remove("board-like"); }
   if(v==="work"){ $("boardTitle").innerHTML="Work Board"; $("tabs").style.display=""; $("tabLeads").style.display="none"; if(boardTab==="leads")boardTab="waiting"; }
   else if(v==="leads"){ $("boardTitle").innerHTML="Lead Radar"; $("tabs").style.display="none"; }
   if(V.tab){boardTab=V.tab;renderBoard._tab=null;renderBoard();}
@@ -2640,7 +2684,7 @@ function stuLoad(){
     mtSetup(ok);
     if(!ok||!SET.mcpToken)return;
     stuApi("GET","/api/songvideo").then(function(j){
-      var ids=(j.jobs||[]).map(function(x){return x.job_id;}).slice(0,12),done=0,full=[];
+      var ids=(j.jobs||[]).map(function(x){return x.job_id;}).slice(0,40),done=0,full=[];
       if(!ids.length){STU.jobs=[];stuRender();mtRender();return;}
       ids.forEach(function(id,ix){ stuApi("GET","/api/songvideo/"+id).then(function(r){full[ix]=r.job;},function(){}).then(function(){ if(++done===ids.length){ STU.jobs=full.filter(Boolean); stuRender(); mtRender(); stuNotify(); } }); });
     }).catch(function(e){ $("mtMsg").textContent="MCP: "+e.message; $("mtBadge").textContent="ERROR"; $("mtBadge").className="badge"; });
@@ -2742,6 +2786,12 @@ function mtRender(){
     if(j.auto_approved||j.image_engine==="cloudflare")h+='<p class="mt-free">Free plan: Cloudflare images, no cost — went straight to the video.</p>';
     h+='<div class="mt-info"><div><h6>Mood</h6><p>'+esc(j.plan.mood||"—")+'</p><h6>Theme</h6><p>'+esc(j.plan.theme||"—")+'</p></div><div><h6>Lyrics'+(j.lyrics_lines_count?' &middot; '+j.lyrics_lines_count+' lines':'')+'</h6><div class="mt-lyr">'+esc((j.lyrics_preview||[]).join("\n")||"—")+((j.lyrics_lines_count||0)>8?"\n…":"")+'</div></div></div>';
   }
+  if(!(pub&&pub.state==="published")&&["failed","rejected"].indexOf(j.status)<0){
+    var sc=j.schedule;
+    if(sc)h+='<div class="mt-sched"><span data-i="calendar-clock"></span><span>Posts <b>'+esc(fmtWhen(sc.publish_at))+'</b> &middot; '+esc(sc.privacy)+(sc.auto?' &middot; automatic':'')+(j.status!=="ready"&&Date.parse(sc.publish_at)<Date.now()?' &middot; as soon as the video is ready':'')+'</span></div>';
+    h+='<details class="mt-redo"><summary>'+(sc?"Change posting date":"Schedule YouTube post")+'</summary><div class="sch-ed"><input type="datetime-local" id="mtSchAt" value="'+esc(sc?toLocalInput(sc.publish_at):toLocalInput(planNext(1)[0].toISOString()))+'" aria-label="Post date and time"><select id="mtSchP" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>'+
+      '<div class="acts"><button class="ap" data-mt="sch-save" type="button"><span data-i="calendar-clock"></span>'+(sc?"Save date":"Schedule — post automatically")+'</button>'+(sc?'<button data-mt="sch-del" type="button"><span data-i="x"></span>Remove from calendar</button>':'')+'</div></details>';
+  }
   if(j.status==="needs_approval"){
     h+='<div class="mt-ask"><p><b>'+j.image_count+' Gemini images &middot; est. '+cost+'</b> (paid). Video ready about '+fmtDur(e.after)+' after you approve.</p><div class="acts"><button class="ap" data-mt="approve" type="button"><span data-i="check"></span>Approve &amp; make video</button><button data-mt="reject" type="button"><span data-i="x"></span>Reject</button></div></div>';
   }
@@ -2768,15 +2818,22 @@ function mtRender(){
     else h+='<p class="r">'+(j.status==="failed"?"Failed: ":"Retrying after: ")+esc(String(j.error).replace(/https?:\/\/\S+/g,"").slice(0,220))+'</p>';
   }
   if(["queued","needs_approval","approved","ready","failed","rejected"].indexOf(j.status)>=0&&!(j.publish&&j.publish.state==="publishing")){
-    h+='<details class="mt-redo"><summary>Redo with a new theme</summary><textarea id="mtRedoT" aria-label="New theme">'+esc(j.theme_hint||"")+'</textarea>'+
+    var fa=STU.fixAreas[j.job_id]||[],lc=(j.corrections||[]).slice(-1)[0];
+    h+='<details class="mt-redo"><summary>Fix something &mdash; tell me what to change</summary>'+
+      '<div class="fx-chips">'+FIX_AREAS.map(function(x){ return '<button type="button" class="fx-chip'+(fa.indexOf(x[0])>=0?' on':'')+'" data-fx="'+x[0]+'">'+esc(x[1])+'</button>'; }).join("")+'</div>'+
+      '<textarea id="mtFixT" aria-label="What should change" placeholder="What should change? e.g. Lyrics are missing; show Angad planting his foot in the chorus; less dark, more gold"></textarea>'+
+      '<div class="fx-row"><input id="mtFixShift" type="number" step="0.5" min="-15" max="15" value="'+(j.lyric_shift_s||0)+'" aria-label="Lyrics timing shift in seconds"><span>lyrics timing, seconds (&minus; earlier, + later)</span></div>'+
+      '<textarea id="mtRedoT" aria-label="Theme / story" placeholder="Story / theme (optional), e.g. Ramayana — Angad challenges Ravana">'+esc(j.theme_hint||"")+'</textarea>'+
       '<input id="mtRedoS" aria-label="Visual style" placeholder="Visual style (optional), e.g. Indian epic painting, dramatic, golden light">'+
-      '<textarea id="mtRedoL" aria-label="Lyrics" placeholder="Lyrics (optional) — paste, or upload .txt / .lrc"></textarea>'+
+      '<textarea id="mtRedoL" aria-label="Lyrics" placeholder="Correct lyrics (optional) — paste, or upload .txt / .lrc"></textarea>'+
       '<label class="mt-file"><input type="file" id="mtRedoLF" accept=".txt,.lrc,text/plain"><span data-i="upload"></span> Upload lyrics file</label>'+
-      '<div class="acts"><button class="ap" data-mt="redo" type="button"><span data-i="rotate-ccw"></span>Redo video</button></div><p class="mt-sh">Same MP3, new plan, new images, new video. Old images are replaced.</p></details>';
+      '<div class="acts"><button class="ap" data-mt="redo" type="button"><span data-i="rotate-ccw"></span>Re-engineer video</button></div>'+
+      '<p class="mt-sh">Same MP3. Your notes go to the planner as hard rules &rarr; new plan, new images, new video.'+(j.schedule?' The posting date stays.':'')+'</p>'+
+      (lc?'<p class="fx-last">Last fix: '+esc(((lc.areas||[]).join(", ")+(lc.text?" — "+lc.text:"")).slice(0,160))+'</p>':'')+'</details>';
   }
   if(j.status==="uploading"&&j.upload_url)h+='<p>Upload not finished. <a style="color:#fff;text-decoration:underline" href="'+esc(j.upload_url)+'" target="_blank" rel="noopener">Open upload page</a></p>';
   /* keep what the owner is typing (redo theme / lyrics / YouTube text) across live refreshes */
-  var keep={},ids=["mtRedoT","mtRedoS","mtRedoL","mtYtT","mtYtD","mtYtG","mtYtP"],act=document.activeElement&&document.activeElement.id,rd=$("mtJob").querySelector(".mt-redo"),wasOpen=rd&&rd.open,sameJob=$("mtJob").getAttribute("data-job")===j.job_id;
+  var keep={},ids=["mtRedoT","mtRedoS","mtRedoL","mtYtT","mtYtD","mtYtG","mtYtP","mtFixT","mtFixShift","mtSchAt","mtSchP"],act=document.activeElement&&document.activeElement.id,rd=$("mtJob").querySelector(".mt-redo"),wasOpen=rd&&rd.open,sameJob=$("mtJob").getAttribute("data-job")===j.job_id;
   for(var q=0;q<ids.length;q++){ var el=$(ids[q]); if(el&&sameJob)keep[ids[q]]=el.value; }
   $("mtJob").innerHTML=h; $("mtJob").setAttribute("data-job",j.job_id);
   for(var q2 in keep){ if($(q2))$(q2).value=keep[q2]; }
@@ -2787,6 +2844,7 @@ function mtRender(){
   var ga=$("mtJob").querySelector("[data-go]"); if(ga)ga.onclick=function(){go("studio");};
   mtGallery(j,false);
   if(pub&&pub.privacy&&$("mtYtP"))$("mtYtP").value=pub.privacy;
+  if(j.schedule&&$("mtSchP")&&!(sameJob&&keep.mtSchP))$("mtSchP").value=j.schedule.privacy;
 }
 setInterval(function(){
   if(!STU.deadline||!$("mtEta"))return;
@@ -2794,6 +2852,8 @@ setInterval(function(){
   $("mtEta").textContent=s>0?"≈ "+fmtDur(s):"any moment…";
 },1000);
 $("mtJob").onclick=function(e){
+  var c=e.target.closest?e.target.closest("button[data-fx]"):null;
+  if(c&&STU.cur){ var k=c.getAttribute("data-fx"),L=STU.fixAreas[STU.cur.job_id]=STU.fixAreas[STU.cur.job_id]||[],ix=L.indexOf(k); if(ix<0)L.push(k); else L.splice(ix,1); c.classList.toggle("on",ix<0); return; }
   var b=e.target.closest?e.target.closest("button[data-mt]"):null; if(!b||!STU.cur)return;
   var a=b.getAttribute("data-mt"),id=STU.cur.job_id;
   if(a==="gallery"){ mtGallery(STU.cur,true); return; }
@@ -2803,9 +2863,17 @@ $("mtJob").onclick=function(e){
     return;
   }
   if(a==="redo"){
-    var th=$("mtRedoT").value.trim(); if(!th){ toast("Write the theme first, e.g. Ramayana — Angad in Ravana's court",false); return; }
+    var fx=$("mtFixT").value.trim(),ar=STU.fixAreas[id]||[],sh=parseFloat($("mtFixShift").value)||0,th=$("mtRedoT").value.trim(),ly=$("mtRedoL").value.trim(),sy=$("mtRedoS").value.trim();
+    if(!fx&&!ar.length&&!ly&&!sy&&sh===(STU.cur.lyric_shift_s||0)&&th===(STU.cur.theme_hint||"")){ toast("Tap what's wrong or write what should change",false); return; }
     b.disabled=true;
-    stuApi("POST","/api/songvideo/"+id+"/redo",{theme:th,style:$("mtRedoS").value.trim(),lyrics:$("mtRedoL").value.trim()}).then(function(r){ toast("Redoing with the new theme",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    stuApi("POST","/api/songvideo/"+id+"/redo",{corrections:fx,areas:ar,lyric_shift:sh,theme:th,style:sy,lyrics:ly}).then(function(r){ STU.fixAreas[id]=[]; STU.redoOpen=null; toast("Re-engineering with your notes",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    return;
+  }
+  if(a==="sch-save"||a==="sch-del"){
+    var bd=a==="sch-del"?{publish_at:null}:{publish_at:new Date($("mtSchAt").value).toISOString(),privacy:$("mtSchP").value,auto:true};
+    if(a==="sch-save"&&!$("mtSchAt").value){ toast("Pick a date and time",false); return; }
+    b.disabled=true;
+    stuApi("POST","/api/songvideo/"+id+"/schedule",bd).then(function(r){ toast(a==="sch-del"?"Removed from the calendar":"Scheduled — posts automatically",true); upd(r.job); stuRender(); },function(e2){ toast(e2.message,false); b.disabled=false; });
     return;
   }
   if(a==="short"){
@@ -2847,11 +2915,47 @@ function mtGallery(j,open){
   if(open)sigOpen("Generated images",sub,h);
   else { $("sigS").innerHTML=sub; $("sigB").innerHTML=h; }
 }
-function mtPick(f){ if(!f)return; STU.file=f; $("mtFileName").textContent=f.name+" · "+(f.size/1048576).toFixed(1)+" MB"; $("mtDrop").classList.add("on"); if(!$("mtTitle").value)$("mtTitle").value=f.name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").slice(0,100); }
-$("mtFile").onchange=function(){ mtPick(this.files&&this.files[0]); };
+var FIX_AREAS=[["lyrics","Lyrics missing / wrong"],["timing","Lyrics timing"],["images","Images / scenes"],["story","Story / characters"],["style","Look & colours"],["text","Title & YouTube text"]];
+STU.fixAreas=STU.fixAreas||{};
+function pad2(n){return (n<10?"0":"")+n;}
+function toLocalInput(iso){ var d=new Date(iso); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())+"T"+pad2(d.getHours())+":"+pad2(d.getMinutes()); }
+function fmtWhen(iso){ var d=new Date(iso); return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+", "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }
+function songBase(name){ return String(name||"").replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").replace(/\s*usesuno\.com\s*/i," ").replace(/\s+/g," ").trim().slice(0,100); }
+/* next free posting days: after the last song already on the calendar (or tomorrow) */
+function planNext(n){
+  var every=Math.max(1,parseInt(($("mtPlanEvery")||{}).value||"1",10)),tm=(($("mtPlanTime")||{}).value||"19:00").split(":"),out=[],start;
+  var dv=$("mtPlanDate")&&$("mtPlanDate").value;
+  if(dv){ var q=dv.split("-"); start=new Date(+q[0],+q[1]-1,+q[2],+tm[0],+tm[1]||0); }
+  else { var last=0; (STU.jobs||[]).forEach(function(j){ if(j.schedule&&!(j.publish&&j.publish.state==="published")){ var t=Date.parse(j.schedule.publish_at); if(t>last)last=t; } });
+    var b=new Date(Math.max(Date.now(),last)); start=new Date(b.getFullYear(),b.getMonth(),b.getDate()+1,+tm[0],+tm[1]||0); }
+  for(var i=0;i<n;i++)out.push(new Date(start.getFullYear(),start.getMonth(),start.getDate()+i*every,start.getHours(),start.getMinutes()));
+  return out;
+}
+function planPreview(){
+  var fs=STU.files||[],on=$("mtPlanOn").checked,el=$("mtPlanPrev");
+  if(!on){ el.textContent=fs.length>1?fs.length+" songs selected — tick the box to spread them over the calendar.":"Tick the box to give this song a posting date."; return; }
+  var d=planNext(Math.max(1,fs.length)),h=[];
+  for(var i=0;i<d.length;i++)h.push((fs[i]?songBase(fs[i].name):"Song "+(i+1))+" → "+fmtWhen(d[i].toISOString()));
+  el.innerHTML=esc(h.slice(0,10).join("\n")).replace(/\n/g,"<br>")+(h.length>10?"<br>…":"")+"<br>"+($("mtPlanAuto").checked?"Each video is made, then posted on its day without asking.":"Videos are made; posting waits for your tap.");
+}
+function mtPick(list){
+  var fs=[],i; if(!list)return; if(list.name)list=[list];
+  for(i=0;i<list.length;i++)if(list[i])fs.push(list[i]);
+  if(!fs.length)return;
+  STU.files=fs; STU.file=fs[0];
+  $("mtFileName").textContent=fs.length>1?fs.length+" songs · "+(fs.reduce(function(a,f){return a+f.size;},0)/1048576).toFixed(1)+" MB":fs[0].name+" · "+(fs[0].size/1048576).toFixed(1)+" MB";
+  $("mtDrop").classList.add("on");
+  if(fs.length===1){ if(!$("mtTitle").value)$("mtTitle").value=songBase(fs[0].name); $("mtTitle").disabled=false; $("mtLyrics").disabled=false; }
+  else { $("mtTitle").value=""; $("mtTitle").placeholder="Titles come from the file names"; $("mtTitle").disabled=true; $("mtLyrics").value=""; $("mtLyrics").placeholder="Lyrics are read from each MP3 (Suno puts them inside the file)"; $("mtLyrics").disabled=true; $("mtPlanBox").open=true; $("mtPlanOn").checked=true; }
+  $("mtGo").textContent=fs.length>1?"Upload "+fs.length+" songs & plan the week":"Upload & start";
+  planPreview();
+}
+$("mtFile").onchange=function(){ mtPick(this.files); };
+["mtPlanOn","mtPlanDate","mtPlanTime","mtPlanEvery","mtPlanAuto"].forEach(function(id){ $(id).addEventListener("change",planPreview); });
+setTimeout(function(){ if($("mtPlanPrev"))planPreview(); },3000);
 ["dragenter","dragover"].forEach(function(ev){ $("mtDrop").addEventListener(ev,function(e){e.preventDefault();$("mtDrop").classList.add("on");}); });
 $("mtDrop").addEventListener("dragleave",function(){ if(!STU.file)$("mtDrop").classList.remove("on"); });
-$("mtDrop").addEventListener("drop",function(e){ e.preventDefault(); mtPick(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]); });
+$("mtDrop").addEventListener("drop",function(e){ e.preventDefault(); mtPick(e.dataTransfer&&e.dataTransfer.files); });
 $("mtPush").onclick=enablePush;
 /* lyrics file (.txt or .lrc with [mm:ss] timings) → textarea */
 function readLyrics(inp,ta){ var f=inp.files&&inp.files[0]; if(!f)return; if(f.size>200*1024){toast("Lyrics file is too big",false);return;}
@@ -2860,17 +2964,29 @@ $("mtLyrFile").onchange=function(){ readLyrics(this,$("mtLyrics")); };
 $("mtJob").addEventListener("change",function(e){ if(e.target&&e.target.id==="mtRedoLF")readLyrics(e.target,$("mtRedoL")); });
 $("mtTokSave").onclick=function(){ var t=$("mtTokIn").value.replace(/\s+/g,""); if(!t){toast("Paste the token first",false);return;} SET.mcpToken=t; saveSet(); $("mtTokIn").value=""; toast("Token saved in this browser",true); updateBrain(); if(SET.autopilot&&!autopilot&&provider()!=="none")setAutopilot(true); stuLoad(); };
 $("mtGo").onclick=function(){
-  var f=STU.file; if(!f){toast("Choose an MP3 first",false);return;}
-  if(f.size>24*1024*1024){toast("File is over 24 MB — export a 192 kbps MP3",false);return;}
-  var btn=this; btn.disabled=true; STU.busy=true; $("mtMsg").textContent="Creating the job…";
-  var fin=function(msg,ok){ btn.disabled=false; STU.busy=false; $("mtMsg").textContent=msg; if(ok!==undefined)toast(msg,ok); };
-  stuApi("POST","/api/songvideo",{title:$("mtTitle").value,theme:$("mtTheme").value,lyrics:$("mtLyrics").value,style:$("mtStyle").value,lyricist:$("mtLyr").value,singer:$("mtSing").value}).then(function(r){
-    var x=new XMLHttpRequest(); x.open("PUT","/api/songvideo/"+r.job.job_id+"/audio"); x.setRequestHeader("Authorization","Bearer "+SET.mcpToken); x.setRequestHeader("Content-Type",f.type||"audio/mpeg");
-    x.upload.onprogress=function(ev){ if(ev.lengthComputable){ var pc=Math.round(ev.loaded/ev.total*100); $("mtBar").style.width=pc+"%"; $("mtMsg").textContent="Uploading "+pc+"%"; } };
-    x.onload=function(){ if(x.status>=200&&x.status<300){ fin("Uploaded ✓ — analysis starts automatically",true); STU.file=null; $("mtFile").value=""; $("mtFileName").textContent="Tap to choose your MP3"; $("mtDrop").classList.remove("on"); $("mtTitle").value=""; $("mtTheme").value=""; $("mtLyrics").value=""; setTimeout(function(){$("mtBar").style.width="0";},1500); stuLoad(); } else { var m="Upload failed"; try{m=JSON.parse(x.responseText).error||m;}catch(e){} fin(m,false);} };
-    x.onerror=function(){ fin("Network error — try again",false); };
-    x.send(f);
-  }).catch(function(e){ fin(e.message,false); });
+  var fs=STU.files||(STU.file?[STU.file]:[]); if(!fs.length){toast("Choose an MP3 first",false);return;}
+  for(var k=0;k<fs.length;k++)if(fs[k].size>24*1024*1024){toast(fs[k].name+" is over 24 MB — export a 192 kbps MP3",false);return;}
+  var btn=this,one=fs.length===1,plan=$("mtPlanOn").checked,dates=plan?planNext(fs.length):[],ok=0,i=0;
+  btn.disabled=true; STU.busy=true;
+  var fin=function(msg,good){ btn.disabled=false; STU.busy=false; $("mtMsg").textContent=msg; if(good!==undefined)toast(msg,good); };
+  var reset=function(){ STU.file=null; STU.files=null; $("mtFile").value=""; $("mtFileName").textContent="Tap to choose your MP3 (or several)"; $("mtDrop").classList.remove("on");
+    $("mtTitle").value=""; $("mtTitle").disabled=false; $("mtTitle").placeholder="Song title (optional)"; $("mtTheme").value=""; $("mtLyrics").value=""; $("mtLyrics").disabled=false;
+    $("mtLyrics").placeholder="Lyrics (optional) — paste, or upload a .txt / .lrc file. .lrc = exact timing for every line"; $("mtGo").textContent="Upload & start"; $("mtPlanOn").checked=false; $("mtPlanDate").value=""; planPreview();
+    setTimeout(function(){$("mtBar").style.width="0";},1500); stuLoad(); };
+  function next(){
+    if(i>=fs.length){ fin(fs.length>1?ok+" of "+fs.length+" songs uploaded ✓ — "+(plan?"on the calendar, videos start automatically":"videos start automatically"):"Uploaded ✓ — analysis starts automatically",ok===fs.length); reset(); return; }
+    var f=fs[i],body={title:one?$("mtTitle").value:songBase(f.name),theme:$("mtTheme").value,lyrics:one?$("mtLyrics").value:"",style:$("mtStyle").value,lyricist:$("mtLyr").value,singer:$("mtSing").value};
+    if(plan){ body.publish_at=dates[i].toISOString(); body.privacy=$("mtPlanPriv").value; body.auto_post=$("mtPlanAuto").checked; }
+    $("mtMsg").textContent=(fs.length>1?"Song "+(i+1)+"/"+fs.length+": ":"")+"Creating the job…";
+    stuApi("POST","/api/songvideo",body).then(function(r){
+      var x=new XMLHttpRequest(); x.open("PUT","/api/songvideo/"+r.job.job_id+"/audio"); x.setRequestHeader("Authorization","Bearer "+SET.mcpToken); x.setRequestHeader("Content-Type",f.type||"audio/mpeg");
+      x.upload.onprogress=function(ev){ if(ev.lengthComputable){ var pc=Math.round(((i+ev.loaded/ev.total)/fs.length)*100); $("mtBar").style.width=pc+"%"; $("mtMsg").textContent=(fs.length>1?"Song "+(i+1)+"/"+fs.length+" · ":"")+"Uploading "+Math.round(ev.loaded/ev.total*100)+"%"; } };
+      x.onload=function(){ if(x.status>=200&&x.status<300)ok++; else { var m="Upload failed"; try{m=JSON.parse(x.responseText).error||m;}catch(e){} toast(f.name+": "+m,false); } i++; next(); };
+      x.onerror=function(){ toast(f.name+": network error",false); i++; next(); };
+      x.send(f);
+    }).catch(function(e){ toast(f.name+": "+e.message,false); i++; next(); });
+  }
+  next();
 };
 function stuRender(){
   var h="",i;
@@ -2882,16 +2998,45 @@ function stuRender(){
     if(j.video_url)h+='<a href="'+esc(j.video_url)+'?dl=1" download><span data-i="download"></span>MP4</a>';
     if(j.youtube)h+='<button data-sc="title" data-id="'+j.job_id+'"><span data-i="copy"></span>Title</button><button data-sc="desc" data-id="'+j.job_id+'"><span data-i="copy"></span>Description</button>';
     if(pb==="published")h+='<a href="'+esc(j.publish.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>YouTube</a>';
-    h+='<button data-sa="delete" data-id="'+j.job_id+'"><span data-i="x"></span>Delete</button></div></div>'; }
+    h+='<button data-sa="delete" data-id="'+j.job_id+'"><span data-i="x"></span>Delete</button></div>';
+    if(pb!=="published"&&pb!=="publishing"&&pb!=="requested"&&j.status!=="rejected")h+='<div class="sch-row"><span data-i="calendar-clock"></span><input type="datetime-local" data-schat="'+j.job_id+'" value="'+(j.schedule?toLocalInput(j.schedule.publish_at):"")+'" aria-label="Post date"><select data-schp="'+j.job_id+'" aria-label="Visibility">'+["public","unlisted","private"].map(function(v){return '<option value="'+v+'"'+(j.schedule&&j.schedule.privacy===v?" selected":"")+'>'+v+'</option>';}).join("")+'</select>'+(j.schedule?'<button data-sa="unsched" data-id="'+j.job_id+'"><span data-i="x"></span>Unschedule</button>':'<span class="sub" style="margin:0">no posting date</span>')+'</div>';
+    h+='</div>'; }
   $("stuJobs").innerHTML=h;
+  stuPlanRender();
   var els=$("stuJobs").querySelectorAll("[data-i]");for(i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}
   $("stuNote").textContent=STU.backend?"":"Runs on the Cloudflare AGENTVERSE.";
 }
+function stuPlanRender(){
+  var el=$("stuPlan"); if(!el)return;
+  var days=[],i,d0=new Date(),h,sched=[],uns=0;
+  d0=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate());
+  (STU.jobs||[]).forEach(function(j){ if(j.schedule)sched.push(j); else if(j.status!=="rejected"&&!(j.publish&&j.publish.state==="published"))uns++; });
+  var last=sched.reduce(function(m,j){return Math.max(m,Date.parse(j.schedule.publish_at));},0);
+  var span=Math.max(7,Math.min(28,Math.ceil((last-d0.getTime())/864e5)+1)); span=Math.ceil(span/7)*7;
+  h='<div class="plan-h"><h4>Weekly planner &middot; YouTube posting calendar</h4><span class="sub" style="margin:0">'+sched.length+' scheduled'+(uns?' &middot; '+uns+' without a date':'')+' &middot; posts go out automatically on their day</span></div><div class="plan-days">';
+  for(i=0;i<span;i++){ var a=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+i),b=new Date(a.getFullYear(),a.getMonth(),a.getDate()+1);
+    h+='<div class="pday'+(i===0?' today':'')+'"><small>'+(i===0?"Today":a.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"}))+'</small>';
+    sched.forEach(function(j){ var t=Date.parse(j.schedule.publish_at); if(t>=a.getTime()&&t<b.getTime()){ var ps=j.publish&&j.publish.state,lab=ps==="published"?"posted":(ps?"posting":(j.status==="ready"?"ready":(j.status==="failed"?"failed":"making"))),pc=ps==="published"||j.status==="ready"?"r":(j.status==="failed"?"x":"b");
+      h+='<div class="pslot" title="'+esc((j.youtube&&j.youtube.title)||j.title||"")+'"><b>'+esc((j.youtube&&j.youtube.title)||j.title||"Song")+'</b>'+new Date(t).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})+(j.schedule.auto?"":" · waits for you")+'<br><span class="pill '+pc+'">'+lab+'</span></div>'; } });
+    h+='</div>'; }
+  h+='</div>';
+  var over=sched.filter(function(j){ return Date.parse(j.schedule.publish_at)<d0.getTime()&&!(j.publish&&j.publish.state==="published"); });
+  if(over.length)h+='<p class="plan-un">Past due &mdash; posts as soon as its video is ready: '+over.map(function(j){return esc(j.title||"Song");}).join(", ")+'</p>';
+  if(!sched.length)h+='<p class="plan-un">Nothing on the calendar yet. Choose several MP3s in the upload box, open <b>Weekly planner</b> and tick the box &mdash; or give any song below a date.</p>';
+  el.innerHTML=h;
+}
+$("stuJobs").addEventListener("change",function(e){
+  var t=e.target,id=t.getAttribute("data-schat")||t.getAttribute("data-schp"); if(!id)return;
+  var at=$("stuJobs").querySelector('[data-schat="'+id+'"]').value,pv=$("stuJobs").querySelector('[data-schp="'+id+'"]').value;
+  if(!at){ if(t.getAttribute("data-schp"))toast("Pick a date first",false); return; }
+  stuApi("POST","/api/songvideo/"+id+"/schedule",{publish_at:new Date(at).toISOString(),privacy:pv,auto:true}).then(function(){ toast("Scheduled — posts automatically",true); stuLoad(); },function(e2){ toast(e2.message,false); });
+});
 $("stuJobs").onclick=function(e){
   var b=e.target.closest?e.target.closest("button"):null;if(!b)return;
   var id=b.getAttribute("data-id"),a=b.getAttribute("data-sa"),c=b.getAttribute("data-sc"),j=null;
   for(var i=0;i<STU.jobs.length;i++)if(STU.jobs[i].job_id===id)j=STU.jobs[i];
   if(c&&j&&j.youtube){copyText(c==="title"?j.youtube.title:j.youtube.description);return;}
+  if(a==="unsched"){ stuApi("POST","/api/songvideo/"+id+"/schedule",{publish_at:null}).then(function(){ toast("Removed from the calendar",true); stuLoad(); },function(e2){toast(e2.message,false);}); return; }
   if(a==="delete"){ if(b.getAttribute("data-c")!=="1"){b.setAttribute("data-c","1");b.lastChild.nodeValue="Tap again to delete";return;} stuApi("DELETE","/api/songvideo/"+id).then(stuLoad,function(e2){toast(e2.message,false);}); }
 };
 setInterval(function(){ if(!SET.mcpToken||!STU.backend||document.hidden)return; if(isLive(STU.cur))stuRefreshCur(); },10000);

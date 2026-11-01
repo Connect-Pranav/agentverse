@@ -54,7 +54,7 @@ jobs:
           python3 -m pip install --quiet pillow
       - name: Install free speech-to-text
         if: steps.cfg.outputs.pending != '0'
-        run: python3 -m pip install --quiet faster-whisper indic_transliteration
+        run: python3 -m pip install --quiet faster-whisper "av<15" numpy indic_transliteration
       - uses: actions/cache@v4
         if: steps.cfg.outputs.pending != '0'
         with:
