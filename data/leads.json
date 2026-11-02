@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-01T22:01:46.716Z",
- "count": 1,
+ "updated": "2026-11-02T05:58:29.883Z",
+ "count": 2,
  "health": {
   "reddit": {
    "ok": 0,
@@ -31,6 +31,24 @@
  "reddit": "public",
  "leads": [
   {
+   "id": "md_117544238089019823",
+   "source": "mastodon #hiring",
+   "title": "📌 Hiring Now! | Senior Software Engineer - Rust (LLM Evaluation & Repository Validation) Contract, remote, op",
+   "text": "📌 Hiring Now! | Senior Software Engineer - Rust (LLM Evaluation & Repository Validation) Contract, remote, open to India, Pakistan and Nigeria ✅ Triaging issues in trending open-source repos ✅ Docker setup and repo environment configuration Pay discussed during screening. Rust folks, how do you keep a large codebase easy to navigate? 👉 Apply here: https:// nearskill.in/jobs/senior-softw are-engineer-rust-llm-evaluation-repository-validation-37599 # AIJobs # Rust # Hiring # RemoteJobs",
+   "url": "https://mastodon.social/@nearskill/117544238089019823",
+   "author": "nearskill",
+   "created": "2026-11-02T01:25:34.514Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 6,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-02T05:58:29.882Z"
+  },
+  {
    "id": "md_117533744122247357",
    "source": "mastodon #hiring",
    "title": "🚀 Now Hiring! | Web Research Specialist (AI Evaluation) Remote contract, 8 weeks, 40 hrs/week with 4 hours PS",
@@ -42,7 +60,7 @@
    "products": [
     "NIKHILs TECH STUDIO"
    ],
-   "score": 6,
+   "score": 5,
    "matched": [
     "llm"
    ],
