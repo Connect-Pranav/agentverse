@@ -624,6 +624,7 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
 .mt-more summary{cursor:pointer;font-size:12px;color:var(--mut);padding:4px 0}
 .mt-more[open]{display:flex;flex-direction:column;gap:8px}
 .mt-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tok-mask{-webkit-text-security:disc}.mt-tok input{font-size:16px}
 .mt-tok{display:none;gap:8px}.mt-tok button,.mt-all{flex:none;font:600 12px var(--fb);color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:7px 14px;min-height:36px}
 .mt-up .btnp{width:100%;min-height:44px}
 .mt-up .btnp:disabled{opacity:.45}
@@ -905,7 +906,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
           <label class="mt-chk"><input type="checkbox" id="mtPlanAuto" checked> Make and post automatically &mdash; don't ask me</label>
           <p class="mt-sh" id="mtPlanPrev"></p>
         </details>
-        <div class="mt-tok" id="mtTok"><input id="mtTokIn" type="password" autocomplete="off" placeholder="AGENTVERSE token (MCP_TOKEN)" aria-label="AGENTVERSE token"><button id="mtTokSave" type="button">Save</button></div>
+        <div class="mt-tok" id="mtTok"><input id="mtTokIn" type="text" class="tok-mask" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="AGENTVERSE token (MCP_TOKEN)" aria-label="AGENTVERSE token"><button id="mtTokSave" type="button">Save</button></div>
         <button class="btnp" id="mtGo" type="button">Upload &amp; start</button>
         <button class="mt-push" id="mtPush" type="button" style="display:none"><span data-i="activity"></span> Notify me in the background</button>
         <div class="stu-bar"><i id="mtBar"></i></div>
@@ -1033,7 +1034,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
     </div>
 
     <h5>Song Studio / MCP</h5>
-    <div class="fg"><div class="f" style="grid-column:1/-1"><label for="sMcp">AGENTVERSE token (the MCP_TOKEN secret on Cloudflare)</label><input id="sMcp" type="password" autocomplete="off"><small>Needed for Song Studio on the Cloudflare link. Stays in this browser.</small></div></div>
+    <div class="fg"><div class="f" style="grid-column:1/-1"><label for="sMcp">AGENTVERSE token (the MCP_TOKEN secret on Cloudflare)</label><input id="sMcp" type="text" class="tok-mask" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><small>Needed for Song Studio on the Cloudflare link. Stays in this browser.</small></div></div>
 
     <h5>Look</h5>
     <div class="fg"><div class="f"><label for="sTheme">Theme</label><select id="sTheme"><option value="glass">Glass (default)</option><option value="neon">Neon</option></select></div></div>
@@ -2742,7 +2743,7 @@ function mtSetup(ok){
   var b=$("mtBadge");
   if(!ok){ b.textContent="CLOUDFLARE ONLY"; b.className="badge"; $("mtTok").style.display="none";
     $("mtMsg").innerHTML='The MCP runs on the Cloudflare AGENTVERSE. <a href="'+SV_CF+'/#studio" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">Open it here</a>.'; $("mtGo").disabled=true; return; }
-  if(!SET.mcpToken){ b.textContent="ADD TOKEN"; b.className="badge"; $("mtTok").style.display="flex"; $("mtGo").disabled=true; $("mtMsg").textContent="Enter your AGENTVERSE token once (the MCP_TOKEN secret)."; return; }
+  if(!SET.mcpToken){ b.textContent="ADD TOKEN"; b.className="badge"; b.style.cursor="pointer"; $("mtTok").style.display="flex"; $("mtGo").disabled=true; $("mtMsg").textContent="Enter your AGENTVERSE token once (the MCP_TOKEN secret)."; return; }
   if(STU.health&&!STU.health.tokenSet){ b.textContent="SERVER LOCKED"; b.className="badge"; $("mtMsg").textContent="Cloudflare secret MCP_TOKEN is not set on the Worker yet."; $("mtGo").disabled=true; return; }
   $("mtTok").style.display="none"; $("mtGo").disabled=STU.busy; b.textContent="LIVE"; b.className="badge run";
   var ps=pushState(),nb=$("mtPush");
@@ -3004,6 +3005,8 @@ function readLyrics(inp,ta){ var f=inp.files&&inp.files[0]; if(!f)return; if(f.s
   var r=new FileReader(); r.onload=function(){ var t=String(r.result||"").replace(/\r/g,""); ta.value=t; var timed=/\[\d{1,2}:\d{2}/.test(t); toast(timed?"Timed lyrics (.lrc) loaded — captions will follow these times":"Lyrics loaded — "+t.split("\n").filter(function(x){return x.trim();}).length+" lines",true); }; r.readAsText(f); }
 $("mtLyrFile").onchange=function(){ readLyrics(this,$("mtLyrics")); };
 $("mtJob").addEventListener("change",function(e){ if(e.target&&e.target.id==="mtRedoLF")readLyrics(e.target,$("mtRedoL")); });
+$("mtBadge").addEventListener("click",function(){ if($("mtTok").style.display!=="flex")return; var i=$("mtTokIn"); i.scrollIntoView({block:"center"}); i.focus(); });
+$("mtTokIn").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); $("mtTokSave").onclick(); } });
 $("mtTokSave").onclick=function(){ var t=$("mtTokIn").value.replace(/\s+/g,""); if(!t){toast("Paste the token first",false);return;} SET.mcpToken=t; saveSet(); $("mtTokIn").value=""; toast("Token saved in this browser",true); updateBrain(); if(SET.autopilot&&!autopilot&&provider()!=="none")setAutopilot(true); stuLoad(); };
 $("mtGo").onclick=function(){
   var fs=STU.files||(STU.file?[STU.file]:[]); if(!fs.length){toast("Choose an MP3 first",false);return;}
