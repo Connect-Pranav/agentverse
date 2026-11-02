@@ -1,0 +1,47 @@
+name: Festive art (Gemini → GIF)
+
+# Makes the festival artwork festive.js shows on the site (e.g. festive/diwali.gif) from festive/art.json.
+# Needs repo secret GEMINI_API_KEY. Runs when festive/art.json or the script changes, or by hand.
+# Commits only festive/** back to the same branch (GITHUB_TOKEN commits do not re-trigger workflows).
+
+on:
+  push:
+    paths: ['festive/art.json', 'scripts/festive-art.py', '.github/workflows/festive-art.yml']
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Only this festival id (e.g. diwali); empty = all'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: festive-art-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  art:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow==11.0.0
+      - name: Generate artwork
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
+          FESTIVE_ONLY: ${{ inputs.only }}
+        run: python scripts/festive-art.py
+      - name: Commit artwork
+        if: always()
+        run: |
+          git config user.name "festive-art[bot]"
+          git config user.email "festive-art@users.noreply.github.com"
+          git add festive
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -m "festive: artwork $(date -u +%F)"
+          git push

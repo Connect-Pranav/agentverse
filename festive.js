@@ -50,7 +50,7 @@
     { id: 'independence_day_in', name: 'Independence Day', greet: 'Happy Independence Day', fixed: '08-15', lead: 2, fx: 'tricolor', prio: 5, colors: ['#ff9933', '#ffffff', '#138808'], hi: '#ffa94d', hi2: '#7fdc8a', deep: '#0b6b2e' },
     { id: 'ganesh_chaturthi', name: 'Ganesh Chaturthi', greet: 'Happy Ganesh Chaturthi', fx: 'petals', garland: true, days: 2, prio: 8, colors: ['#ff9f1c', '#ff5e5b', '#ffd23f'], hi: '#ffa94d', hi2: '#ffd23f', deep: '#c2410c' },
     { id: 'dussehra', name: 'Dussehra', greet: 'Happy Dussehra', fx: 'petals', garland: true, prio: 7, colors: ['#ff9f1c', '#ffd23f', '#ff5e5b'], hi: '#ffb347', hi2: '#ffd23f', deep: '#b45309' },
-    { id: 'diwali', name: 'Diwali', greet: 'Happy Diwali', fx: 'diyas', garland: true, days: 2, prio: 10, colors: ['#ffb347', '#ffd76a', '#ff7a3d'], hi: '#ffbe55', hi2: '#ffe08a', deep: '#b8520a' },
+    { id: 'diwali', name: 'Diwali', greet: 'Happy Diwali', art: 'festive/diwali.gif', artTitle: 'Shubh Deepavali', fx: 'diyas', garland: true, days: 2, prio: 10, colors: ['#ffb347', '#ffd76a', '#ff7a3d'], hi: '#ffbe55', hi2: '#ffe08a', deep: '#b8520a' },
     { id: 'halloween', name: 'Halloween', greet: 'Happy Halloween', fixed: '10-31', fx: 'bats', prio: 3, colors: ['#ff8a1f', '#b26bff'], hi: '#ff9a3d', hi2: '#c49bff', deep: '#9a3c00' },
     { id: 'thanksgiving', name: 'Thanksgiving', greet: 'Happy Thanksgiving', calc: 'thanksgiving', fx: 'leaves', prio: 4, colors: ['#e76f24', '#c2410c', '#f2b134', '#9c4221'], hi: '#f59e4b', hi2: '#f2c14e', deep: '#9a3412' },
     { id: 'christmas', name: 'Christmas', greet: 'Merry Christmas', fixed: '12-25', fx: 'snow', garland: true, days: 1, prio: 9, colors: ['#ffffff', '#dff4ff'], hi: '#ff5a5f', hi2: '#7fe0a0', deep: '#b3121a' },
@@ -154,7 +154,22 @@
     ' background:rgba(255,255,255,.12);color:#fff;font-size:15px;line-height:1}',
     '.fst-pill button:hover{background:rgba(255,255,255,.22)}.fst-pill button:focus-visible{outline:2px solid var(--fst-hi2);outline-offset:2px}',
     '@keyframes fst-in{from{opacity:0;transform:translate(-50%,-10px)}}',
-    '@media (prefers-reduced-motion:reduce){.fst-bulb,.fst-p,.fst-p svg{animation:none}.fst-pill{animation:none}}',
+    '.fst-pill img{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;margin-left:-6px;border:1.5px solid var(--fst-hi2);cursor:pointer}',
+    '.fst-pill.has-art span{cursor:pointer}',
+    '.fst-scrim{position:fixed;inset:0;z-index:2147483003;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.55);',
+    ' backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fst-fade .35s ease both}',
+    '.fst-card{position:relative;width:min(360px,100%);border-radius:22px;overflow:hidden;color:#fff;font:600 15px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;',
+    ' background:color-mix(in srgb,var(--fst-deep) 70%,#000);border:1.5px solid color-mix(in srgb,var(--fst-hi2) 70%,transparent);',
+    ' box-shadow:0 30px 80px -20px rgba(0,0,0,.8),0 0 60px -10px var(--fst-hi);animation:fst-pop .5s cubic-bezier(.2,.8,.2,1) both}',
+    '.fst-card img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover}',
+    '.fst-card .cap{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}',
+    '.fst-card .cap b{color:var(--fst-hi2);font-size:18px;letter-spacing:.01em}',
+    '.fst-card .cap i{font-style:normal;font-weight:500;opacity:.8;font-size:13px}',
+    '.fst-card button{all:unset;cursor:pointer;position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;',
+    ' background:rgba(0,0,0,.45);color:#fff;font-size:18px}',
+    '.fst-card button:focus-visible{outline:2px solid var(--fst-hi2);outline-offset:2px}',
+    '@keyframes fst-fade{from{opacity:0}}@keyframes fst-pop{from{opacity:0;transform:scale(.92) translateY(10px)}}',
+    '@media (prefers-reduced-motion:reduce){.fst-bulb,.fst-p,.fst-p svg{animation:none}.fst-pill,.fst-scrim,.fst-card{animation:none}}',
   ].join('\n');
 
   // Small original shapes; `c` is the fill colour.
@@ -223,12 +238,33 @@
     state = { els: [], vars: [], target: null };
   }
 
+  // Festival artwork card (animated GIF made by scripts/festive-art.py). Shown only if the file really exists.
+  function openArt(fest, src, sub) {
+    var old = document.querySelector('.fst-scrim');
+    if (old) old.remove();
+    var scrim = document.createElement('div');
+    scrim.className = 'fst-scrim';
+    scrim.setAttribute('role', 'dialog');
+    scrim.setAttribute('aria-modal', 'true');
+    scrim.setAttribute('aria-label', fest.artTitle || fest.greet);
+    ['--fst-hi', '--fst-hi2', '--fst-deep'].forEach(function (v, i) { scrim.style.setProperty(v, [fest.hi, fest.hi2, fest.deep][i]); });
+    scrim.innerHTML = '<div class="fst-card"><img alt="' + (fest.artTitle || fest.greet) + ' festival artwork" src="' + src + '"><div class="cap"><b>' + (fest.artTitle || fest.greet) + '</b><i>' + sub + '</i></div><button type="button" aria-label="Close">×</button></div>';
+    var close = function () { scrim.remove(); document.removeEventListener('keydown', esc); };
+    var esc = function (e) { if (e.key === 'Escape') close(); };
+    scrim.addEventListener('click', function (e) { if (e.target === scrim || e.target.tagName === 'BUTTON') close(); });
+    document.addEventListener('keydown', esc);
+    document.body.appendChild(scrim);
+    state.els.push(scrim);
+    scrim.querySelector('button').focus({ preventScroll: true });
+  }
+
   /* opts:
    *   target      element whose CSS variables are recoloured (default <html>)
    *   vars        { hi: ['--accent'], hi2: [...], deep: [...] } — site variables to set from the palette
    *   position    'top' | 'bottom' for the greeting pill (default 'top'); offset: px from that edge
    *   particles   how many decorations (default 16; 0 disables); minimal(): return true to skip particles
-   *   now         Date override (tests)
+   *   artBase     URL prefix for festival artwork (default '' → relative to the page)
+ *   now         Date override (tests)
    */
   function init(opts) {
     opts = opts || {};
@@ -296,6 +332,26 @@
         pill.remove();
       });
       add(pill);
+      if (fest.art) {
+        // Only wire the artwork once the GIF has actually loaded — no art yet means no thumbnail, no card.
+        var src = (opts.artBase || '') + fest.art;
+        var probe = new Image();
+        probe.onload = function () {
+          if (!pill.isConnected) return;
+          var sub = pill.querySelector('i').textContent;
+          var thumb = document.createElement('img');
+          thumb.src = src;
+          thumb.alt = '';
+          pill.insertBefore(thumb, pill.firstChild);
+          pill.classList.add('has-art');
+          var open = function () { openArt(fest, src, sub); };
+          thumb.addEventListener('click', open);
+          pill.querySelector('span').addEventListener('click', open);
+          var seen = 'festive.art.' + fest.id + '.' + year;
+          if (!pick.preview && store(seen) !== '1') { store(seen, '1'); setTimeout(open, 1200); } // once per festival
+        };
+        probe.src = src;
+      }
     }
     return pick;
   }
