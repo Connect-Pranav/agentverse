@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      # Pin Python: ubuntu-latest (26.04) ships a Python with no prebuilt wheels for av<15
+      # Pin Python so pip always finds prebuilt wheels (ubuntu-latest moved to 26.04)
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -58,7 +58,7 @@ jobs:
           python3 -m pip install --quiet pillow
       - name: Install free speech-to-text
         if: steps.cfg.outputs.pending != '0'
-        run: python3 -m pip install --quiet faster-whisper "av<15" numpy indic_transliteration
+        run: python3 -m pip install --quiet faster-whisper "av>=15,<19" numpy indic_transliteration
       - uses: actions/cache@v4
         if: steps.cfg.outputs.pending != '0'
         with:
