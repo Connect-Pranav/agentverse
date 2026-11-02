@@ -1,6 +1,58 @@
 {
  "items": [
   {
+   "id": "sv_4pxuo0",
+   "brand": "Foliocraft",
+   "dept": "Publishing & Social",
+   "title": "Accelerate Your Job Search: Why a Portfolio Beats a Resume",
+   "body": "In today’s competitive market, a portfolio showcases your real work, results, and personality—key factors recruiters evaluate over a generic resume. By presenting a curated collection of projects with clear context, you demonstrate problem‑solving, design thinking, and impact. Recruiters can instantly gauge your fit, reducing the interview cycle time and boosting your odds of landing offers. A portfolio also signals professionalism and confidence, qualities that hiring managers value. For professionals across design, copy, coding, and more, a polished portfolio is the fastest path to job offers.",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Get hired faster with a portfolio",
+   "ts": 1793651409992,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
+   "id": "sv_aysbh7",
+   "brand": "Foliocraft",
+   "dept": "Creative Studio",
+   "title": "Speed to Hire with a Portfolio",
+   "body": "🚀 Want to land offers faster? A portfolio gives recruiters a 360° view of your skills—no guesswork. Show your best work, explain your process, and highlight results. That’s the difference between being *considered* and being *offered*. Ready to get hired sooner? #CareerGrowth #PortfolioPower #JobSearchTips",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Get hired faster with a portfolio",
+   "ts": 1793651409992,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
+   "id": "sv_h7tb0m",
+   "brand": "Foliocraft",
+   "dept": "Publishing & Social",
+   "title": "Get Hired Faster with a Portfolio: Recruiters' Checklist",
+   "body": "Learn the exact elements recruiters look for in a portfolio and how to optimize yours for quick hiring decisions. In this video, we cover:\n1️⃣ Clear project context & impact metrics\n2️⃣ Visual storytelling & design consistency\n3️⃣ Easy navigation & mobile friendliness\n4️⃣ Personal branding & unique value proposition\n5️⃣ Call-to-action for next steps\nWatch now and start building a portfolio that gets you hired faster!",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Get hired faster with a portfolio",
+   "ts": 1793651409992,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
+   "id": "sv_xw7b5s",
+   "brand": "Foliocraft",
+   "dept": "Publishing & Social",
+   "title": "AMA: Build a Portfolio That Gets You Jobs",
+   "body": "Got questions about creating a portfolio that lands interviews? Drop them here! From choosing the right platform to showcasing the right work, I’ll share insights and tips that helped professionals across industries win offers. Let’s get your portfolio ready for the hiring spotlight!",
+   "status": "waiting",
+   "lead_id": null,
+   "topic": "Get hired faster with a portfolio",
+   "ts": 1793651409992,
+   "server": true,
+   "brain": "cloud · cloudflare/pollinations-openai"
+  },
+  {
    "id": "sv_u7ghkg",
    "brand": "NIKHILs TECH STUDIO",
    "dept": "Content Engine",
@@ -223,21 +275,22 @@
    "brain": "cloud · cloudflare/meta/llama-3.3-70b-instruct-fp8-fast"
   }
  ],
- "cycles": 4,
+ "cycles": 5,
  "topics": [
+  "Get hired faster with a portfolio",
   "Claude Workflow: Building an AI Research Agent",
   "The Cozy Bedtime Habit",
   "Song lyric story reveal",
   "Portfolio vs Resume"
  ],
- "updated": "2026-11-01T15:27:29.898Z",
+ "updated": "2026-11-02T20:30:09.992Z",
  "last": {
-  "brand": "NIKHILs TECH STUDIO",
-  "topic": "Claude Workflow: Building an AI Research Agent",
-  "why": "Directly addresses the fresh lead's requirement for AI evaluation and evidence trails.",
-  "summary": "Focuses on precision AI research workflows to attract skilled learners.",
+  "brand": "Foliocraft",
+  "topic": "Get hired faster with a portfolio",
+  "why": "Shows tangible hiring speed benefits, encouraging purchase",
+  "summary": "Show portfolio’s hiring speed benefits with cross‑platform content.",
   "brain": "cloud",
-  "model": "cloudflare/zai-org/glm-4.7-flash",
+  "model": "cloudflare/pollinations-openai",
   "count": 4
  }
 }
