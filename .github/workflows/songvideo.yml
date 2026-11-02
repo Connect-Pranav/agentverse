@@ -95,5 +95,6 @@ jobs:
               print(0)
           PY
           )
+          n=$(printf '%s\n' "$n" | tail -n1)   # worker-lookup log lines also land in stdout
           echo "$n job(s) still waiting"
           if [ "$n" != "0" ]; then gh workflow run songvideo.yml --ref main -R "$GITHUB_REPOSITORY"; fi
