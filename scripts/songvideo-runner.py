@@ -660,6 +660,48 @@ def has_deva(s):
     return any("ऀ" <= ch <= "ॿ" for ch in s or "")
 
 
+def is_deva_ch(ch):
+    return "\u0900" <= ch <= "\u097F" or "\uA8E0" <= ch <= "\uA8FF" or "\u1CD0" <= ch <= "\u1CFF" or ch in "\u200c\u200d"
+
+
+def script_runs(text, fnt):
+    """Noto Sans Devanagari has no Latin letters (they render as boxes), so a mixed
+    Hindi + English title is drawn in runs: Devanagari with the Hindi font, the rest with DejaVu.
+    `fnt` is a font or a (deva_font, latin_font) pair; returns [(run_text, font)]."""
+    if not isinstance(fnt, tuple):
+        return [(text, fnt)]
+    dv, la = fnt
+    runs = []
+    for ch in text:
+        f = dv if is_deva_ch(ch) else la if not ch.isspace() else (runs[-1][1] if runs else la)
+        if runs and runs[-1][1] is f:
+            runs[-1][0] += ch
+        else:
+            runs.append([ch, f])
+    return [(t, f) for t, f in runs]
+
+
+def mixed_length(draw, text, fnt):
+    return sum(draw.textlength(t, font=f) for t, f in script_runs(text, fnt))
+
+
+def draw_mixed(draw, xy, text, fnt, fill):
+    x, y = xy
+    for t, f in script_runs(text, fnt):
+        draw.text((x, y), t, font=f, fill=fill)
+        x += draw.textlength(t, font=f)
+
+
+def title_font(draw, title, size=84, max_w=None, min_size=40):
+    """Title font that covers both scripts and fits the frame width."""
+    max_w = max_w or W * 0.9
+    while True:
+        f = (font(size, deva=True), font(size)) if has_deva(title) else font(size)
+        if size <= min_size or mixed_length(draw, title, f) <= max_w:
+            return f
+        size -= 4
+
+
 def ease(t):
     t = max(0.0, min(1.0, t))
     return 1 - (1 - t) ** 3
@@ -694,7 +736,8 @@ def render_card_frames(folder, logo_path, title, credits, kind):
     ImageDraw.Draw(g).ellipse((W / 2 - 700, H / 2 - 500, W / 2 + 700, H / 2 + 500), fill=110)
     g = g.filter(ImageFilter.GaussianBlur(160))
     bg.paste(Image.new("RGBA", (W, H), (70, 40, 140, 255)), (0, 0), g)
-    t_font, c_font, s_font = font(84, deva=has_deva(title)), font(46), font(30, bold=False)
+    t_font = title_font(ImageDraw.Draw(Image.new("RGB", (8, 8))), title or "Sunverse")
+    c_font, s_font = font(46), font(30, bold=False)
     # title card sits ON the first scene (like the Bajrangbali video): soft dark band behind the text only
     band = Image.new("L", (W, H), 0)
     ImageDraw.Draw(band).rounded_rectangle((W * 0.18, H / 2 - 260, W * 0.82, H / 2 + 200), radius=200, fill=150)
@@ -759,12 +802,12 @@ def render_card_frames(folder, logo_path, title, credits, kind):
                 y = H / 2 - 150
                 for text, fnt, col, delay in rows:
                     a = ease((ct - delay) / 0.7)
-                    w = d.textlength(text, font=fnt)
+                    w = mixed_length(d, text, fnt)
                     tl = Image.new("RGBA", (W, H), (0, 0, 0, 0))  # blend, never punch holes in the card
                     td = ImageDraw.Draw(tl)
-                    td.text((W / 2 - w / 2 + 3, y + 30 * (1 - a) + 4), text, font=fnt, fill=(0, 0, 0, int(170 * a)))
+                    draw_mixed(td, (W / 2 - w / 2 + 3, y + 30 * (1 - a) + 4), text, fnt, (0, 0, 0, int(170 * a)))
                     tl = tl.filter(ImageFilter.GaussianBlur(3))
-                    ImageDraw.Draw(tl).text((W / 2 - w / 2, y + 30 * (1 - a)), text, font=fnt, fill=col + (int(255 * a),))
+                    draw_mixed(ImageDraw.Draw(tl), (W / 2 - w / 2, y + 30 * (1 - a)), text, fnt, col + (int(255 * a),))
                     im.alpha_composite(tl)
                     y += 150 if fnt is t_font else 80
                 lx = int(W / 2 - 260 * ease(ct / 1.2))
@@ -797,7 +840,7 @@ def thumbnail(img_path, logo_path, title, out):
     ImageDraw.Draw(grad).rectangle((0, 430, 1280, 720), fill=200)
     im.paste(Image.new("RGB", (1280, 720), (8, 6, 24)), (0, 0), grad.filter(ImageFilter.GaussianBlur(80)))
     d = ImageDraw.Draw(im)
-    f = font(76, deva=has_deva(title))
+    f = title_font(d, title, 76, max_w=1100)
     t = title or "Sunverse"
     while d.textlength(t, font=f) > 1150 and f.size > 40:
         f = font(f.size - 4, deva=has_deva(title))
@@ -817,6 +860,7 @@ def ass_time(s):
 def write_ass(lines, path, start_after):
     deva = any(has_deva(l.get("text", "")) for l in lines)
     fontname = "Noto Sans Devanagari" if deva else "Noto Sans"
+    spacing = 0 if deva else 0.5  # any letter-spacing makes libass split Hindi syllables (matras show as dotted circles)
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -824,7 +868,7 @@ PlayResY: {H}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Lyric,{fontname},58,&H00FFFFFF,&H00FFFFFF,&H64000000,&H8C000000,1,0,0,0,100,100,0.5,0,1,2.2,3,2,160,160,96,1
+Style: Lyric,{fontname},58,&H00FFFFFF,&H00FFFFFF,&H64000000,&H8C000000,1,0,0,0,100,100,{spacing},0,1,2.2,3,2,160,160,96,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
