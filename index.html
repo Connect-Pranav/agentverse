@@ -445,6 +445,57 @@ body.glass.ready .panel{transition:filter .5s var(--ease),opacity .5s var(--ease
 body.glass.spot .panel{filter:blur(2px) saturate(.8);opacity:.55}
 body.glass.spot .panel.spotlit{filter:none;opacity:1;transform:scale(1.015)}
 .dock,.gnav{position:fixed}
+/* ===== Nav motion styles (Settings → Look → Nav motion). Original effects; the .navpill is the moving indicator. ===== */
+body[data-navfx] .dock .navpill{transition:background .3s,box-shadow .3s,border-color .3s}
+body[data-navfx] .dock .navpill:before,body[data-navfx] .dock .navpill:after{content:"";position:absolute;pointer-events:none}
+/* 01 liquid: blue liquid drop that stretches between tabs */
+body[data-navfx=liquid] .dock .navpill{background:linear-gradient(135deg,#60a5fa,#2563eb 60%,#1e40af);box-shadow:0 8px 22px rgba(37,99,235,.5),inset 0 1px 0 rgba(255,255,255,.45)}
+body.glass[data-navfx=liquid] .dock button.on{color:#fff}
+/* 02 magnetic: raised tile, icons lean toward the pointer */
+body[data-navfx=magnetic] .dock .navpill{background:#fff;border-radius:16px;box-shadow:0 10px 22px rgba(0,0,0,.28),0 1px 0 rgba(255,255,255,.8) inset}
+/* 03 glass capsule: glossy blue bubble */
+body[data-navfx=capsule] .dock .navpill{border-radius:50%;background:radial-gradient(circle at 35% 30%,#93c5fd 0,#3b82f6 45%,#1d4ed8 100%);box-shadow:0 6px 18px rgba(59,130,246,.55)}
+body[data-navfx=capsule] .dock .navpill:after{inset:12% 20% 55% 20%;border-radius:50%;background:rgba(255,255,255,.45);filter:blur(1px)}
+body.glass[data-navfx=capsule] .dock button.on{color:#fff}
+/* 04 segmented: active tab pops up as a raised segment */
+body[data-navfx=segmented] .dock .navpill{background:#fff;border-radius:14px;box-shadow:0 12px 24px rgba(0,0,0,.3),0 2px 0 rgba(0,0,0,.06)}
+body[data-navfx=segmented] .dock button{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+body[data-navfx=segmented] .dock:not(.vert) button.on{transform:translateY(-4px)}
+body[data-navfx=segmented] .dock.vert button.on{transform:translateX(4px)}
+/* 05 orbit: ring with planets circling the active icon */
+body[data-navfx=orbit] .dock .navpill{background:transparent!important;border-radius:50%;box-shadow:none!important;border:2px solid rgba(255,138,43,.95)}
+body[data-navfx=orbit] .dock .navpill:before{inset:-6px;border-radius:50%;background:radial-gradient(circle at 50% 4px,#ff8a2b 0 4px,transparent 5px);animation:nfxSpin 2.4s linear infinite}
+body[data-navfx=orbit] .dock .navpill:after{inset:-1px -9px;border-radius:50%;border:1.5px solid rgba(255,160,70,.6);background:radial-gradient(circle at 50% calc(100% - 3px),#ffb066 0 3px,transparent 4px);animation:nfxTilt 3.4s linear infinite}
+@keyframes nfxSpin{to{transform:rotate(360deg)}}
+@keyframes nfxTilt{from{transform:rotate(60deg)}to{transform:rotate(420deg)}}
+/* 06 cyber neon: dark dock, glowing cyan frame */
+body[data-navfx=neon].glass .dock{background:rgba(5,18,18,.88);border-color:rgba(46,242,208,.25)}
+body.glass[data-navfx=neon] .dock button{color:#7de8d6}
+body[data-navfx=neon] .dock .navpill{background:rgba(46,242,208,.08)!important;border:1px solid #2ef2d0;border-radius:14px;box-shadow:0 0 14px rgba(46,242,208,.75),inset 0 0 10px rgba(46,242,208,.35)!important}
+body.glass[data-navfx=neon] .dock button.on{color:#eafffb;text-shadow:0 0 8px #2ef2d0;filter:drop-shadow(0 0 6px rgba(46,242,208,.8))}
+body[data-navfx=neon] .dock .navpill.flick{animation:nfxFlick .45s steps(2) 1}
+@keyframes nfxFlick{0%,40%{opacity:.3}20%,60%,100%{opacity:1}}
+/* 07 wave: a wave bump travels to the active tab */
+body[data-navfx=wave] .dock .navpill{background:transparent!important;box-shadow:none!important;border-radius:0}
+body[data-navfx=wave] .dock .navpill:before{inset:0;background:no-repeat center/100% 100% url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20' preserveAspectRatio='none'%3E%3Cpath d='M0 18 C20 18 28 3 50 3 S80 18 100 18' fill='none' stroke='%23dbeafe' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");filter:drop-shadow(0 0 6px rgba(147,197,253,.9));animation:nfxWave 1.6s ease-in-out infinite;transform-origin:50% 100%}
+body[data-navfx=wave] .dock.vert .navpill:before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 100' preserveAspectRatio='none'%3E%3Cpath d='M2 0 C2 20 17 28 17 50 S2 80 2 100' fill='none' stroke='%23dbeafe' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");transform-origin:0 50%;animation-name:nfxWaveV}
+body[data-navfx=wave] .dock button{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+body[data-navfx=wave] .dock:not(.vert) button.on{transform:translateY(-3px)}
+body[data-navfx=wave] .dock.vert button.on{transform:translateX(3px)}
+body.glass[data-navfx=wave] .dock button.on{color:#1d4ed8}
+@keyframes nfxWave{50%{transform:scaleY(.7)}}
+@keyframes nfxWaveV{50%{transform:scaleX(.7)}}
+/* 08 morphing blob: gradient blob that keeps changing shape */
+body[data-navfx=blob] .dock .navpill{background:linear-gradient(135deg,#ff5fa2,#a855f7 55%,#3b82f6);box-shadow:0 8px 24px rgba(236,72,153,.5)!important;animation:nfxMorph 3.2s ease-in-out infinite}
+body.glass[data-navfx=blob] .dock button.on{color:#fff}
+@keyframes nfxMorph{0%,100%{border-radius:42% 58% 63% 37%/45% 40% 60% 55%}33%{border-radius:60% 40% 35% 65%/55% 62% 38% 45%}66%{border-radius:38% 62% 52% 48%/62% 38% 62% 38%}}
+/* 09 layered cards: stacked card with depth, tilts in */
+body[data-navfx=cards] .dock .navpill{background:#fff;border-radius:13px;box-shadow:4px 4px 0 -1px rgba(255,255,255,.6),8px 8px 0 -2px rgba(255,255,255,.32),0 12px 22px rgba(0,0,0,.3)!important}
+/* 10 minimal luxury: thin gold line + gold icon, slow and calm */
+body[data-navfx=luxury] .dock .navpill{background:linear-gradient(90deg,#b8862f,#f3d18b,#b8862f)!important;border-radius:2px;box-shadow:0 0 10px rgba(243,209,139,.7)!important}
+body.glass[data-navfx=luxury] .dock button.on{color:#c9962f;filter:drop-shadow(0 0 6px rgba(243,209,139,.55))}
+body[data-navfx=luxury] .dock button{transition:color .6s}
+@media (prefers-reduced-motion:reduce){body[data-navfx] .dock .navpill,body[data-navfx] .dock .navpill:before,body[data-navfx] .dock .navpill:after{animation:none!important}}
 .navpill{position:absolute;left:0;top:0;border-radius:99px;background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.25);z-index:0;pointer-events:none}
 .gnav .navpill{background:rgba(255,255,255,.24);box-shadow:none}
 .dock button,.gnav button{position:relative;z-index:1}
@@ -1075,7 +1126,8 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
     <div class="fg"><div class="f" style="grid-column:1/-1"><label for="sMcp">AGENTVERSE token (the MCP_TOKEN secret on Cloudflare)</label><input id="sMcp" type="text" class="tok-mask" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><small>Needed for Song Studio on the Cloudflare link. Stays in this browser.</small></div></div>
 
     <h5>Look</h5>
-    <div class="fg"><div class="f"><label for="sTheme">Theme</label><select id="sTheme"><option value="glass">Glass (default)</option><option value="neon">Neon</option></select></div></div>
+    <div class="fg"><div class="f"><label for="sTheme">Theme</label><select id="sTheme"><option value="glass">Glass (default)</option><option value="neon">Neon</option></select></div>
+      <div class="f"><label for="sNav">Nav motion</label><select id="sNav"><option value="liquid">01 · Liquid floating bar</option><option value="magnetic">02 · Magnetic dock</option><option value="capsule">03 · Glass capsule</option><option value="segmented">04 · Segmented dynamic bar</option><option value="orbit">05 · Orbit</option><option value="neon">06 · Cyber neon</option><option value="wave">07 · Wave indicator</option><option value="blob">08 · Morphing blob</option><option value="cards">09 · Layered cards</option><option value="luxury">10 · Minimal luxury</option><option value="classic">Classic (original)</option></select><small>Changes live — tap the side/top nav to see it move.</small></div></div>
 
     <h5>Voice</h5>
     <div class="fg">
@@ -1187,7 +1239,7 @@ var DEFAULT_BRANDS = {
   "LittleLoop":{what:"Instagram channel @little_loop09 with short animated stories for kids.",aud:"Parents of young children.",voice:"Playful, gentle, wholesome.",goal:"Followers who share reels.",ch:"Instagram Reels",top:"bedtime story|good habits|sharing is caring|morning routine for kids"},
   "NIKHILs TECH STUDIO":{what:"AI skills studio: teaching Claude, ChatGPT and Gemini, resume writing, job-hunt tools and custom AI agents.",aud:"Students, job seekers and professionals learning AI.",voice:"Calm, authoritative, premium tech-documentary. Never hyped.",goal:"Followers and first paying learners.",ch:"Instagram Reels, YouTube",top:"SQL interview tip|Claude workflow|resume with AI|AI agent for a small business"}
 };
-var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",mcpToken:"",freeAI:false,immWake:true,ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",engine:"auto",svSpeaker:"",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
+var DEF_SET = {provider:"auto",gkey:"",gmodel:"auto",groqKey:"",groqModel:"auto",orKey:"",orModel:"auto",interval:30,maxHour:4,lang:"en-IN",rate:1,theme:"glass",mcpToken:"",freeAI:false,immWake:true,ytKey:"",ytHandle:"@SURVERSE_09",autopilot:false,voice:"auto",navfx:"liquid",engine:"auto",svSpeaker:"",wake:false,speak:true,convo:false,leadsUrl:"data/leads.json"};
 
 var SIGNALS = [["Lead scraper","LS","#ff3d7f"],["Reddit","R","#ff4500"],["Hacker News","Y","#ff6600"],["RSS feeds","RS","#f59e0b"],["Owner notes","ON","#8b6cff"],["Team memory","M","#4fd1e8"],["YouTube","▶","#e00000"],["Instagram","IG","#d62976"]];
 var RECORD = [["Work board","WB","#f5a623"],["Lead store","LD","#ff7a59"],["Approvals","AP","#8b6cff"],["Activity log","LG","#64748b"],["Brand brains","BB","#16a34a"],["Settings","ST","#3b7ae0"],["Memory","MM","#0ea5e9"]];
@@ -1904,7 +1956,7 @@ $("brandSel").onchange=function(){setBrand(this.value);};
 /* ---------------- settings modal ---------------- */
 function openSettings(){
   $("sProv").value=SET.provider;$("sKey").value=SET.gkey;$("sModel").value=SET.gmodel;$("sGroq").value=SET.groqKey;$("sGroqM").value=SET.groqModel;$("sOR").value=SET.orKey;$("sORM").value=SET.orModel;$("sFree").checked=SET.freeAI!==false;$("sInt").value=SET.interval;$("sMax").value=SET.maxHour;
-  $("sLang").value=SET.lang;$("sTheme").value=SET.theme;$("sMcp").value=SET.mcpToken||"";fillVoices();$("sEngine").value=SET.engine||"auto";svFill();svLoad();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
+  $("sLang").value=SET.lang;$("sTheme").value=SET.theme;$("sNav").value=SET.navfx||"liquid";$("sMcp").value=SET.mcpToken||"";fillVoices();$("sEngine").value=SET.engine||"auto";svFill();svLoad();$("sWake").checked=!!SET.wake;$("sRate").value=SET.rate;$("sLeads").value=SET.leadsUrl;$("sNewBrand").value="";
   renderBrands();$("sBrand").value=ST.brand;loadBrandForm(ST.brand);renderMem();updateBrain();
   $("settings").className="open";modalIn();$("setClose").focus();
 }
@@ -1932,7 +1984,7 @@ $("sSave").onclick=function(){
   if(warn.length)setTimeout(function(){toast(warn.join(" · "),false);},400);
   mk("sModel","gmodel");mk("sGroqM","groqModel");mk("sORM","orModel");
   SET.interval=Math.max(2,+$("sInt").value||30);SET.maxHour=Math.min(20,Math.max(1,+$("sMax").value||4));
-  SET.lang=$("sLang").value;SET.theme=$("sTheme").value;applyTheme();SET.mcpToken=$("sMcp").value.replace(/\s+/g,"");SET.voice=$("sVoice").value||"auto";SET.engine=$("sEngine").value||"auto";SET.svSpeaker=$("sSpeaker").value||"";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
+  SET.lang=$("sLang").value;SET.theme=$("sTheme").value;SET.navfx=$("sNav").value||"liquid";applyTheme();SET.mcpToken=$("sMcp").value.replace(/\s+/g,"");SET.voice=$("sVoice").value||"auto";SET.engine=$("sEngine").value||"auto";SET.svSpeaker=$("sSpeaker").value||"";setWake($("sWake").checked);SET.rate=Math.min(1.6,Math.max(0.6,+$("sRate").value||1));SET.leadsUrl=$("sLeads").value.trim()||DEF_SET.leadsUrl;
   var eb=$("sBrand").value;ST.brands[eb]={what:$("bWhat").value,aud:$("bAud").value,voice:$("bVoice").value,goal:$("bGoal").value,ch:$("bCh").value,top:$("bTop").value||"general update"};
   var nb=$("sNewBrand").value.trim();
   if(nb&&!ST.brands[nb]){ST.brands[nb]={what:"Describe "+nb,aud:"Describe the audience",voice:"Friendly, clear",goal:"Grow followers and leads",ch:"Instagram",top:"intro post|behind the scenes|how it works"};ST.brand=nb;}
@@ -2200,17 +2252,62 @@ function navPills(){
   for(var i=0;i<navs.length;i++){ if(!navs[i].querySelector(".navpill")){ var p=document.createElement("i"); p.className="navpill"; navs[i].insertBefore(p,navs[i].firstChild); } }
   movePills(true);
 }
+var NAVFX=["liquid","magnetic","capsule","segmented","orbit","neon","wave","blob","cards","luxury"];
+function applyNavFx(fx){
+  fx=NAVFX.indexOf(fx)>=0?fx:(fx==="classic"?"classic":"liquid");
+  if(fx==="classic")document.body.removeAttribute("data-navfx"); else document.body.setAttribute("data-navfx",fx);
+  var d=document.querySelectorAll(".dock button"); for(var i=0;i<d.length;i++){ if(HAS_GSAP)gsap.set(d[i],{clearProps:"x,y"}); }
+  movePills(true);
+}
+function pillRect(fx,nav,on){
+  var x=on.offsetLeft,y=on.offsetTop,w=on.offsetWidth,h=on.offsetHeight,vert=nav.classList.contains("vert"),s;
+  if(fx==="capsule"){ s=Math.min(w,h)*.92; return {x:x+(w-s)/2,y:y+(h-s)/2,w:s,h:s}; }
+  if(fx==="orbit"){ s=Math.min(w,h)*.86; return {x:x+(w-s)/2,y:y+(h-s)/2,w:s,h:s}; }
+  if(fx==="segmented"||fx==="cards"||fx==="magnetic"){ return {x:x-2,y:y-2,w:w+4,h:h+4}; }
+  if(fx==="luxury"){ return vert?{x:x-6,y:y+h*.2,w:3,h:h*.6}:{x:x+w*.2,y:y+h-2,w:w*.6,h:3}; }
+  if(fx==="wave"){ return vert?{x:x-8,y:y-h*.25,w:12,h:h*1.5}:{x:x-w*.25,y:y+h-9,w:w*1.5,h:12}; }
+  return {x:x,y:y,w:w,h:h};
+}
 function movePills(instant){
-  var navs=document.querySelectorAll(".dock,.gnav");
+  var navs=document.querySelectorAll(".dock,.gnav"),fx=document.body.getAttribute("data-navfx")||"classic";
   for(var i=0;i<navs.length;i++){
     var nav=navs[i],pill=nav.querySelector(".navpill"),on=nav.querySelector("button.on");
     if(!pill)continue;
     if(!on||getComputedStyle(nav).display==="none"){pill.style.opacity=0;continue;}
-    var x=on.offsetLeft,y=on.offsetTop,w=on.offsetWidth,h=on.offsetHeight;
-    if(MOTION&&!instant){ gsap.to(pill,{x:x,y:y,width:w,height:h,opacity:1,duration:.55,ease:"elastic.out(1,.75)"}); }
-    else{ if(HAS_GSAP){gsap.set(pill,{x:x,y:y,width:w,height:h,opacity:1});}else{pill.style.cssText="opacity:1;transform:translate("+x+"px,"+y+"px);width:"+w+"px;height:"+h+"px";} }
+    var isDock=nav.classList.contains("dock"), f=isDock?fx:"classic";
+    if(isDock)nav.classList.toggle("vert",nav.offsetHeight>nav.offsetWidth);
+    var r=pillRect(f,nav,on), to={x:r.x,y:r.y,width:r.w,height:r.h,opacity:1}, prev=pill._r;
+    pill._r=r;
+    if(MOTION&&!instant){
+      gsap.killTweensOf(pill);
+      if(f==="liquid"&&prev){ /* the drop stretches to cover both tabs, then pulls into the new one */
+        var ux=Math.min(prev.x,r.x),uy=Math.min(prev.y,r.y);
+        gsap.timeline().to(pill,{x:ux,y:uy,width:Math.max(prev.x+prev.w,r.x+r.w)-ux,height:Math.max(prev.y+prev.h,r.y+r.h)-uy,opacity:1,duration:.2,ease:"power2.in"})
+          .to(pill,{x:r.x,y:r.y,width:r.w,height:r.h,duration:.65,ease:"elastic.out(1,.55)"});
+      }
+      else if(f==="segmented"||f==="magnetic"){ gsap.to(pill,Object.assign(to,{duration:.45,ease:"back.out(2.2)"})); }
+      else if(f==="cards"){ gsap.fromTo(pill,{rotation:-8,scale:.85},Object.assign(to,{rotation:0,scale:1,duration:.5,ease:"back.out(1.8)"})); }
+      else if(f==="luxury"){ gsap.to(pill,Object.assign(to,{duration:.85,ease:"power3.inOut"})); }
+      else if(f==="neon"){ gsap.to(pill,Object.assign(to,{duration:.28,ease:"power2.out"})); pill.classList.remove("flick"); void pill.offsetWidth; pill.classList.add("flick"); }
+      else if(f==="capsule"||f==="orbit"){ gsap.fromTo(pill,{scale:.6},Object.assign(to,{scale:1,duration:.55,ease:"back.out(2)"})); }
+      else if(f==="wave"){ gsap.to(pill,Object.assign(to,{duration:.7,ease:"sine.inOut"})); }
+      else if(f==="blob"){ gsap.fromTo(pill,{scaleX:1.25,scaleY:.8},Object.assign(to,{scaleX:1,scaleY:1,duration:.7,ease:"elastic.out(1,.5)"})); }
+      else { gsap.to(pill,Object.assign(to,{duration:.55,ease:"elastic.out(1,.75)"})); }
+    }
+    else{ if(HAS_GSAP){gsap.set(pill,Object.assign(to,{rotation:0,scale:1,scaleX:1,scaleY:1}));}else{pill.style.cssText="opacity:1;transform:translate("+r.x+"px,"+r.y+"px);width:"+r.w+"px;height:"+r.h+"px";} }
   }
 }
+/* 02 magnetic: icons lean toward the pointer */
+(function(){
+  var d=document.querySelector(".dock"); if(!d)return;
+  d.addEventListener("pointermove",function(e){
+    if(document.body.getAttribute("data-navfx")!=="magnetic"||!MOTION)return;
+    var bs=d.querySelectorAll("button");
+    for(var i=0;i<bs.length;i++){ var b=bs[i].getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2,dx=e.clientX-cx,dy=e.clientY-cy,dist=Math.sqrt(dx*dx+dy*dy),k=dist<90?(1-dist/90)*.35:0;
+      gsap.to(bs[i],{x:dx*k,y:dy*k,scale:1+k*.35,duration:.3,ease:"power3.out"}); }
+  });
+  d.addEventListener("pointerleave",function(){ if(!HAS_GSAP)return; gsap.to(d.querySelectorAll("button"),{x:0,y:0,scale:1,duration:.6,ease:"elastic.out(1,.4)"}); });
+})();
 function spotlight(id){
   var el=$(id);if(!el||!document.body.classList.contains("glass"))return;
   var p=el.classList.contains("panel")?el:(el.closest?el.closest(".panel"):null)||el;
@@ -2294,7 +2391,7 @@ function switchView(v){
 }
 
 /* ---------------- theme + glass navigation ---------------- */
-function applyTheme(){ document.body.classList.toggle("glass",SET.theme!=="neon"); setTimeout(function(){drawWires();movePills(true);},80); }
+function applyTheme(){ document.body.classList.toggle("glass",SET.theme!=="neon"); applyNavFx(SET.navfx); setTimeout(function(){drawWires();movePills(true);},80); }
 applyTheme();
 function openVani(){ if(!vaniOpen()){ $("vmin").onclick({stopPropagation:function(){}}); } $("vinput").focus(); }
 function markNav(t,nv){
@@ -2369,6 +2466,7 @@ function onWake(rest){
 document.addEventListener("visibilitychange",function(){ if(document.hidden)stopWake(); else resumeWake(); });
 $("optWake").checked=!!SET.wake;
 $("optWake").onchange=function(){ setWake(this.checked); };
+$("sNav").onchange=function(){ SET.navfx=this.value; applyNavFx(SET.navfx); saveSet(); var on=document.querySelector(".dock button.on"); if(on&&HAS_GSAP){ var p=document.querySelector(".dock .navpill"); if(p)p._r=null; } movePills(false); };
 $("vclear").onclick=function(){ stopSpeaking(); afterSpeak=null; VH=[]; $("vlog").innerHTML=""; vsys("Chat clear. Nayi baat shuru karo."); };
 $("vstop").onclick=function(e){ e.stopPropagation(); afterSpeak=null; stopSpeaking(); resumeWake(); };
 $("sPreview").onclick=function(){ var keep=SET.voice,keepE=SET.engine,keepS=SET.svSpeaker; SET.voice=$("sVoice").value||"auto"; SET.engine=$("sEngine").value||"auto"; SET.svSpeaker=$("sSpeaker").value||""; var was=SET.speak; SET.speak=true;
