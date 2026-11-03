@@ -385,11 +385,20 @@ def transcribe(audio, jid, words=None, hint_text=""):
     m = WhisperModel(os.environ.get("WHISPER_MODEL") or "small", device="cpu", compute_type="int8")
     prompt = ("Hindi song lyrics. " + " ".join((hint_text or "").split()))[:220]
     wt = words is not None
-    segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1, initial_prompt=prompt, word_timestamps=wt)
+    segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1, initial_prompt=prompt, word_timestamps=wt,
+                           vad_parameters={"threshold": 0.3, "min_silence_duration_ms": 400})
     segs = list(segs)
-    if not segs:  # loud music can hide the voice from the voice detector — listen to everything
-        segs, _ = m.transcribe(audio, language="hi", vad_filter=False, beam_size=1, initial_prompt=prompt, word_timestamps=wt)
-        segs = list(segs)
+    expect = len((hint_text or "").split())
+    nwords = sum(len(getattr(sg, "words", None) or []) for sg in segs) if wt else len(segs)
+    if not segs or (wt and expect and nwords < 0.6 * expect):
+        # loud music hides the singer from the voice detector — listen to everything, keep the pass that heard more
+        segs2, _ = m.transcribe(audio, language="hi", vad_filter=False, beam_size=1, initial_prompt=prompt, word_timestamps=wt,
+                                condition_on_previous_text=False)
+        segs2 = list(segs2)
+        n2 = sum(len(getattr(sg, "words", None) or []) for sg in segs2) if wt else len(segs2)
+        log(f"[{jid}] speech-to-text heard {nwords} words with the voice detector, {n2} without (lyric sheet has {expect})")
+        if n2 > nwords:
+            segs = segs2
     if wt:
         for sg in segs:
             for w in (getattr(sg, "words", None) or []):
@@ -724,10 +733,10 @@ def mixed_length(draw, text, fnt):
     return sum(draw.textlength(t, font=f) for t, f in script_runs(text, fnt))
 
 
-def draw_mixed(draw, xy, text, fnt, fill):
+def draw_mixed(draw, xy, text, fnt, fill, **kw):
     x, y = xy
     for t, f in script_runs(text, fnt):
-        draw.text((x, y), t, font=f, fill=fill)
+        draw.text((x, y), t, font=f, fill=fill, **kw)
         x += draw.textlength(t, font=f)
 
 
@@ -879,11 +888,9 @@ def thumbnail(img_path, logo_path, title, out):
     ImageDraw.Draw(grad).rectangle((0, 430, 1280, 720), fill=200)
     im.paste(Image.new("RGB", (1280, 720), (8, 6, 24)), (0, 0), grad.filter(ImageFilter.GaussianBlur(80)))
     d = ImageDraw.Draw(im)
-    f = title_font(d, title, 76, max_w=1100)
     t = title or "Sunverse"
-    while d.textlength(t, font=f) > 1150 and f.size > 40:
-        f = font(f.size - 4, deva=has_deva(title))
-    d.text((60, 560), t, font=f, fill=(255, 255, 255), stroke_width=3, stroke_fill=(30, 10, 60))
+    f = title_font(d, t, 76, max_w=1150)  # Hindi + English title: each script in its own font, shrunk to fit
+    draw_mixed(d, (60, 560), t, f, (255, 255, 255), stroke_width=3, stroke_fill=(30, 10, 60))
     lg = soft_logo(logo_path)
     lg = lg.resize((150, int(150 * lg.height / lg.width)), Image.LANCZOS)
     im.paste(lg, (1280 - 190, 40), lg)

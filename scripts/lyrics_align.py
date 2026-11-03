@@ -118,7 +118,7 @@ def align(sheet_lines, words, roman=None, max_gap=15.0):
         else:
             timed.append({"li": li, "start": None, "end": None, "text": line, "used": set()})
     stats["anchored"] = sum(1 for t in timed if t["start"] is not None)
-    if stats["anchored"] < max(2, 0.4 * len(sheet_lines)):
+    if stats["anchored"] < max(3, 0.3 * len(sheet_lines)):
         return [], stats
 
     # unanchored lines between two anchored ones: share the gap by length (only if the gap is short = still singing)
