@@ -476,3 +476,48 @@ test('owner images: upload, free plan, runner fetches them, clear', async () => 
   assert.deepEqual([...new Uint8Array(await img.arrayBuffer())], [3]);
   assert.equal((await f(`/api/songvideo/${id}/own`, 'DELETE')).status, 409, 'not while rendering');
 });
+
+test('VANI voice: owner-only Sarvam proxy, key stays server-side, caps, cache and clear errors', async () => {
+  const e = { ...env(), SARVAM_API_KEY: 'sk-secret', VANI_TTS_DAILY_CHARS: '40' };
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const call = (path, body, h = H) => worker.fetch(new Request(B + path, body ? { method: 'POST', headers: h, body: JSON.stringify(body) } : { headers: h }), e);
+  assert.equal((await call('/api/vani/config', null, {})).status, 401, 'no token, no config');
+  const cfg = await (await call('/api/vani/config')).json();
+  assert.equal(cfg.enabled, true);
+  assert.equal(cfg.model, 'bulbul:v3');
+  assert.ok(cfg.speakers.includes('simran'));
+  assert.ok(!JSON.stringify(cfg).includes('sk-secret'), 'API key never leaves the Worker');
+  const health = await (await worker.fetch(new Request(B + '/health'), e)).json();
+  assert.equal(health.vaniVoice, true);
+
+  const real = globalThis.fetch;
+  const sent = [];
+  let reply = () => new Response(JSON.stringify({ request_id: 'r', audios: [btoa('ID3fake-mp3-bytes')] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  globalThis.fetch = async (url, init) => { sent.push({ url: String(url), init }); return reply(); };
+  try {
+    assert.equal((await call('/api/vani/tts', { text: 'नमस्ते', speaker: 'evil' })).status, 400, 'speaker allowlist');
+    const r = await call('/api/vani/tts', { text: 'नमस्ते, मैं VANI हूँ', speaker: 'ishita', pace: 1.1 });
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('content-type'), 'audio/mpeg');
+    assert.equal(new TextDecoder().decode(await r.arrayBuffer()), 'ID3fake-mp3-bytes');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].url, 'https://api.sarvam.ai/text-to-speech');
+    assert.equal(sent[0].init.headers['api-subscription-key'], 'sk-secret');
+    const b = JSON.parse(sent[0].init.body);
+    assert.deepEqual([b.language_code, b.speaker, b.pace, b.model], ['hi-IN', 'ishita', 1.1, 'bulbul:v3'], 'Devanagari → hi-IN');
+    const again = await call('/api/vani/tts', { text: 'नमस्ते, मैं VANI हूँ', speaker: 'ishita', pace: 1.1 });
+    assert.equal(again.headers.get('x-vani-cached'), 'true');
+    assert.equal(sent.length, 1, 'repeat phrase served from cache, no credit spent');
+    const cap = await call('/api/vani/tts', { text: 'this sentence is far too long for the tiny test cap' });
+    assert.equal(cap.status, 429, 'daily character cap');
+    reply = () => new Response(JSON.stringify({ error: { message: 'no credits', code: 'insufficient_quota_error' } }), { status: 402 });
+    const out = await call('/api/vani/tts', { text: 'Hi' });
+    assert.equal(out.status, 502);
+    assert.match((await out.json()).error, /credits are used up/);
+  } finally { globalThis.fetch = real; }
+
+  const off = { ...env() };
+  const nokey = await worker.fetch(new Request(B + '/api/vani/tts', { method: 'POST', headers: H, body: JSON.stringify({ text: 'Hi' }) }), off);
+  assert.equal(nokey.status, 503);
+  assert.match((await nokey.json()).error, /SARVAM_API_KEY/);
+});

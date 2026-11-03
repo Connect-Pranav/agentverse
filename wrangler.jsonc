@@ -17,6 +17,21 @@
   // No id: Wrangler creates the KV namespace on the first deploy and keeps the binding afterwards.
   "ai": { "binding": "AI" },
   "kv_namespaces": [{ "binding": "MEDIA" }],
-  "vars": { "SONGVIDEO_IMAGE_USD": "0.067" },
+  // VANI voice (Sarvam Bulbul through /api/vani/tts). The key is the secret SARVAM_API_KEY, never a var.
+  // Model/speaker ids come from https://docs.sarvam.ai/api-reference/text-to-speech/convert — check them there before changing.
+  "vars": {
+    "SONGVIDEO_IMAGE_USD": "0.067",
+    "VANI_VOICE_PROVIDER": "sarvam",
+    "VANI_LANGUAGE": "hi-IN",
+    "VANI_VOICE_PERSONALITY": "natural",
+    "VANI_SPEECH_RATE": "1.0",
+    "VANI_AUTO_PLAY": "true",
+    "VANI_INTERRUPT_ENABLED": "true",
+    "VANI_SARVAM_MODEL": "bulbul:v3",
+    "VANI_SARVAM_SPEAKER": "simran",
+    "VANI_SARVAM_SPEAKERS": "simran,ishita,priya,ritu,kavya,shreya",
+    "VANI_TTS_DAILY_CHARS": "5000",
+    "VANI_TTS_MAX_CHARS": "900"
+  },
   "observability": { "enabled": true }
 }

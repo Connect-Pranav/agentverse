@@ -53,3 +53,43 @@ Personal data is kept only in the Worker's private KV.
 Gmail: in the same Google Cloud project as YouTube enable the **Gmail API**, then in the OAuth Playground authorize
 `https://www.googleapis.com/auth/gmail.send` and `https://www.googleapis.com/auth/gmail.readonly` with your own
 client, exchange, and save the refresh token as repo secret `GMAIL_REFRESH_TOKEN` (plus `YT_CLIENT_ID`, `YT_CLIENT_SECRET`).
+
+## VANI voice — natural Indian female voice (Sarvam Bulbul)
+
+VANI keeps her existing mic, transcript, settings and brain. Only her **voice** can now come from Sarvam AI's
+Bulbul model (Hindi, Hinglish, Indian English) through this Worker:
+
+```
+mic (browser speech recognition, free) → VANI brain (existing chain: Claude/Groq/Gemini/OpenRouter/free/rule brain)
+  → reply (screen, Roman Hinglish) + say (voice script: Hindi in Devanagari, English words kept)
+  → POST /api/vani/tts (owner token) → Worker adds SARVAM_API_KEY → Sarvam → MP3 → plays sentence by sentence
+```
+
+**Setup (one time)**
+1. Sign up at <https://dashboard.sarvam.ai> → API keys → create a key.
+2. Cloudflare → Workers & Pages → `agentverse` → Settings → Variables and Secrets → **Secret** `SARVAM_API_KEY`.
+3. Open AGENTVERSE → Settings → Voice → *Voice engine: Auto* → pick **Sarvam voice** (Simran / Ishita / Priya …) → **Preview voice** to compare.
+
+**Settings (wrangler.jsonc vars, all optional):** `VANI_VOICE_PROVIDER` (`sarvam` | `device`), `VANI_LANGUAGE` (`hi-IN`),
+`VANI_SPEECH_RATE` (`1.0`), `VANI_AUTO_PLAY`, `VANI_INTERRUPT_ENABLED`, `VANI_VOICE_PERSONALITY`,
+`VANI_SARVAM_MODEL` (`bulbul:v3`), `VANI_SARVAM_SPEAKER` (`simran`), `VANI_SARVAM_SPEAKERS` (allowlist),
+`VANI_TTS_DAILY_CHARS` (`5000`), `VANI_TTS_MAX_CHARS` (`900`). Model and speaker ids must match Sarvam's current list:
+<https://docs.sarvam.ai/api-reference/text-to-speech/convert> (bulbul:v3 speakers include simran, ishita, priya, ritu, kavya, shreya).
+
+**Free-tier limits (checked on docs.sarvam.ai, Nov 2026)**
+- Sarvam has **no permanent free tier**: new verified accounts get **₹100 of credits** (they don't expire). After that TTS is
+  pay-as-you-go: bulbul:v3 **₹3 per 1,000 characters**, bulbul:v4-flash ₹1 per 1,000. A typical VANI reply is ~100–200 characters.
+- When the credits run out Sarvam answers 402: VANI shows *"Sarvam credits are used up"* and speaks with the **free device
+  voice**. She never switches to another paid provider.
+- `VANI_TTS_DAILY_CHARS` (default 5000 ≈ ₹15/day on v3) is a hard daily cap enforced in the Worker; resets 05:30 IST.
+- Repeated phrases (greetings, the opening brief) are cached in KV for 14 days and cost nothing the second time.
+- Sarvam allows 60 requests/minute; text up to 2500 characters per request (VANI sends one sentence group at a time).
+- Mic input uses the browser's speech recognition (free; Chrome/Edge send audio to Google for recognition; not available in Firefox).
+- Sarvam announced that **bulbul:v3 voice agents reach end of life on 10 Nov 2026** and recommends Bulbul v4. VANI calls the
+  REST TTS endpoint, which still lists bulbul:v3. To move, set `VANI_SARVAM_MODEL=bulbul:v4-flash` and a matching v4 persona
+  speaker list (e.g. `simran_enhi_companion,ishita_enhi_companion,sanchita_enhi_companion`), then Preview.
+
+**Security:** the key exists only as a Cloudflare secret; `/api/vani/*` needs the owner token; speakers are allowlisted;
+text is capped per request and per day. Only the reply text VANI is about to speak is sent to Sarvam.
+
+**Tests:** `node --test mcp/test/server.test.mjs` (includes the VANI proxy test with Sarvam mocked).

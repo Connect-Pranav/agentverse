@@ -19,6 +19,7 @@
 import * as growth from './growth.mjs';
 import * as push from './push.mjs';
 import * as crm from './crm.mjs';
+import * as vani from './vani.mjs';
 
 const VERSION = '1.3.0';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -722,7 +723,7 @@ async function route(request, env) {
   const method = request.method;
   const len = Number(request.headers.get('content-length') ?? 0);
 
-  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI) }, 200, { 'access-control-allow-origin': '*' });
+  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled }, 200, { 'access-control-allow-origin': '*' });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && seg[2] && method === 'GET') {
     const m = /^(\d{1,2})\.jpg$/.exec(seg[2]);
@@ -737,6 +738,19 @@ async function route(request, env) {
     if (method === 'GET') return new Response(uploadPage(j), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
     if (method === 'PUT') { const r = await storeAudio(env, j, request.body, len, request.headers.get('content-type')); kick(env, ctxOf(request)); return json(view(env, request, r)); }
     throw new HttpError(405, 'Use GET or PUT');
+  }
+  if (seg[0] === 'api' && seg[1] === 'vani') {
+    owner(request, env);
+    try {
+      if (seg[2] === 'config' && method === 'GET') return json(await vani.view(env, kv(env)), 200, { 'cache-control': 'no-store' });
+      if (seg[2] === 'tts' && method === 'POST') {
+        const r = await vani.tts(env, kv(env), await readJson(request, 16 * 1024));
+        const head = new Uint8Array(r.audio instanceof ArrayBuffer ? r.audio : r.audio.buffer ?? r.audio).slice(0, 4);
+        const wav = head[0] === 0x52 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x46; // "RIFF"
+        return new Response(r.audio, { headers: { 'content-type': wav ? 'audio/wav' : 'audio/mpeg', 'cache-control': 'no-store', 'x-vani-cached': String(r.cached), 'x-vani-left-today': String(r.leftToday) } });
+      }
+    } catch (e) { if (e instanceof vani.VaniError) throw new HttpError(e.status, e.message); throw e; }
+    throw new HttpError(404, 'Not found');
   }
   if (path === '/api/brain' && method === 'POST') { if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env); else owner(request, env); return json(await cloudBrain(env, await readJson(request, 64 * 1024))); }
   if (seg[0] === 'api' && seg[1] === 'push') {

@@ -1,0 +1,5 @@
+# Local `npx wrangler dev` secrets for AGENTVERSE. Copy to .dev.vars (git-ignored) and fill in.
+# On Cloudflare set these as Secrets (Worker → Settings → Variables and Secrets), never as plain vars.
+MCP_TOKEN=
+# VANI voice: Sarvam AI key from https://dashboard.sarvam.ai (₹100 free credits on sign-up, then paid per character).
+SARVAM_API_KEY=
