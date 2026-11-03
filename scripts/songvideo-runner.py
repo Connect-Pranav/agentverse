@@ -375,19 +375,27 @@ def cloud_json(system, prompt):
     return json.loads(t[a:b + 1])
 
 
-def transcribe(audio, jid):
-    """Free speech-to-text on the runner (faster-whisper, CPU)."""
+def transcribe(audio, jid, words=None, hint_text=""):
+    """Free speech-to-text on the runner (faster-whisper, CPU). Pass a list as `words` to also get
+    every sung word with its own start/end time (used to lock the lyric sheet to the voice)."""
     from faster_whisper import WhisperModel
     import numpy as np
     pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", audio, "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True, check=True).stdout
     audio = np.frombuffer(pcm, np.int16).astype(np.float32) / 32768.0  # decoded here: newer PyAV broke faster-whisper's own loader
     m = WhisperModel(os.environ.get("WHISPER_MODEL") or "small", device="cpu", compute_type="int8")
-    segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1,
-                           initial_prompt="Hindi song lyrics.")
+    prompt = ("Hindi song lyrics. " + " ".join((hint_text or "").split()))[:220]
+    wt = words is not None
+    segs, _ = m.transcribe(audio, language="hi", vad_filter=True, beam_size=1, initial_prompt=prompt, word_timestamps=wt)
     segs = list(segs)
     if not segs:  # loud music can hide the voice from the voice detector — listen to everything
-        segs, _ = m.transcribe(audio, language="hi", vad_filter=False, beam_size=1, initial_prompt="Hindi song lyrics.")
+        segs, _ = m.transcribe(audio, language="hi", vad_filter=False, beam_size=1, initial_prompt=prompt, word_timestamps=wt)
         segs = list(segs)
+    if wt:
+        for sg in segs:
+            for w in (getattr(sg, "words", None) or []):
+                t = (w.word or "").strip()
+                if t and w.end > w.start:
+                    words.append({"start": round(w.start, 2), "end": round(w.end, 2), "w": t})
     out = []
     for sg in segs:
         t = sg.text.strip()
@@ -471,6 +479,22 @@ def fit_lines(owner_lines, heard, dur):
     return out
 
 
+def sync_to_voice(sheet_lines, words, jid):
+    """Known lyric lines + heard word timings → lines that start when the singer sings them ([] if no match)."""
+    if not sheet_lines or not words:
+        return []
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import lyrics_align
+    try:
+        out, st = lyrics_align.align(sheet_lines, words, roman=to_roman)
+    except Exception as e:
+        log(f"[{jid}] lyric sync failed: {redact(e)}")
+        return []
+    log(f"[{jid}] lyric sync: {st['matched']}/{st['sheet_words']} sheet words heard, {st['anchored']}/{st['lines']} lines locked to the voice, "
+        f"{st['repeats']} repeated lines" + ("" if out else " — too few matches, keeping the old timing"))
+    return out
+
+
 def corrections_text(job):
     fx = [c for c in (job.get("corrections") or []) if c.get("text") or c.get("areas")]
     if not fx:
@@ -513,15 +537,19 @@ def analyze_free(job, work, audio, dur, jid):
     timed = parse_lrc(sheet, dur)
     owner_lines = [] if timed else lyric_lines_of(sheet)
     progress(jid, "analyze", "Listening to the lyrics (free speech-to-text)", 2, 4, max(60, dur * 0.6))
-    heard = []
+    heard, words = [], []
     if not timed:
         try:
-            heard = transcribe(audio, jid)
+            heard = transcribe(audio, jid, words=words, hint_text=" ".join(owner_lines))
         except Exception as e:
             log(f"[{jid}] transcription failed: {redact(e)}")
     lines = timed or heard
-    if owner_lines:  # owner / embedded lyrics are the truth; place them where the singer is heard
-        lines = fit_lines(owner_lines, heard, dur)
+    if not timed and not owner_lines and words:  # no sheet: caption lines cut at the singer's breaths, not 30 s blocks
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import lyrics_align
+        lines = lyrics_align.words_to_lines(words) or heard
+    if owner_lines:  # owner / embedded lyrics are the truth; lock each line to when the singer sings it
+        lines = sync_to_voice(owner_lines, words, jid) or fit_lines(owner_lines, heard, dur)
     progress(jid, "analyze", "Reading mood, theme and story", 3, 4, 40)
     for l in lines[:120]:
         l["text"] = to_roman(l["text"]) or l["text"]
@@ -615,6 +643,17 @@ def analyze(job, work):
             lrc = parse_lrc(job.get("lyrics") or "", dur)
             if lrc:  # owner's .lrc timings beat any guess
                 a["lyrics_lines"] = [{**l, "text": to_roman(l["text"]) or l["text"]} for l in lrc]
+            elif a.get("lyrics_lines"):  # Gemini's timestamps are guesses: lock its lines to the heard voice
+                progress(jid, "analyze", "Syncing the lyrics to the singer's voice", 3, 4, max(60, dur * 0.6))
+                try:
+                    words = []
+                    transcribe(audio, jid, words=words, hint_text=lyrics)
+                    gl = [str(l.get("text") or "").strip() for l in a["lyrics_lines"] if str(l.get("text") or "").strip()]
+                    synced = sync_to_voice(gl, words, jid)
+                    if synced:
+                        a["lyrics_lines"] = synced
+                except Exception as e:
+                    log(f"[{jid}] voice sync skipped: {redact(e)}")
             a["image_engine"] = (os.environ.get("SONGVIDEO_IMAGE_ENGINE") or ("gemini" if paid_gemini() else "gemini-free")).lower()
             a["source"] = model
             # make scenes contiguous and inside the song

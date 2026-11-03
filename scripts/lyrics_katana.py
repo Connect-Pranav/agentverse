@@ -81,8 +81,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if not rows:
         open(path, "w", encoding="utf-8").write(head)
         return 0
+    rows.sort(key=lambda r: r[0])
     for i in range(len(rows) - 1):
         rows[i][1] = min(rows[i][1], rows[i + 1][0] - STRIKE / 2)
+    # a line squeezed to a blink (e.g. pushed past the intro onto the next line) only flashes: drop it
+    rows = [r for r in rows if r[1] - r[0] >= 0.5]
+    if not rows:
+        open(path, "w", encoding="utf-8").write(head)
+        return 0
 
     ev = []
     blade = "m 0 0 l 520 -5 l 1040 0 l 520 5"       # tapered blade streak
