@@ -74,7 +74,7 @@ jobs:
           SONGVIDEO_IMAGE_ENGINE: ${{ vars.SONGVIDEO_IMAGE_ENGINE }}
           SONGVIDEO_IMAGE_USD: ${{ vars.SONGVIDEO_IMAGE_USD }}
           GEMINI_BILLING: ${{ vars.GEMINI_BILLING }}
-          SONGVIDEO_CAPTIONS: ${{ vars.SONGVIDEO_CAPTIONS }}
+          SONGVIDEO_LYRICS: ${{ vars.SONGVIDEO_LYRICS }}   # lyrics off unless this is 'on'
           WHISPER_MODEL: ${{ vars.WHISPER_MODEL }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}

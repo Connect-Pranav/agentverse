@@ -23,7 +23,8 @@ import base64, json, math, os, re, shutil, subprocess, sys, tempfile, time, urll
 GL = "https://generativelanguage.googleapis.com"
 PART = 22 * 1024 * 1024
 W, H, FPS = 1920, 1080, 24
-CAPTIONS = (os.environ.get("SONGVIDEO_CAPTIONS") or "on").lower() not in ("off", "0", "false", "no")  # katana-strike lyrics
+# Lyrics on screen are OFF: their timing did not match the song. Opt back in with repo variable SONGVIDEO_LYRICS=on.
+CAPTIONS = (os.environ.get("SONGVIDEO_LYRICS") or "off").lower() in ("on", "1", "true", "yes")  # katana-strike lyrics
 INTRO_S, CREDITS_S, OUTRO_S = 5.0, 4.0, 5.0
 
 
@@ -1117,7 +1118,7 @@ def render(job, work):
     filt.append(f"[wi][oc]overlay=0:0:eof_action=pass,subtitles='{ass}'[vout]")
     filt.append(f"[{n + 2}:a]afade=t=in:d=1.5,apad,atrim=0:{total:.3f},afade=t=out:st={dur - 2:.3f}:d=2[aout]")
     out = os.path.join(work, "video.mp4")
-    progress(jid, "render", "Encoding the MP4 (logo intro, credits, lyrics)", n_sc, n_sc, enc_est + up_est)
+    progress(jid, "render", "Encoding the MP4 (logo intro, credits" + (", lyrics)" if CAPTIONS else ")"), n_sc, n_sc, enc_est + up_est)
     run(["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(filt), "-map", "[vout]", "-map", "[aout]",
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", str(FPS),
          "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", f"{total:.3f}", out])
