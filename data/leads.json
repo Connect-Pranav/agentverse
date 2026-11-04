@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-04T06:14:29.792Z",
- "count": 3,
+ "updated": "2026-11-04T14:32:48.762Z",
+ "count": 4,
  "health": {
   "reddit": {
    "ok": 0,
@@ -30,6 +30,24 @@
  },
  "reddit": "public",
  "leads": [
+  {
+   "id": "md_117558004836674167",
+   "source": "mastodon #hiring",
+   "title": "🔥 Hiring Alert! | Senior AI Consultant $100–150/hr, remote contract. ✅ LLM and agent work taken into producti",
+   "text": "🔥 Hiring Alert! | Senior AI Consultant $100–150/hr, remote contract. ✅ LLM and agent work taken into production ✅ Scoping client engagements from discovery onward ✅ Recommending architectures and implementation approaches ✅ Independent consultants, certified through the network AI folks, what made the difference between a pilot that shipped and one that stalled? 👉 Apply here: https:// nearskill.in/jobs/senior-ai-co nsultant-18128 # ArtificialIntelligence # RemoteJobs # Hiring # AIJobs",
+   "url": "https://mastodon.social/@nearskill/117558004836674167",
+   "author": "nearskill",
+   "created": "2026-11-04T11:46:38.413Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 8,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-04T14:32:48.762Z"
+  },
   {
    "id": "md_117548081819263299",
    "source": "mastodon #getfedihired",
