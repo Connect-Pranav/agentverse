@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-04T14:32:48.762Z",
- "count": 4,
+ "updated": "2026-11-04T23:39:25.193Z",
+ "count": 3,
  "health": {
   "reddit": {
    "ok": 0,
@@ -47,24 +47,6 @@
     "llm"
    ],
    "firstSeen": "2026-11-04T14:32:48.762Z"
-  },
-  {
-   "id": "md_117548081819263299",
-   "source": "mastodon #getfedihired",
-   "title": "Mark’s contributions to design systems, and to front-end more generally, have been a massive influence on me. ",
-   "text": "Mark’s contributions to design systems, and to front-end more generally, have been a massive influence on me. If you’re hiring or know someone who is, you should absolutely reach out to him. # GetFediHired https:// ruby.social/@allmarkedup/11754 1729702013338",
-   "url": "https://follow.ethanmarcotte.com/@beep/117548078228679765",
-   "author": "beep@follow.ethanmarcotte.com",
-   "created": "2026-11-02T17:42:10.000Z",
-   "product": "NIKHILs TECH STUDIO",
-   "products": [
-    "NIKHILs TECH STUDIO"
-   ],
-   "score": 5,
-   "matched": [
-    "llm"
-   ],
-   "firstSeen": "2026-11-03T00:56:58.679Z"
   },
   {
    "id": "md_117544238089019823",
