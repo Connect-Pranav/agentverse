@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-05T06:42:28.251Z",
- "count": 3,
+ "updated": "2026-11-05T19:55:49.656Z",
+ "count": 4,
  "health": {
   "reddit": {
    "ok": 0,
@@ -47,6 +47,24 @@
     "llm"
    ],
    "firstSeen": "2026-11-04T14:32:48.762Z"
+  },
+  {
+   "id": "md_117564769562593772",
+   "source": "mastodon #hiring",
+   "title": "🔥 Hiring Alert! | Senior Software Engineer, LLM Evaluation & Repository Validation Remote contract, 20 hrs/we",
+   "text": "🔥 Hiring Alert! | Senior Software Engineer, LLM Evaluation & Repository Validation Remote contract, 20 hrs/week, pay discussed during screening ✅ Triaging issues across trending open-source libraries ✅ Setting up repos with Docker and environments How do you decide when an open-source project is well maintained? 👉 Apply here: https:// nearskill.in/jobs/senior-softw are-engineer-llm-evaluation-repository-validation-34123 # Hiring # Python # RemoteJobs # AIJobs",
+   "url": "https://mastodon.social/@nearskill/117564769562593772",
+   "author": "nearskill",
+   "created": "2026-11-05T16:26:59.949Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 6,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-05T19:55:49.656Z"
   },
   {
    "id": "md_117544238089019823",
