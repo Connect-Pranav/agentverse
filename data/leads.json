@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-08T13:20:26.126Z",
- "count": 4,
+ "updated": "2026-11-08T22:01:51.179Z",
+ "count": 5,
  "health": {
   "reddit": {
    "ok": 0,
@@ -47,6 +47,24 @@
     "llm"
    ],
    "firstSeen": "2026-11-04T14:32:48.762Z"
+  },
+  {
+   "id": "md_117582123717949254",
+   "source": "mastodon #getfedihired",
+   "title": "💼 Citi is hiring a Generative AI Data Scientist - Deep Learning and LLM Location: 🇮🇳 Pune, Maharashtra, Ind",
+   "text": "💼 Citi is hiring a Generative AI Data Scientist - Deep Learning and LLM Location: 🇮🇳 Pune, Maharashtra, India # DataScience # DataScientist # tech # JobSearch # GetFediHired # HashyJobs # # Citi https:// datasciencejobs.com/jobs/gener ative-ai-data-scientist-citi-india-66/",
+   "url": "https://mastodon.social/@datasciencejobs/117582123717949254",
+   "author": "datasciencejobs",
+   "created": "2026-11-08T18:00:23.337Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 5,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-08T22:01:51.179Z"
   },
   {
    "id": "md_117564769562593772",
