@@ -20,6 +20,8 @@ import * as growth from './growth.mjs';
 import * as push from './push.mjs';
 import * as crm from './crm.mjs';
 import * as vani from './vani.mjs';
+import * as telegram from './telegram.mjs';
+import * as work from './work.mjs';
 
 const VERSION = '1.3.0';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -723,7 +725,18 @@ async function route(request, env) {
   const method = request.method;
   const len = Number(request.headers.get('content-length') ?? 0);
 
-  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled }, 200, { 'access-control-allow-origin': '*' });
+  if (method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'access-control-allow-headers': 'content-type, authorization',
+      },
+    });
+  }
+
+  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled, telegramBot: Boolean(env.TELEGRAM_BOT_TOKEN) }, 200, { 'access-control-allow-origin': '*' });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && seg[2] && method === 'GET') {
     const m = /^(\d{1,2})\.jpg$/.exec(seg[2]);
@@ -761,6 +774,51 @@ async function route(request, env) {
     if (seg[2] === 'test' && method === 'POST') return json({ sent: await push.notify(kv(env), { title: 'AGENTVERSE', body: 'Notifications are on ✓', url: '/', tag: 'test' }) });
     throw new HttpError(404, 'Not found');
   }
+  if (seg[0] === 'api' && seg[1] === 'telegram') {
+    if (seg[2] === 'webhook' && method === 'POST') {
+      const update = await readJson(request);
+      const res = await telegram.handleWebhook(env, update, async (action, type, id) => {
+        if (type === 'song') {
+          const j = await jobOf(env, id);
+          await decide(env, j, action);
+          if (action === 'approve') kick(env, ctxOf(request));
+          return { message: action === 'approve' ? '🎵 Song job approved & rendering started' : '🎵 Song job rejected' };
+        }
+        if (type === 'work') {
+          return work.decide(kv(env), id, action);
+        }
+        if (type === 'crm') {
+          return crm.decide(kv(env), id, { action });
+        }
+        return { message: `${action} applied to ${type} ${id}` };
+      });
+      return json(res, 200, { 'access-control-allow-origin': '*' });
+    }
+    owner(request, env);
+    if (seg[2] === 'test' && method === 'POST') {
+      const ok = await telegram.sendTelegramMessage(env, '⚡ <b>AGENTVERSE Telegram Bot Connected!</b>\nYou will receive instant 1-click approvals for agent content, song videos, and high-intent leads here.');
+      return json({ sent: ok });
+    }
+    throw new HttpError(404, 'Not found');
+  }
+  if (seg[0] === 'api' && seg[1] === 'work') {
+    const k = kv(env);
+    if (method === 'GET' && !seg[2]) {
+      return json(await work.load(k), 200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+    }
+    if (seg[2] === 'upsert' && method === 'POST') {
+      if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env);
+      else owner(request, env);
+      const payload = await readJson(request, 1024 * 1024);
+      return json(await work.upsert(k, env, payload), 200, { 'access-control-allow-origin': '*' });
+    }
+    if (seg[2] === 'decide' && method === 'POST') {
+      owner(request, env);
+      const { id, action } = await readJson(request);
+      return json(await work.decide(k, id, action), 200, { 'access-control-allow-origin': '*' });
+    }
+    throw new HttpError(404, 'Not found');
+  }
   if (seg[0] === 'api' && seg[1] === 'crm') {
     const k = kv(env);
     if (seg[2] === 'runner') {
@@ -769,7 +827,12 @@ async function route(request, env) {
       if (seg[3] === 'report' && method === 'POST') {
         const before = crm.ownerView(await crm.load(k), 0).counts;
         const v = crm.ownerView(await crm.runnerReport(k, await readJson(request, 1024 * 1024)), 0);
-        if (v.counts.new > before.new) ping(env, request, { title: 'New Foliocraft leads', body: `${v.counts.new - before.new} new lead${v.counts.new - before.new > 1 ? 's' : ''} ready to approve.`, url: '/#leads', tag: 'crm-new' });
+        if (v.counts.new > before.new) {
+          ping(env, request, { title: 'New Foliocraft leads', body: `${v.counts.new - before.new} new lead${v.counts.new - before.new > 1 ? 's' : ''} ready to approve.`, url: '/#leads', tag: 'crm-new' });
+          const c = ctxOf(request);
+          const t = telegram.sendTelegramMessage(env, `🎯 <b>${v.counts.new - before.new} New Foliocraft Leads Ready</b>\nCheck the Leads page to review and send outreach.`);
+          if (c?.waitUntil) c.waitUntil(t);
+        }
         if (v.counts.replied > before.replied) ping(env, request, { title: 'A lead replied 💬', body: `${v.counts.replied - before.replied} new repl${v.counts.replied - before.replied > 1 ? 'ies' : 'y'} in the Foliocraft inbox.`, url: '/#leads', tag: 'crm-reply' });
         return json(v);
       }
@@ -843,6 +906,17 @@ async function route(request, env) {
       ping(env, request, r.status === 'needs_approval'
         ? { title: 'Approve the images', body: `${songName(r)}: ${r.imageCount} images, est. ${r.estCostInr ? '₹' + r.estCostInr : '$' + r.estCostUsd}. Tap to approve.`, tag: r.id }
         : { title: 'Song analysed', body: `${songName(r)}: ${r.analysis?.mood || ''} — making ${r.imageCount} images and the video now.`, tag: r.id });
+      if (r.status === 'needs_approval') {
+        const c = ctxOf(request);
+        const t = telegram.notifyApproval(env, {
+          id: r.id,
+          type: 'song',
+          title: songName(r),
+          estCost: r.estCostInr ? `₹${r.estCostInr}` : `$${r.estCostUsd}`,
+          summary: `${r.imageCount} images · ${r.analysis?.mood || ''}`,
+        });
+        if (c?.waitUntil) c.waitUntil(t);
+      }
       return json({ job: runnerView(r) });
     }
     if (seg[4] === 'video' && method === 'PUT') {

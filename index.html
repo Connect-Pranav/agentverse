@@ -1744,6 +1744,7 @@ function approve(id){
   if(o.lead_id){ST.leadState[o.lead_id]="drafted";}
   markFeedDone(id,true);toast("Approved · "+o.title,true);pulse("Owner","Orchestrator","#8b6cff");
   addTerm([["","✓ owner.approved(\""+o.title.slice(0,30)+"\")"]]);
+  if(SET.mcpToken){ try{fetch("/api/work/decide",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+SET.mcpToken},body:JSON.stringify({id:id,action:"approve"})});}catch(e){} }
   save();renderBoard();refreshStats();return true;
 }
 function reject(id,reason){
@@ -1751,6 +1752,7 @@ function reject(id,reason){
   o.status="rejected";learn("Rejected ("+o.dept+"): "+o.title+(reason?" — reason: "+reason:""));
   markFeedDone(id,false);toast("Rejected · "+o.title,false);
   addTerm([["p","✕ owner.rejected() → team learns"]]);
+  if(SET.mcpToken){ try{fetch("/api/work/decide",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+SET.mcpToken},body:JSON.stringify({id:id,action:"reject"})});}catch(e){} }
   save();renderBoard();refreshStats();return true;
 }
 
@@ -2665,11 +2667,16 @@ function ytRender(){
 })();
 
 
-/* ---------------- 24/7 server agent results (GitHub Actions → data/work.json) ---------------- */
+/* ---------------- 24/7 server agent results (Cloudflare KV / GitHub Actions) ---------------- */
 var SERVER=null;
 function loadWork(){
   if(!window.fetch)return;
-  fetch(DATA_BASE+"data/work.json?t="+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(w){
+  var workUrl = (location.hostname.indexOf("workers.dev")>=0 || location.pathname.indexOf("/mcp")>=0) ? "/api/work" : DATA_BASE+"data/work.json?t="+Date.now();
+  fetch(workUrl).then(function(r){
+    if(!r.ok && workUrl !== DATA_BASE+"data/work.json?t="+Date.now()) return fetch(DATA_BASE+"data/work.json?t="+Date.now()).then(function(r2){if(!r2.ok)throw 0;return r2.json();});
+    if(!r.ok)throw 0;
+    return r.json();
+  }).then(function(w){
     SERVER=w; var have={},i,n=0; for(i=0;i<ST.outputs.length;i++)have[ST.outputs[i].id]=1;
     ST.serverSeen=ST.serverSeen||{};
     for(i=(w.items||[]).length-1;i>=0;i--){ var it=w.items[i]; if(have[it.id]||ST.serverSeen[it.id])continue; ST.serverSeen[it.id]=1; ST.outputs.unshift(it); n++;

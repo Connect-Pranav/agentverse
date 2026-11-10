@@ -19,7 +19,16 @@ Autonomous social media & growth agent team + VANI voice agent + free lead scrap
 ## Cloudflare (free, auto-updates on every commit)
 1. Cloudflare dashboard → Workers & Pages → Create → **Import a repository** → GitHub → `agentverse`.
 2. Project name `agentverse`, build command: (leave empty), deploy command: `npx wrangler deploy`.
-3. Deploy → live at `https://agentverse.pravanigroup.workers.dev`. Every new commit (including the 6-hourly leads update) redeploys automatically.
+3. Deploy → live at `https://agentverse.pravanigroup.workers.dev`. Every new commit redeploys automatically.
+
+## Telegram 1-Click Mobile Approvals (Optional)
+Manage your agency and review agent drafts on your phone with one tap:
+1. Create a bot via [@BotFather](https://t.me/BotFather) → copy `TELEGRAM_BOT_TOKEN`.
+2. Get your numeric ID from [@userinfobot](https://t.me/userinfobot) → `TELEGRAM_CHAT_ID`.
+3. Cloudflare Worker → Settings → Variables and Secrets → add **secret** `TELEGRAM_BOT_TOKEN` and var `TELEGRAM_CHAT_ID`.
+4. Set the webhook in your browser:
+   `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-worker>.workers.dev/api/telegram/webhook`
+5. You'll now receive instant interactive cards with `[✅ Approve]` and `[❌ Reject]` buttons whenever an agent produces content or when a song video is ready for review!
 
 ## Optional secrets (Settings → Secrets → Actions)
 - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` — free "script" app at reddit.com/prefs/apps. Strongly recommended: Reddit often blocks GitHub servers without it.

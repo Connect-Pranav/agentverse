@@ -521,3 +521,113 @@ test('VANI voice: owner-only Sarvam proxy, key stays server-side, caps, cache an
   assert.equal(nokey.status, 503);
   assert.match((await nokey.json()).error, /SARVAM_API_KEY/);
 });
+
+test('Work KV store: upsert agent outputs, live query and approval decisions', async () => {
+  const e = env();
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+
+  // 1. Initial load should return empty work object
+  const initial = await (await worker.fetch(new Request(B + '/api/work'), e)).json();
+  assert.deepEqual(initial.items, []);
+  assert.equal(initial.cycles, 0);
+
+  // 2. Upsert work items from agent cycle
+  const upsertRes = await worker.fetch(new Request(B + '/api/work/upsert', {
+    method: 'POST',
+    headers: H,
+    body: JSON.stringify({
+      brand: 'Foliocraft',
+      topic: 'Freelance Portfolio Secrets',
+      why: 'High audience search volume',
+      summary: 'Drafted 2 items',
+      model: 'gemini-2.5-flash',
+      items: [
+        { id: 'item_1', dept: 'Content Engine', title: 'Viral Reel Script', body: 'Hook: Stop using PDF resumes.', needs_approval: true },
+        { id: 'item_2', dept: 'Search Visibility', title: 'SEO Keywords', body: 'Keywords: portfolio, dev', needs_approval: false },
+      ],
+    }),
+  }), e);
+
+  assert.equal(upsertRes.status, 200);
+  const updated = await upsertRes.json();
+  assert.equal(updated.cycles, 1);
+  assert.equal(updated.items.length, 2);
+  assert.equal(updated.items[0].status, 'waiting');
+  assert.equal(updated.items[1].status, 'ready');
+
+  // 3. Live query from dashboard should return the updated items
+  const query = await (await worker.fetch(new Request(B + '/api/work'), e)).json();
+  assert.equal(query.items.length, 2);
+  assert.equal(query.last.brand, 'Foliocraft');
+
+  // 4. Owner approves item_1
+  const decideRes = await worker.fetch(new Request(B + '/api/work/decide', {
+    method: 'POST',
+    headers: H,
+    body: JSON.stringify({ id: 'item_1', action: 'approve' }),
+  }), e);
+
+  assert.equal(decideRes.status, 200);
+  const decideJson = await decideRes.json();
+  assert.equal(decideJson.item.status, 'ready');
+  assert.equal(decideJson.success, true);
+});
+
+test('Telegram bot: webhook handles 1-click inline button approvals', async () => {
+  const e = { ...env(), TELEGRAM_BOT_TOKEN: '123456:bot-token', TELEGRAM_CHAT_ID: '987654321' };
+  const H = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+
+  // First create a work item waiting for approval
+  await worker.fetch(new Request(B + '/api/work/upsert', {
+    method: 'POST',
+    headers: H,
+    body: JSON.stringify({
+      brand: 'Sunverse',
+      topic: 'New Release',
+      items: [{ id: 'tg_test_item', dept: 'Publishing & Social', title: 'YouTube Community Post', body: 'Check out our new song', needs_approval: true }],
+    }),
+  }), e);
+
+  // Mock global fetch for Telegram API endpoints (answerCallbackQuery, editMessageText)
+  const real = globalThis.fetch;
+  const tgCalls = [];
+  globalThis.fetch = async (url, init) => {
+    tgCalls.push({ url: String(url), body: JSON.parse(init.body || '{}') });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  try {
+    // Simulate user tapping "Approve" button in Telegram
+    const webhookRes = await worker.fetch(new Request(B + '/api/telegram/webhook', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        callback_query: {
+          id: 'cq_123',
+          data: 'app:work:tg_test_item',
+          message: {
+            message_id: 42,
+            chat: { id: 987654321 },
+            text: '⚡ AGENTVERSE Approval Request\nYouTube Community Post',
+          },
+        },
+      }),
+    }), e);
+
+    assert.equal(webhookRes.status, 200);
+    const whJson = await webhookRes.json();
+    assert.equal(whJson.handled, true);
+    assert.equal(whJson.action, 'approve');
+
+    // Verify item is now approved in KV
+    const workState = await (await worker.fetch(new Request(B + '/api/work'), e)).json();
+    const item = workState.items.find((x) => x.id === 'tg_test_item');
+    assert.equal(item.status, 'ready');
+
+    // Verify Telegram callback query answered and message updated
+    assert.ok(tgCalls.some((c) => c.url.includes('answerCallbackQuery')));
+    assert.ok(tgCalls.some((c) => c.url.includes('editMessageText')));
+  } finally {
+    globalThis.fetch = real;
+  }
+});

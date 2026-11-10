@@ -27,9 +27,9 @@
     "VANI_SPEECH_RATE": "1.0",
     "VANI_AUTO_PLAY": "true",
     "VANI_INTERRUPT_ENABLED": "true",
-    "VANI_SARVAM_MODEL": "bulbul:v3",
+    "VANI_SARVAM_MODEL": "bulbul:v4-flash",
     "VANI_SARVAM_SPEAKER": "simran",
-    "VANI_SARVAM_SPEAKERS": "simran,ishita,priya,ritu,kavya,shreya",
+    "VANI_SARVAM_SPEAKERS": "simran,ishita,priya,ritu,kavya,shreya,sanchita,simran_enhi_companion,ishita_enhi_companion,sanchita_enhi_companion",
     "VANI_TTS_DAILY_CHARS": "5000",
     "VANI_TTS_MAX_CHARS": "900"
   },

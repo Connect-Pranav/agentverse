@@ -21,7 +21,7 @@
 
 const SARVAM_URL = 'https://api.sarvam.ai/text-to-speech';
 const LANGS = ['bn-IN', 'en-IN', 'gu-IN', 'hi-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'od-IN', 'pa-IN', 'ta-IN', 'te-IN'];
-const DEF_SPEAKERS = 'simran,ishita,priya,ritu,kavya,shreya';
+const DEF_SPEAKERS = 'simran,ishita,priya,ritu,kavya,shreya,sanchita,simran_enhi_companion,ishita_enhi_companion,sanchita_enhi_companion';
 
 export class VaniError extends Error {
   constructor(status, message) { super(message); this.status = status; }

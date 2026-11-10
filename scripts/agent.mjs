@@ -106,3 +106,31 @@ WORK.updated = now;
 WORK.last = { brand, topic: out.topic, why: out.why, summary: out.summary, brain: used, model: res.model, count: items.length };
 fs.writeFileSync("data/work.json", JSON.stringify(WORK, null, 1));
 log(`cycle ${WORK.cycles}: ${brand} · "${out.topic}" · ${items.length} items via ${used}/${res.model}`);
+
+// Direct real-time sync to Cloudflare KV (live in dashboard & instant Telegram notification)
+if (CLOUD_URL && (K.cloud || process.env.SV_MCP_TOKEN)) {
+  try {
+    const token = K.cloud || process.env.SV_MCP_TOKEN;
+    const r = await fetch(CLOUD_URL + "/api/work/upsert", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 AGENTVERSE-agent",
+      },
+      body: JSON.stringify({
+        brand,
+        topic: out.topic,
+        why: out.why,
+        summary: out.summary,
+        model: res.model,
+        brain: used,
+        items,
+      }),
+    });
+    if (r.ok) log("✓ synced to Cloudflare KV (instant live database & Telegram alert dispatched)");
+    else log("Cloudflare KV sync status:", r.status);
+  } catch (e) {
+    log("Cloudflare KV sync error:", e.message);
+  }
+}
