@@ -631,3 +631,36 @@ test('Telegram bot: webhook handles 1-click inline button approvals', async () =
     globalThis.fetch = real;
   }
 });
+
+test('Telegram bot: /start message returns chat id', async () => {
+  const e = { ...env(), TELEGRAM_BOT_TOKEN: '123456:bot-token' };
+  const real = globalThis.fetch;
+  const sentMessages = [];
+  globalThis.fetch = async (url, init) => {
+    sentMessages.push({ url: String(url), body: JSON.parse(init.body || '{}') });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  try {
+    const res = await worker.fetch(new Request(B + '/api/telegram/webhook', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          message_id: 1,
+          chat: { id: 777888999 },
+          from: { first_name: 'Pranav' },
+          text: '/start',
+        },
+      }),
+    }), e);
+
+    assert.equal(res.status, 200);
+    const json = await res.json();
+    assert.equal(json.handled, true);
+    assert.equal(json.chatId, 777888999);
+    assert.ok(sentMessages.some((m) => m.body.chat_id === 777888999 && m.body.text.includes('777888999')));
+  } finally {
+    globalThis.fetch = real;
+  }
+});

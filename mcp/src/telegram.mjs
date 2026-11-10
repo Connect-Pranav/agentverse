@@ -57,7 +57,36 @@ export async function notifyApproval(env, { id, type, title, brand, summary, est
 }
 
 export async function handleWebhook(env, update, onAction, fetchImpl = fetch) {
-  if (!update || !update.callback_query) return { ok: true, handled: false };
+  if (!update) return { ok: true, handled: false };
+
+  // Handle direct messages (e.g. /start, /help) to give the user their chat ID instantly
+  if (update.message) {
+    const msg = update.message;
+    const chatId = msg.chat?.id;
+    const fromName = msg.from?.first_name || 'there';
+    if (chatId && env.TELEGRAM_BOT_TOKEN) {
+      const welcome = `👋 <b>Hello ${escapeHtml(fromName)}! Welcome to AGENTVERSE.</b>\n\n` +
+        `Your Telegram Chat ID is:\n<code>${chatId}</code>\n\n` +
+        `🔑 <b>Next Step:</b>\n` +
+        `Add <code>TELEGRAM_CHAT_ID = ${chatId}</code> in your Cloudflare Worker Settings (Variables and Secrets) so your 8 AI agents can send you 1-click mobile approvals right here!`;
+
+      try {
+        await fetchImpl(`${TG_API}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: welcome,
+            parse_mode: 'HTML',
+          }),
+        });
+      } catch {}
+      return { ok: true, handled: true, type: 'message', chatId };
+    }
+    return { ok: true, handled: false };
+  }
+
+  if (!update.callback_query) return { ok: true, handled: false };
   const cq = update.callback_query;
   const data = cq.data || '';
   const parts = data.split(':');
