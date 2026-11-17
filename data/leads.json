@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-17T07:52:09.055Z",
- "count": 1,
+ "updated": "2026-11-17T20:53:34.564Z",
+ "count": 2,
  "health": {
   "reddit": {
    "ok": 0,
@@ -30,6 +30,24 @@
  },
  "reddit": "public",
  "leads": [
+  {
+   "id": "md_117630692133374479",
+   "source": "mastodon #hiring",
+   "title": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract. Pay discussed during screening. ✅ Pyt",
+   "text": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract. Pay discussed during screening. ✅ Python code datasets for model training ✅ Reviewing AI-generated code for reliability ✅ Building Python agents and verification tools How do you spot a code review that needs a closer look? 👉 Apply here: https:// nearskill.in/jobs/senior-pytho n-engineer-llm-evaluation-us-based-73094?utm_source=mastodon&utm_medium=social # Python # Hiring # RemoteJobs # AIJobs",
+   "url": "https://mastodon.social/@nearskill/117630692133374479",
+   "author": "nearskill",
+   "created": "2026-11-17T07:51:58.542Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 6,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-17T20:53:34.564Z"
+  },
   {
    "id": "md_117627973475121746",
    "source": "mastodon #hiring",
