@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-18T07:23:54.412Z",
- "count": 2,
+ "updated": "2026-11-18T20:28:43.596Z",
+ "count": 1,
  "health": {
   "reddit": {
    "ok": 0,
@@ -47,24 +47,6 @@
     "llm"
    ],
    "firstSeen": "2026-11-17T20:53:34.564Z"
-  },
-  {
-   "id": "md_117627973475121746",
-   "source": "mastodon #hiring",
-   "title": "Front End collapsed from 27% of postings in early 2022 to 6.6% now. That is the number that matters in the lat",
-   "text": "Front End collapsed from 27% of postings in early 2022 to 6.6% now. That is the number that matters in the latest HN \"Who is Hiring\" breakdown. The thread itself is thin - 244 jobs in November, 37% below last year, and August's 224 was the fewest since January 2014. Fewer seats, and the seats that remain changed shape: AI is in 51.6% of postings, agents at 14.8% now outrank LLMs at 10.7%. # hiring # frontend https:// links.madcoolsocial.com/AnMDxAy",
-   "url": "https://mastodon.social/@Madcoolsocial/117627973475121746",
-   "author": "Madcoolsocial",
-   "created": "2026-11-16T20:20:35.111Z",
-   "product": "NIKHILs TECH STUDIO",
-   "products": [
-    "NIKHILs TECH STUDIO"
-   ],
-   "score": 5,
-   "matched": [
-    "llm"
-   ],
-   "firstSeen": "2026-11-16T21:59:24.365Z"
   }
  ]
 }
