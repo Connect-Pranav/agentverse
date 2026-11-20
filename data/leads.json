@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-20T07:11:13.386Z",
- "count": 1,
+ "updated": "2026-11-20T20:12:31.028Z",
+ "count": 2,
  "health": {
   "reddit": {
    "ok": 0,
@@ -30,6 +30,24 @@
  },
  "reddit": "public",
  "leads": [
+  {
+   "id": "md_117649142566619467",
+   "source": "mastodon #hiring",
+   "title": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHir",
+   "text": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHired https:// thomsonreuters.wd5.myworkdayjo bs.com/en-US/External_Career_Site/job/United-States-of-America-Eagan-Minnesota/Research-Manager--Frontier-LLM-_JREQ205579-6",
+   "url": "https://mastodon.social/@openassignments/117649142566619467",
+   "author": "openassignments",
+   "created": "2026-11-20T14:04:09.811Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 7,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-20T20:12:31.028Z"
+  },
   {
    "id": "md_117630692133374479",
    "source": "mastodon #hiring",
