@@ -3842,9 +3842,13 @@ function sigRender(){
 
   // Visual Image Preview
   if($("sigVisualImg")){
-    var imgUrl = "/api/signal/visual?date=" + encodeURIComponent(s.date || "") + "&t=" + Date.now();
+    var imgUrl = "/api/signal/visual?t=" + Date.now();
     $("sigVisualImg").src = imgUrl;
-    if($("sigDownloadVisualBtn")) $("sigDownloadVisualBtn").href = imgUrl;
+    $("sigVisualImg").onerror = function(){
+      this.onerror = null;
+      this.src = "/api/signal/visual";
+    };
+    if($("sigDownloadVisualBtn")) $("sigDownloadVisualBtn").href = "/api/signal/visual";
   }
 
   // Render Research Ledger
