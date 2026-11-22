@@ -11,9 +11,9 @@
 const TG_API = 'https://api.telegram.org';
 const DEFAULT_BOT_TOKEN = '8852122727:AAHbi2M5gjSvH5HbKohyHS6Z_DOrRdGH_SI';
 
-export async function sendTelegramMessage(env, text, replyMarkup = null, fetchImpl = fetch) {
+export async function sendTelegramMessage(env, text, replyMarkup = null, fetchImpl = fetch, targetChatId = null) {
   const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
-  let chatId = env.TELEGRAM_CHAT_ID;
+  let chatId = targetChatId || env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try {
       chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id'));
@@ -42,9 +42,9 @@ export async function sendTelegramMessage(env, text, replyMarkup = null, fetchIm
   }
 }
 
-export async function notifyApproval(env, { id, type, title, brand, summary, estCost }, fetchImpl = fetch) {
+export async function notifyApproval(env, { id, type, title, brand, summary, estCost }, fetchImpl = fetch, targetChatId = null) {
   const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
-  let chatId = env.TELEGRAM_CHAT_ID;
+  let chatId = targetChatId || env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try {
       chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id'));
@@ -68,7 +68,7 @@ export async function notifyApproval(env, { id, type, title, brand, summary, est
     ],
   };
 
-  return sendTelegramMessage(env, text, inlineKeyboard, fetchImpl);
+  return sendTelegramMessage(env, text, inlineKeyboard, fetchImpl, chatId);
 }
 
 export async function handleWebhook(env, update, onAction, fetchImpl = fetch) {
@@ -135,9 +135,10 @@ export async function handleWebhook(env, update, onAction, fetchImpl = fetch) {
   }
 
   // Answer callback query so user sees popup alert
-  if (env.TELEGRAM_BOT_TOKEN && cq.id) {
+  const botToken = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  if (botToken && cq.id) {
     try {
-      await fetchImpl(`${TG_API}/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      await fetchImpl(`${TG_API}/bot${botToken}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ callback_query_id: cq.id, text: resultMessage }),
@@ -146,11 +147,11 @@ export async function handleWebhook(env, update, onAction, fetchImpl = fetch) {
   }
 
   // Edit original message to remove buttons and show decision
-  if (env.TELEGRAM_BOT_TOKEN && cq.message?.message_id && cq.message?.chat?.id) {
+  if (botToken && cq.message?.message_id && cq.message?.chat?.id) {
     try {
       const origText = cq.message.text || '';
       const decisionText = `${origText}\n\n━━━━━━━━━━━━━━━━━━━━\n${isApprove ? '✅' : '❌'} <b>${isApprove ? 'Approved' : 'Rejected'} via Telegram</b> at ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`;
-      await fetchImpl(`${TG_API}/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+      await fetchImpl(`${TG_API}/bot${botToken}/editMessageText`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

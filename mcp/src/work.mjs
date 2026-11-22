@@ -24,7 +24,8 @@ export async function upsert(kv, env, payload, fetchImpl = fetch) {
   const newItems = Array.isArray(payload.items) ? payload.items : [];
 
   const formatted = [];
-  for (const it of newItems) {
+  for (let idx = 0; idx < newItems.length; idx++) {
+    const it = newItems[idx];
     if (!it || !it.body) continue;
     const id = it.id || `sv_${Math.random().toString(36).slice(2, 8)}`;
     const item = {
@@ -37,7 +38,7 @@ export async function upsert(kv, env, payload, fetchImpl = fetch) {
       lead_id: it.lead_id || null,
       url: it.url || undefined,
       topic,
-      ts: it.ts || Date.now(),
+      ts: it.ts || (Date.now() - idx),
       server: true,
       brain: String(payload.brain || payload.model || 'Agentverse Cloud'),
     };

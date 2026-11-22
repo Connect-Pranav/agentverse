@@ -233,3 +233,29 @@ test('PRANAV SIGNAL: REST endpoints /api/signal and decision flow', async () => 
   const decData = await decRes.json();
   assert.equal(decData.success, true);
 });
+
+test('PRANAV SIGNAL: Public endpoints for UI visual, draft state, and OAuth callback', async () => {
+  const env = mockEnv();
+
+  // Public GET /api/signal/draft without auth headers (for browser UI)
+  const draftRes = await worker.fetch(new Request(BASE + '/api/signal/draft', { method: 'GET' }), env);
+  assert.equal(draftRes.status, 200);
+  const draftJson = await draftRes.json();
+  assert.equal(draftJson.ok, true);
+  assert.ok(draftJson.state);
+  assert.ok(draftJson.state.benchmarks.length > 0);
+
+  // Public GET /api/signal/visual returns SVG directly
+  const visRes = await worker.fetch(new Request(BASE + '/api/signal/visual', { method: 'GET' }), env);
+  assert.equal(visRes.status, 200);
+  assert.match(visRes.headers.get('content-type'), /image\/svg\+xml/);
+  const svgText = await visRes.text();
+  assert.ok(svgText.includes('<svg'));
+  assert.ok(svgText.includes('PRANAV KUMAR'));
+
+  // Public GET /api/signal/auth/callback returns instructional page
+  const cbRes = await worker.fetch(new Request(BASE + '/api/signal/auth/callback?code=mock_code_123', { method: 'GET' }), env);
+  assert.equal(cbRes.status, 200);
+  const cbHtml = await cbRes.text();
+  assert.ok(cbHtml.includes('LinkedIn Authorization Code Received'));
+});

@@ -11,7 +11,7 @@ const MAX_DRAFTS = 90;
 const MAX_SOURCES = 150;
 const MAX_BENCHMARKS = 40;
 const nowIso = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-const todayDate = () => new Date().toISOString().slice(0, 10);
+export const todayDate = () => new Date().toISOString().slice(0, 10);
 const clean = (s, max) => String(s ?? '').replace(/\u0000/g, '').trim().slice(0, max);
 
 export class SignalError extends Error {
@@ -437,18 +437,12 @@ What is the biggest operational bottleneck you are seeing in your GTM motion rig
 // -------------------------------------------------------------
 // 7. Visual Creative Agent (1200x627 Landscape 1.91:1)
 // -------------------------------------------------------------
-export async function createLinkedInVisual(kv, draftId = null) {
-  const s = await load(kv);
-  const id = draftId || `post_${todayDate()}`;
-  const draft = s.drafts[id];
-  if (!draft) throw new SignalError(404, `Draft "${id}" not found.`);
-
-  // Generate SVG Graphic (Navy, Cyan, Gold accents, Crisp Data Layout)
-  const headline = 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK';
-  const subline = 'Why buying more sales tools hides broken funnel mechanics';
+export function getDefaultSvg(headline = 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK', subline = 'Why buying more sales tools hides broken funnel mechanics') {
   const authorBadge = 'PRANAV KUMAR · REVOPS & GTM STRATEGY';
+  const cleanHeadline = (headline || 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanSubline = (subline || 'Why buying more sales tools hides broken funnel mechanics').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const svgVisual = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="background:#070B19;font-family:'Space Grotesk',system-ui,sans-serif;">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="background:#070B19;font-family:'Space Grotesk',system-ui,sans-serif;">
   <defs>
     <radialGradient id="aurora" cx="80%" cy="20%" r="60%">
       <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.25"/>
@@ -487,8 +481,8 @@ export async function createLinkedInVisual(kv, draftId = null) {
   <text x="156" y="144" fill="#38BDF8" font-size="13" font-weight="700" letter-spacing="1.5">${authorBadge}</text>
 
   <!-- Title & Hook -->
-  <text x="120" y="215" fill="#F8FAFC" font-size="38" font-weight="800" letter-spacing="-0.5">${headline}</text>
-  <text x="120" y="260" fill="#94A3B8" font-size="21" font-weight="500">${subline}</text>
+  <text x="120" y="215" fill="#F8FAFC" font-size="34" font-weight="800" letter-spacing="-0.5">${cleanHeadline}</text>
+  <text x="120" y="260" fill="#94A3B8" font-size="20" font-weight="500">${cleanSubline}</text>
 
   <!-- 3 Comparison Columns -->
   <!-- Col 1 -->
@@ -516,6 +510,18 @@ export async function createLinkedInVisual(kv, draftId = null) {
   <text x="120" y="515" fill="#64748B" font-size="13" font-weight="500">PRANAV SIGNAL · LINKEDIN GROWTH STUDIO · AGENTVERSE</text>
   <text x="1080" y="515" fill="#38BDF8" font-size="13" font-weight="600" text-anchor="end">1200 × 627 (1.91:1) Editorial Asset</text>
 </svg>`;
+}
+
+export async function createLinkedInVisual(kv, draftId = null) {
+  const s = await load(kv);
+  const id = draftId || `post_${todayDate()}`;
+  const draft = s.drafts[id];
+  if (!draft) throw new SignalError(404, `Draft "${id}" not found.`);
+
+  // Generate SVG Graphic (Navy, Cyan, Gold accents, Crisp Data Layout)
+  const headline = 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK';
+  const subline = 'Why buying more sales tools hides broken funnel mechanics';
+  const svgVisual = getDefaultSvg(headline, subline);
 
   const visual = {
     id: `vis_${id}`,
@@ -638,22 +644,26 @@ export async function publishLinkedInPost(kv, env, draftId = null, options = {},
   const draft = s.drafts[id];
   if (!draft) throw new SignalError(404, `Draft "${id}" not found.`);
 
-  const mode = options.mode || s.settings.publishMode || 'draft_only';
-  const hasToken = Boolean(env.LINKEDIN_ACCESS_TOKEN && env.LINKEDIN_PERSON_URN);
+  const kvToken = await kv.get('signal/linkedin_token');
+  const kvUrn = await kv.get('signal/linkedin_person_urn');
+  const accessToken = env.LINKEDIN_ACCESS_TOKEN || kvToken;
+  const personUrn = env.LINKEDIN_PERSON_URN || kvUrn;
+  const hasToken = Boolean(accessToken && personUrn);
+  const mode = options.mode || (hasToken ? 'api' : s.settings.publishMode) || 'draft_only';
 
-  if (mode === 'api' && hasToken) {
+  if ((mode === 'api' || mode === 'auto') && hasToken) {
     // Official LinkedIn Posts API (/rest/posts)
     try {
       const liRes = await fetchImpl('https://api.linkedin.com/rest/posts', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${env.LINKEDIN_ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${accessToken}`,
           'X-Restli-Protocol-Version': '2.0.0',
           'LinkedIn-Version': '202610',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          author: env.LINKEDIN_PERSON_URN,
+          author: personUrn,
           commentary: draft.body,
           visibility: 'PUBLIC',
           distribution: {
