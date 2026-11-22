@@ -2,8 +2,8 @@ name: PRANAV SIGNAL — LinkedIn Growth Studio
 
 on:
   schedule:
-    # 08:00 Asia/Kolkata = 02:30 UTC every day
-    - cron: '30 2 * * *'
+    # 09:30 Asia/Kolkata = 04:00 UTC every day
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 concurrency:

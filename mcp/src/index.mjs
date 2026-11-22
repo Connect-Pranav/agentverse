@@ -824,7 +824,36 @@ async function route(request, env) {
           return { message: action === 'approve' ? '🎵 Song job approved & rendering started' : '🎵 Song job rejected' };
         }
         if (type === 'work') {
+          if (id.startsWith('sig_')) {
+            const sigId = id.replace(/^sig_/, '');
+            if (action === 'approve') {
+              await signal.publishLinkedInPost(kv(env), env, sigId, { mode: env.LINKEDIN_ACCESS_TOKEN ? 'api' : 'manual' });
+            } else {
+              const s = await signal.load(kv(env));
+              if (s.drafts[sigId]) { s.drafts[sigId].status = 'rejected'; await signal.save(kv(env), s); }
+            }
+          }
           return work.decide(kv(env), id, action);
+        }
+        if (action === 'send_latest_signal') {
+          try {
+            const s = await signal.load(kv(env));
+            const keys = Object.keys(s.drafts || {});
+            const latestId = keys.sort().pop();
+            if (latestId && s.drafts[latestId]) {
+              const d = s.drafts[latestId];
+              await telegram.notifyApproval(env, {
+                id: `sig_${latestId}`,
+                type: 'work',
+                title: `LinkedIn: ${d.hook ? d.hook.split('\n')[0].slice(0, 60) : 'Daily Thought Leadership'}`,
+                brand: 'Pranav Signal',
+                summary: (d.body || '').slice(0, 220) + '...',
+              });
+            }
+          } catch (e) {
+            console.error('send_latest_signal error:', e);
+          }
+          return { ok: true };
         }
         if (type === 'crm') {
           return crm.decide(kv(env), id, { action });
@@ -883,10 +912,10 @@ async function route(request, env) {
     }
     if (seg[2] === 'auth' && seg[3] === 'url' && method === 'GET') {
       owner(request, env);
-      const clientId = env.LINKEDIN_CLIENT_ID || 'mock_client_id';
+      const clientId = env.LINKEDIN_CLIENT_ID || '868a0408ew7ql5';
       const redirectUri = encodeURIComponent(`${url.origin}/api/signal/auth/callback`);
       const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=openid%20profile%20w_member_social`;
-      return json({ url: authUrl, configured: Boolean(env.LINKEDIN_CLIENT_ID) }, 200, { 'access-control-allow-origin': '*' });
+      return json({ url: authUrl, configured: Boolean(env.LINKEDIN_CLIENT_ID || clientId) }, 200, { 'access-control-allow-origin': '*' });
     }
     owner(request, env);
     if (!seg[2] && method === 'GET') return json(signal.ownerView(await signal.load(k)), 200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });

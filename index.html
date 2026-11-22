@@ -1124,7 +1124,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <span class="sig-badge">PRANAV SIGNAL</span>
           <span class="sig-badge gold">LinkedIn Growth Studio</span>
-          <span class="sig-badge live" id="sigLiveBadge">Daily 08:00 IST</span>
+          <span class="sig-badge live" id="sigLiveBadge">Daily 09:30 IST</span>
         </div>
         <h2 style="font-size:22px;font-weight:700;margin:0 0 4px;color:#fff">Autonomous Executive Thought Leadership</h2>
         <p style="font-size:12.5px;color:var(--mut);margin:0">RevOps · GTM Strategy · P&L Ownership · Funnel Optimization · Enterprise AI & Automation</p>
@@ -1146,7 +1146,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
       <div class="sig-stat-card">
         <small>Daily Topic Selection</small>
         <b id="sigTopicVal" style="font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">AI Agents in B2B Pipeline</b>
-        <span id="sigTopicDate">08:00 IST Cycle</span>
+        <span id="sigTopicDate">09:30 IST Cycle</span>
       </div>
       <div class="sig-stat-card">
         <small>Approval Queue</small>
@@ -3805,7 +3805,7 @@ function sigLoad(){
           { date: "Thu", topic: "Sales Incentive Engineering", pillar: "GTM Strategy", status: "scheduled" },
           { date: "Fri", topic: "Weekly Operator Retrospective", pillar: "Leadership", status: "scheduled" }
         ],
-        audit_log: ["08:00 IST cycle initialized", "Benchmarked 6 public revenue leaders", "Generated branded 1200x627 visual", "Submitted to Work Board and Telegram @VaniPro_Bot"]
+        audit_log: ["09:30 IST cycle initialized", "Benchmarked 6 public revenue leaders", "Generated branded 1200x627 visual", "Submitted to Work Board and Telegram @VaniPro_Bot"]
       };
       sigRender();
     }
@@ -3818,7 +3818,7 @@ function sigRender(){
   if($("sigScoreVal")) $("sigScoreVal").innerHTML = (s.score || 94) + '<span style="font-size:14px;color:var(--mut)">/100</span>';
   if($("sigScoreAngle")) $("sigScoreAngle").textContent = s.category || "Enterprise AI & RevOps GTM";
   if($("sigTopicVal")) $("sigTopicVal").textContent = s.topic || "AI Agents in B2B Pipeline Execution";
-  if($("sigTopicDate")) $("sigTopicDate").textContent = (s.date || new Date().toISOString().slice(0, 10)) + " · 08:00 IST";
+  if($("sigTopicDate")) $("sigTopicDate").textContent = (s.date || new Date().toISOString().slice(0, 10)) + " · 09:30 IST";
   if($("sigApprovalStatus")) $("sigApprovalStatus").textContent = (s.status === "approved" ? "Approved" : (s.status === "published" ? "Published" : "Pending Approval"));
   if($("sigDraftStatusBadge")){
     $("sigDraftStatusBadge").textContent = (s.status === "approved" ? "Approved" : (s.status === "published" ? "Live on LinkedIn" : "Awaiting Review"));

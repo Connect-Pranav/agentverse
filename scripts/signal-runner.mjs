@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PRANAV SIGNAL — Daily 08:00 IST LinkedIn Growth Studio Runner
+// PRANAV SIGNAL — Daily 09:30 IST LinkedIn Growth Studio Runner
 // Orchestrates 9 specialist agents:
 // 1. LinkedIn Profile Analyst
 // 2. Domain Leader Intelligence

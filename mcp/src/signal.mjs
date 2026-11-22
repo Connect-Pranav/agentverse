@@ -118,7 +118,7 @@ export async function load(kv) {
   const s = (await kv.get(KEY, 'json')) ?? {};
   s.positioning = s.positioning || PRANAV_POSITIONING;
   s.settings = {
-    dailySchedule: '08:00 Asia/Kolkata',
+    dailySchedule: '09:30 Asia/Kolkata',
     autoDraft: true,
     requireApproval: true,
     publishMode: 'draft_only', // 'draft_only' | 'manual' | 'api'
@@ -772,7 +772,7 @@ export async function getResourcesList() {
     { uri: 'pranav://benchmark-profiles', name: 'GTM & RevOps Benchmark Profiles', description: 'Monitored industry thought leaders in RevOps, GTM and AI for Business', mimeType: 'application/json' },
     { uri: 'pranav://content-pillars', name: 'Content Pillars', description: '5 core strategic content pillars for Pranav Kumar', mimeType: 'application/json' },
     { uri: 'pranav://approved-posts', name: 'Approved Posts Ledger', description: 'History of approved and published LinkedIn posts', mimeType: 'application/json' },
-    { uri: 'pranav://editorial-calendar', name: 'Editorial Calendar', description: 'Daily 08:00 IST schedule and upcoming topics', mimeType: 'application/json' },
+    { uri: 'pranav://editorial-calendar', name: 'Editorial Calendar', description: 'Daily 09:30 IST schedule and upcoming topics', mimeType: 'application/json' },
     { uri: 'pranav://performance-history', name: 'LinkedIn Performance Analytics', description: 'Engagement metrics, impression benchmarks, and audience insights', mimeType: 'application/json' },
   ];
 }
