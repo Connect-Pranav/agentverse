@@ -3819,10 +3819,27 @@ function sigRender(){
   if($("sigScoreAngle")) $("sigScoreAngle").textContent = s.category || "Enterprise AI & RevOps GTM";
   if($("sigTopicVal")) $("sigTopicVal").textContent = s.topic || "AI Agents in B2B Pipeline Execution";
   if($("sigTopicDate")) $("sigTopicDate").textContent = (s.date || new Date().toISOString().slice(0, 10)) + " · 09:30 IST";
-  if($("sigApprovalStatus")) $("sigApprovalStatus").textContent = (s.status === "approved" ? "Approved" : (s.status === "published" ? "Published" : "Pending Approval"));
+
+  var isApp = (s.status === "approved" || s.status === "ready" || s.status === "ready_for_manual_publish" || s.status === "published");
+  var isPub = (s.status === "published");
+
+  if($("sigApprovalStatus")) $("sigApprovalStatus").textContent = (isPub ? "Published on LinkedIn" : (isApp ? "Approved (" + (s.approval_source === "telegram" ? "via Telegram" : "Ready") + ")" : "Pending Approval"));
   if($("sigDraftStatusBadge")){
-    $("sigDraftStatusBadge").textContent = (s.status === "approved" ? "Approved" : (s.status === "published" ? "Live on LinkedIn" : "Awaiting Review"));
-    $("sigDraftStatusBadge").className = "sig-badge " + (s.status === "approved" || s.status === "published" ? "live" : "gold");
+    $("sigDraftStatusBadge").textContent = (isPub ? "Live on LinkedIn" : (isApp ? "Approved & Ready" : "Awaiting Review"));
+    $("sigDraftStatusBadge").className = "sig-badge " + (isApp ? "live" : "gold");
+  }
+
+  // Publishing mode & LinkedIn connect status
+  if($("sigPubMode")) $("sigPubMode").textContent = s.linkedin_connected ? "Direct API" : "1-Click Copy";
+  if($("sigPubDetail")) $("sigPubDetail").textContent = s.linkedin_connected ? "LinkedIn Account Connected" : "Safe / 1-Click Copy";
+  if($("sigAuthBtn")){
+    if(s.linkedin_connected){
+      $("sigAuthBtn").innerHTML = icon("check-circle") + " LinkedIn Linked";
+      $("sigAuthBtn").className = "sig-btn live";
+    } else {
+      $("sigAuthBtn").innerHTML = icon("key-round") + " LinkedIn Auth";
+      $("sigAuthBtn").className = "sig-btn gold";
+    }
   }
 
   // Populate editor fields
@@ -3840,14 +3857,18 @@ function sigRender(){
   if($("qcOrig")) $("qcOrig").innerHTML = icon("star") + " " + (qc.originality_passed ? "100% Original" : "Original");
   if($("qcLength")) $("qcLength").innerHTML = icon("scroll-text") + " " + (fullBody.length) + " Chars";
 
-  // Visual Image Preview
-  if($("sigVisualImg")){
-    var imgUrl = "/api/signal/visual?t=" + Date.now();
-    $("sigVisualImg").src = imgUrl;
-    $("sigVisualImg").onerror = function(){
-      this.onerror = null;
-      this.src = "/api/signal/visual";
-    };
+  // Visual Preview: Direct SVG Injection
+  if($("sigVisualContainer")){
+    var svg = (s.visual && s.visual.svg) || (d.visual && d.visual.svg);
+    if(svg && svg.indexOf("<svg") >= 0){
+      $("sigVisualContainer").innerHTML = svg;
+    } else {
+      fetch("/api/signal/visual?t=" + Date.now()).then(function(r){ return r.text(); }).then(function(svgText){
+        if(svgText && svgText.indexOf("<svg") >= 0){
+          $("sigVisualContainer").innerHTML = svgText;
+        }
+      }).catch(function(e){ console.warn("Visual fetch:", e); });
+    }
     if($("sigDownloadVisualBtn")) $("sigDownloadVisualBtn").href = "/api/signal/visual";
   }
 
@@ -3955,10 +3976,25 @@ function sigInitControls(){
   // LinkedIn Auth Button
   if($("sigAuthBtn")){
     $("sigAuthBtn").onclick = function(){
+      if(SIG.state && SIG.state.linkedin_connected){
+        toast("LinkedIn account is connected & active!", true);
+        return;
+      }
       sigApi("GET", "/api/signal/auth/url").then(function(r){
         if(r && r.url){
-          window.open(r.url, "_blank");
-          toast("Opened LinkedIn OAuth authorization window", true);
+          var redirectUrl = r.redirectUri || "https://agentverse.aistudio09.workers.dev/api/signal/auth/callback";
+          var tokenPrompt = prompt("LINKEDIN CONNECT SETUP:\n\n1. In your LinkedIn Developer Portal (Auth tab), ensure Authorized redirect URL is set to:\n" + redirectUrl + "\n\nPress OK to open LinkedIn Login window (or paste an Access Token directly below):", "");
+          if(tokenPrompt && tokenPrompt.trim()){
+            sigApi("POST", "/api/signal/auth/token", { token: tokenPrompt.trim() }).then(function(){
+              toast("LinkedIn Token saved successfully!", true);
+              sigLoad();
+            }).catch(function(err){
+              toast("Token save failed: " + err.message, false);
+            });
+          } else if(tokenPrompt !== null){
+            window.open(r.url, "_blank");
+            toast("Opened LinkedIn OAuth authorization window", true);
+          }
         } else {
           toast("Configure LINKEDIN_CLIENT_ID secret in Cloudflare", false);
         }

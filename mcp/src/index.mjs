@@ -940,6 +940,16 @@ async function route(request, env) {
       const freshState = await signal.load(k);
       const activeDraft = currentDraft || freshState.drafts[`post_${today}`] || Object.values(freshState.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
 
+      // Check Work Board status for human approvals (e.g. from Telegram)
+      const w = await work.load(k);
+      const workItem = (w.items || []).find((x) => x.id === `sig_${activeDraft?.id}` || x.id === activeDraft?.id);
+      const isApproved = workItem?.status === 'ready' || activeDraft?.status === 'ready_for_manual_publish' || activeDraft?.status === 'ready' || activeDraft?.status === 'approved' || activeDraft?.status === 'published';
+      const isPublished = activeDraft?.status === 'published';
+      const effStatus = isPublished ? 'published' : (isApproved ? 'approved' : 'waiting_approval');
+      const hasLinkedInToken = Boolean(env.LINKEDIN_ACCESS_TOKEN || (await k.get('signal/linkedin_token')));
+
+      const svgVisual = activeDraft?.visual?.svg || signal.getDefaultSvg(activeDraft?.visual?.headline, activeDraft?.visual?.subline);
+
       const draftObj = activeDraft ? {
         id: activeDraft.id,
         hook: activeDraft.hook,
@@ -948,6 +958,7 @@ async function route(request, env) {
         framework: activeDraft.framework,
         question: activeDraft.question,
         tags: activeDraft.tags,
+        visual: { svg: svgVisual },
       } : {
         id: `post_${today}`,
         hook: "Most revenue leaders think their biggest problem is pipeline generation.\n\nIn 90% of scaling companies, that is completely wrong.",
@@ -956,17 +967,21 @@ async function route(request, env) {
         framework: "1. Systemic Qualification Before Rep Engagement\n2. Replace More Activity With Clean Routing\n3. Align Compensation Directly to Realized Revenue",
         question: "How is your commercial leadership auditing pipeline leaks and rep routing this quarter?",
         tags: ["#RevenueOperations", "#GTMStrategy", "#SalesLeadership", "#FunnelOptimization", "#PAndLOwnership", "#BusinessOperations"],
+        visual: { svg: svgVisual },
       };
 
       return json({
         ok: true,
         state: {
           date: activeDraft?.date || today,
-          status: activeDraft?.status || 'draft',
+          status: effStatus,
           score: freshState.signals[0]?.score || 94,
-          topic: freshState.signals[0]?.title || activeDraft?.topic || 'AI Agents in B2B Pipeline Execution: Why Revenue Operations Needs Deterministic Guardrails',
+          topic: freshState.signals[0]?.title || activeDraft?.topic || 'The Death of the Pure Inbound Playbook: High-Velocity Outbound Renaissance',
           category: freshState.signals[0]?.category || 'Enterprise AI & RevOps GTM',
           draft: draftObj,
+          visual: { svg: svgVisual },
+          linkedin_connected: hasLinkedInToken,
+          approval_source: workItem?.status === 'ready' ? 'telegram' : (isApproved ? 'system' : null),
           quality_check: activeDraft?.qualityCheck ? {
             fact_check_passed: activeDraft.qualityCheck.checks?.factChecked !== false,
             brand_voice_score: activeDraft.qualityCheck.checks?.brandVoiceScore || 98,
@@ -1075,6 +1090,15 @@ async function route(request, env) {
       const redirectUri = encodeURIComponent(callbackUrl);
       const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=w_member_social`;
       return json({ url: authUrl, redirectUri: callbackUrl, configured: Boolean(env.LINKEDIN_CLIENT_ID || clientId) }, 200, { 'access-control-allow-origin': '*' });
+    }
+
+    // Direct token / secret configuration endpoint
+    if (seg[2] === 'auth' && seg[3] === 'token' && method === 'POST') {
+      const payload = await readJson(request);
+      if (payload.token) await k.put('signal/linkedin_token', String(payload.token).trim());
+      if (payload.client_secret) await k.put('signal/linkedin_client_secret', String(payload.client_secret).trim());
+      if (payload.person_urn) await k.put('signal/linkedin_person_urn', String(payload.person_urn).trim());
+      return json({ ok: true, connected: true }, 200, { 'access-control-allow-origin': '*' });
     }
 
     // Run Pipeline (Runner or Owner)
