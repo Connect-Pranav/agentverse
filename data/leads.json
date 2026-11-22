@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-22T06:43:46.909Z",
+ "updated": "2026-11-22T19:34:36.068Z",
  "count": 3,
  "health": {
   "reddit": {
@@ -31,24 +31,6 @@
  "reddit": "public",
  "leads": [
   {
-   "id": "md_117649142566619467",
-   "source": "mastodon #hiring",
-   "title": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHir",
-   "text": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHired https:// thomsonreuters.wd5.myworkdayjo bs.com/en-US/External_Career_Site/job/United-States-of-America-Eagan-Minnesota/Research-Manager--Frontier-LLM-_JREQ205579-6",
-   "url": "https://mastodon.social/@openassignments/117649142566619467",
-   "author": "openassignments",
-   "created": "2026-11-20T14:04:09.811Z",
-   "product": "NIKHILs TECH STUDIO",
-   "products": [
-    "NIKHILs TECH STUDIO"
-   ],
-   "score": 7,
-   "matched": [
-    "llm"
-   ],
-   "firstSeen": "2026-11-20T20:12:31.028Z"
-  },
-  {
    "id": "md_117654608558394982",
    "source": "mastodon #hiring",
    "title": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract with Turing. Pay discussed during scre",
@@ -65,6 +47,24 @@
     "llm"
    ],
    "firstSeen": "2026-11-21T19:12:38.108Z"
+  },
+  {
+   "id": "md_117649142566619467",
+   "source": "mastodon #hiring",
+   "title": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHir",
+   "text": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHired https:// thomsonreuters.wd5.myworkdayjo bs.com/en-US/External_Career_Site/job/United-States-of-America-Eagan-Minnesota/Research-Manager--Frontier-LLM-_JREQ205579-6",
+   "url": "https://mastodon.social/@openassignments/117649142566619467",
+   "author": "openassignments",
+   "created": "2026-11-20T14:04:09.811Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 6,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-20T20:12:31.028Z"
   },
   {
    "id": "md_117630692133374479",
