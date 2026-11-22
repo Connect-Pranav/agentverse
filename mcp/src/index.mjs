@@ -1032,7 +1032,7 @@ async function route(request, env) {
       }
 
       const clientId = env.LINKEDIN_CLIENT_ID || '868a0408ew7ql5';
-      const clientSecret = env.LINKEDIN_CLIENT_SECRET;
+      const clientSecret = env.LINKEDIN_CLIENT_SECRET || (await k.get('signal/linkedin_client_secret'));
       const redirectUri = `${url.origin}/api/signal/auth/callback`;
 
       if (clientSecret) {
@@ -1076,10 +1076,71 @@ async function route(request, env) {
         }
       } else {
         await k.put('signal/linkedin_auth_code', code);
-        return new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;background:#060813;color:#fff;padding:40px;text-align:center;"><div style="max-width:540px;margin:0 auto;background:#0d1127;padding:32px;border-radius:16px;border:1px solid rgba(56,189,248,.3);"><h2>🔑 LinkedIn Authorization Code Received!</h2><p style="color:#94a3b8;font-size:14px;line-height:1.6">Code: <code>${esc(code.slice(0, 16))}...</code></p><p style="color:#38bdf8;font-size:14px;line-height:1.6">To enable direct API publishing without manual copy, add your <b>Client Secret</b> from the LinkedIn Developer Portal (Auth tab) to your Cloudflare Worker as <code>LINKEDIN_CLIENT_SECRET</code>.</p><p style="color:#f5c542;font-size:13px">Note: 1-click clipboard manual publishing is always active right now!</p><a href="/" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#00f0ff;color:#000;font-weight:bold;text-decoration:none;border-radius:8px">Return to AgentVerse</a></div></body></html>`, {
+        return new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;background:#060813;color:#fff;padding:40px;text-align:center;"><div style="max-width:540px;margin:20px auto;background:#0d1127;padding:32px;border-radius:16px;border:1px solid rgba(56,189,248,.3);"><h2>🔑 LinkedIn Authorization Code Received!</h2><p style="color:#94a3b8;font-size:14px;line-height:1.6">Code: <code>${esc(code.slice(0, 16))}...</code></p><p style="color:#38bdf8;font-size:14px;line-height:1.6">Almost done! Paste the <b>Primary Client Secret</b> from your open LinkedIn tab to complete the link:</p><form method="POST" action="/api/signal/auth/exchange" style="margin-top:20px;"><input type="hidden" name="code" value="${esc(code)}"><input type="password" name="client_secret" placeholder="Paste Primary Client Secret" required style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(56,189,248,.4);background:#070b19;color:#fff;margin-bottom:14px;box-sizing:border-box;font-size:14px;"><button type="submit" style="width:100%;padding:12px 20px;background:#00f0ff;color:#000;font-weight:bold;border:0;border-radius:8px;cursor:pointer;font-size:15px;">Complete LinkedIn Connection &rarr;</button></form><p style="margin-top:16px"><a href="/" style="color:#94a3b8;font-size:13px;text-decoration:none">&larr; Return to AgentVerse (1-click manual publish active)</a></p></div></body></html>`, {
           status: 200,
           headers: { 'content-type': 'text/html; charset=utf-8' },
         });
+      }
+    }
+
+    // Exchange endpoint
+    if (seg[2] === 'auth' && seg[3] === 'exchange' && method === 'POST') {
+      let code, clientSecret;
+      const ct = request.headers.get('content-type') || '';
+      if (ct.includes('application/x-www-form-urlencoded')) {
+        const formData = await request.formData();
+        code = formData.get('code');
+        clientSecret = formData.get('client_secret');
+      } else {
+        const j = await readJson(request);
+        code = j.code;
+        clientSecret = j.client_secret;
+      }
+      const clientId = env.LINKEDIN_CLIENT_ID || '868a0408ew7ql5';
+      const redirectUri = `${url.origin}/api/signal/auth/callback`;
+
+      if (code && clientSecret) {
+        try {
+          const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code: String(code).trim(),
+              client_id: clientId,
+              client_secret: String(clientSecret).trim(),
+              redirect_uri: redirectUri,
+            }),
+          });
+          const tokenData = await tokenRes.json();
+          if (tokenData.access_token) {
+            await k.put('signal/linkedin_token', tokenData.access_token);
+            await k.put('signal/linkedin_client_secret', String(clientSecret).trim());
+            try {
+              const uRes = await fetch('https://api.linkedin.com/v2/userinfo', {
+                headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
+              });
+              const uData = await uRes.json();
+              if (uData.sub) {
+                await k.put('signal/linkedin_person_urn', `urn:li:person:${uData.sub}`);
+              }
+            } catch {}
+            return new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;background:#060813;color:#fff;padding:40px;text-align:center;"><div style="max-width:540px;margin:40px auto;background:#0d1127;padding:32px;border-radius:16px;border:1px solid #10b981;"><h2>🎉 LinkedIn Connected Successfully!</h2><p style="color:#38bdf8">Your LinkedIn account is now linked to PRANAV SIGNAL for automated publishing.</p><p><a href="/" style="display:inline-block;padding:12px 24px;background:#00f0ff;color:#000;font-weight:bold;text-decoration:none;border-radius:8px">Return to AgentVerse Dashboard</a></p><script>setTimeout(() => window.location.href='/', 2000);</script></div></body></html>`, {
+              status: 200,
+              headers: { 'content-type': 'text/html; charset=utf-8' },
+            });
+          } else {
+            return new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;background:#060813;color:#fff;padding:40px;text-align:center;"><div style="max-width:540px;margin:40px auto;background:#0d1127;padding:32px;border-radius:16px;border:1px solid #ef4444;"><h2>LinkedIn Token Error</h2><p style="color:#f43f5e">${esc(tokenData.error_description || JSON.stringify(tokenData))}</p><p><a href="/" style="color:#00f0ff">Return to AgentVerse</a></p></div></body></html>`, {
+              status: 400,
+              headers: { 'content-type': 'text/html; charset=utf-8' },
+            });
+          }
+        } catch (e) {
+          return new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;background:#060813;color:#fff;padding:40px;text-align:center;"><h2>Exchange Error</h2><p style="color:#f43f5e">${esc(e.message)}</p><a href="/" style="color:#00f0ff">Return to AgentVerse</a></body></html>`, {
+            status: 500,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          });
+        }
       }
     }
 
