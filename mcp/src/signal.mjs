@@ -134,6 +134,19 @@ export async function load(kv) {
   s.history = s.history || [];
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };
   s.logs = s.logs || [];
+
+  // Auto-upgrade any legacy dark visual to the new vibrant high-contrast editorial matrix
+  for (const d of Object.values(s.drafts || {})) {
+    if (d?.visual && (!d.visual.svg || d.visual.svg.includes('aurora') || !d.visual.svg.includes('STAGE 1: BROKEN MOTION'))) {
+      d.visual.svg = getDefaultSvg(d.visual.headline, d.visual.subline);
+      d.visual.dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(d.visual.svg)}`;
+      if (s.visuals && s.visuals[d.id]) {
+        s.visuals[d.id].svg = d.visual.svg;
+        s.visuals[d.id].dataUri = d.visual.dataUri;
+      }
+    }
+  }
+
   return s;
 }
 
@@ -437,78 +450,204 @@ What is the biggest operational bottleneck you are seeing in your GTM motion rig
 // -------------------------------------------------------------
 // 7. Visual Creative Agent (1200x627 Landscape 1.91:1)
 // -------------------------------------------------------------
-export function getDefaultSvg(headline = 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK', subline = 'Why buying more sales tools hides broken funnel mechanics') {
+export function getDefaultSvg(headline = 'THE B2B REVENUE LEAKAGE MATRIX', subline = 'Why buying more sales tools hides broken funnel mechanics — and how operators fix it') {
   const authorBadge = 'PRANAV KUMAR · REVOPS & GTM STRATEGY';
-  const cleanHeadline = (headline || 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const cleanSubline = (subline || 'Why buying more sales tools hides broken funnel mechanics').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanHeadline = (headline || 'THE B2B REVENUE LEAKAGE MATRIX').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanSubline = (subline || 'Why buying more sales tools hides broken funnel mechanics — and how operators fix it').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="background:#070B19;font-family:'Space Grotesk',system-ui,sans-serif;">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="background:#070B19;font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <defs>
-    <radialGradient id="aurora" cx="80%" cy="20%" r="60%">
-      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.25"/>
-      <stop offset="50%" stop-color="#6366F1" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="goldGlow" cx="20%" cy="80%" r="50%">
-      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.07)"/>
-      <stop offset="100%" stop-color="rgba(255,255,255,0.02)"/>
+    <linearGradient id="bgGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B"/>
+      <stop offset="50%" stop-color="#080C1E"/>
+      <stop offset="100%" stop-color="#050814"/>
     </linearGradient>
+    <radialGradient id="topCyanGlow" cx="25%" cy="10%" r="50%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bottomGoldGlow" cx="80%" cy="90%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="pillShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
   </defs>
 
-  <!-- Background Glows -->
-  <rect width="1200" height="627" fill="#080C1E"/>
-  <rect width="1200" height="627" fill="url(#aurora)"/>
-  <rect width="1200" height="627" fill="url(#goldGlow)"/>
+  <!-- Deep Obsidian Slate Canvas -->
+  <rect width="1200" height="627" fill="url(#bgGlow)"/>
+  <rect width="1200" height="627" fill="url(#topCyanGlow)"/>
+  <rect width="1200" height="627" fill="url(#bottomGoldGlow)"/>
 
-  <!-- Grid lines -->
-  <g stroke="rgba(255,255,255,0.04)" stroke-width="1">
-    <line x1="80" y1="0" x2="80" y2="627"/>
-    <line x1="1120" y1="0" x2="1120" y2="627"/>
-    <line x1="0" y1="80" x2="1200" y2="80"/>
-    <line x1="0" y1="547" x2="1200" y2="547"/>
+  <!-- Subtle Blueprint Grid Lines -->
+  <g stroke="rgba(255,255,255,0.03)" stroke-width="1">
+    <line x1="60" y1="0" x2="60" y2="627"/>
+    <line x1="1140" y1="0" x2="1140" y2="627"/>
+    <line x1="0" y1="130" x2="1200" y2="130"/>
+    <line x1="0" y1="495" x2="1200" y2="495"/>
   </g>
 
-  <!-- Outer Glass Frame -->
-  <rect x="80" y="80" width="1040" height="467" rx="24" fill="url(#cardGrad)" stroke="rgba(56,189,248,0.22)" stroke-width="1.5"/>
+  <!-- Top Badges & Breadcrumb -->
+  <g transform="translate(60, 24)">
+    <!-- Author Pill -->
+    <rect x="0" y="0" width="375" height="30" rx="15" fill="rgba(0,240,255,0.08)" stroke="#00F0FF" stroke-width="1.2"/>
+    <circle cx="16" cy="15" r="5" fill="#00F0FF"/>
+    <text x="30" y="19" fill="#00F0FF" font-size="11.5" font-weight="700" letter-spacing="1.2">${authorBadge}</text>
 
-  <!-- Header Pill Badge -->
-  <rect x="120" y="120" width="360" height="38" rx="19" fill="rgba(56,189,248,0.12)" stroke="rgba(56,189,248,0.4)" stroke-width="1"/>
-  <circle cx="140" cy="139" r="6" fill="#38BDF8"/>
-  <text x="156" y="144" fill="#38BDF8" font-size="13" font-weight="700" letter-spacing="1.5">${authorBadge}</text>
+    <!-- Track Record Badge -->
+    <rect x="715" y="0" width="365" height="30" rx="15" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="897" y="19" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">IndiaMART · Justdial · Magicbricks · magicpin</text>
+  </g>
 
-  <!-- Title & Hook -->
-  <text x="120" y="215" fill="#F8FAFC" font-size="34" font-weight="800" letter-spacing="-0.5">${cleanHeadline}</text>
-  <text x="120" y="260" fill="#94A3B8" font-size="20" font-weight="500">${cleanSubline}</text>
+  <!-- Eye-Catching Header -->
+  <g transform="translate(60, 68)">
+    <text x="0" y="28" fill="#FFFFFF" font-size="28" font-weight="900" letter-spacing="-0.5">${cleanHeadline}</text>
+    <rect x="585" y="4" width="220" height="32" rx="6" fill="#FACC15"/>
+    <text x="695" y="25" fill="#0F172A" font-size="13" font-weight="900" text-anchor="middle" letter-spacing="0.5">WHERE PIPELINE DIES</text>
+    <text x="0" y="52" fill="#94A3B8" font-size="14" font-weight="500">${cleanSubline}</text>
+  </g>
 
-  <!-- 3 Comparison Columns -->
-  <!-- Col 1 -->
-  <rect x="120" y="300" width="300" height="180" rx="16" fill="rgba(244,63,94,0.06)" stroke="rgba(244,63,94,0.25)" stroke-width="1"/>
-  <text x="145" y="340" fill="#F43F5E" font-size="14" font-weight="700">❌ THE UNHEALTHY MOTION</text>
-  <text x="145" y="375" fill="#E2E8F0" font-size="16" font-weight="600">• MQLs inflated with poor fit</text>
-  <text x="145" y="410" fill="#E2E8F0" font-size="16" font-weight="600">• Reps do manual data entry</text>
-  <text x="145" y="445" fill="#94A3B8" font-size="14">Result: High CAC, low win-rate</text>
+  <!-- 3 VIBRANT EDITORIAL WHITE CARDS -->
+  
+  <!-- CARD 1: THE UNHEALTHY MOTION -->
+  <g transform="translate(60, 138)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="345" height="345" rx="16" fill="#FFFFFF"/>
+    <path d="M 0 16 Q 0 0 16 0 L 329 0 Q 345 0 345 16 L 345 52 L 0 52 Z" fill="#DC2626"/>
+    <text x="18" y="27" fill="#FFFFFF" font-size="13.5" font-weight="800">❌ STAGE 1: BROKEN MOTION</text>
+    <text x="18" y="43" fill="#FECACA" font-size="10.5" font-weight="600">High CAC · Friction · Leaking Funnel</text>
+    
+    <g transform="translate(18, 70)">
+      <circle cx="14" cy="14" r="14" fill="#FEE2E2"/>
+      <text x="14" y="18" fill="#DC2626" font-size="13" font-weight="900" text-anchor="middle">!</text>
+      <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Lead Routing Latency</text>
+      <text x="38" y="29" fill="#64748B" font-size="11">Manual assignment · 4 to 24h delay</text>
 
-  <!-- Col 2 -->
-  <rect x="450" y="300" width="300" height="180" rx="16" fill="rgba(56,189,248,0.06)" stroke="rgba(56,189,248,0.25)" stroke-width="1"/>
-  <text x="475" y="340" fill="#38BDF8" font-size="14" font-weight="700">⚡ REVOPS AUTOMATION</text>
-  <text x="475" y="375" fill="#E2E8F0" font-size="16" font-weight="600">• Account intent pre-scoring</text>
-  <text x="475" y="410" fill="#E2E8F0" font-size="16" font-weight="600">• Sub-3min routing to best rep</text>
-  <text x="475" y="445" fill="#94A3B8" font-size="14">Result: 3.2x faster deal velocity</text>
+      <g transform="translate(0, 52)">
+        <circle cx="14" cy="14" r="14" fill="#FEE2E2"/>
+        <text x="14" y="18" fill="#DC2626" font-size="13" font-weight="900" text-anchor="middle">!</text>
+        <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Rep Data Drudgery</text>
+        <text x="38" y="29" fill="#64748B" font-size="11">Reps spend 60% time on CRM hygiene</text>
+      </g>
 
-  <!-- Col 3 -->
-  <rect x="780" y="300" width="300" height="180" rx="16" fill="rgba(245,158,11,0.06)" stroke="rgba(245,158,11,0.25)" stroke-width="1"/>
-  <text x="805" y="340" fill="#F59E0B" font-size="14" font-weight="700">📈 COMMERCIAL P&amp;L</text>
-  <text x="805" y="375" fill="#E2E8F0" font-size="16" font-weight="600">• Incentives tied to retention</text>
-  <text x="805" y="410" fill="#E2E8F0" font-size="16" font-weight="600">• Grounded multi-city scale</text>
-  <text x="805" y="445" fill="#94A3B8" font-size="14">Result: Predictable gross margin</text>
+      <g transform="translate(0, 104)">
+        <circle cx="14" cy="14" r="14" fill="#FEE2E2"/>
+        <text x="14" y="18" fill="#DC2626" font-size="13" font-weight="900" text-anchor="middle">!</text>
+        <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Unqualified MQL Spikes</text>
+        <text x="38" y="29" fill="#64748B" font-size="11">Reps burn hours chasing cold contacts</text>
+      </g>
+    </g>
 
-  <!-- Footer Tag -->
-  <text x="120" y="515" fill="#64748B" font-size="13" font-weight="500">PRANAV SIGNAL · LINKEDIN GROWTH STUDIO · AGENTVERSE</text>
-  <text x="1080" y="515" fill="#38BDF8" font-size="13" font-weight="600" text-anchor="end">1200 × 627 (1.91:1) Editorial Asset</text>
+    <g transform="translate(18, 288)">
+      <rect x="0" y="0" width="309" height="40" rx="10" fill="#FEF2F2" stroke="#F87171" stroke-width="1.2"/>
+      <text x="154" y="24" fill="#B91C1C" font-size="11.5" font-weight="800" text-anchor="middle">🚨 CAC +68% · WIN-RATE 8.2%</text>
+    </g>
+  </g>
+
+  <!-- CARD 2: THE TOOL OVERLOAD TRAP -->
+  <g transform="translate(427, 138)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="345" height="345" rx="16" fill="#FFFFFF"/>
+    <path d="M 0 16 Q 0 0 16 0 L 329 0 Q 345 0 345 16 L 345 52 L 0 52 Z" fill="#D97706"/>
+    <text x="18" y="27" fill="#FFFFFF" font-size="13.5" font-weight="800">⚠️ STAGE 2: TOOL OVERLOAD</text>
+    <text x="18" y="43" fill="#FEF3C7" font-size="10.5" font-weight="600">12+ Disconnected SaaS Apps &amp; Silos</text>
+
+    <g transform="translate(18, 70)">
+      <circle cx="14" cy="14" r="14" fill="#FEF3C7"/>
+      <text x="14" y="18" fill="#D97706" font-size="13" font-weight="900" text-anchor="middle">⚡</text>
+      <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Dashboard Silos</text>
+      <text x="38" y="29" fill="#64748B" font-size="11">Data fractured across point tools</text>
+
+      <g transform="translate(0, 52)">
+        <circle cx="14" cy="14" r="14" fill="#FEF3C7"/>
+        <text x="14" y="18" fill="#D97706" font-size="13" font-weight="900" text-anchor="middle">⚡</text>
+        <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Context Switching</text>
+        <text x="38" y="29" fill="#64748B" font-size="11">6 tabs open per call; zero sync</text>
+      </g>
+
+      <g transform="translate(0, 104)">
+        <circle cx="14" cy="14" r="14" fill="#FEF3C7"/>
+        <text x="14" y="18" fill="#D97706" font-size="13" font-weight="900" text-anchor="middle">⚡</text>
+        <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Unchecked Tech Spend</text>
+        <text x="38" y="29" fill="#64748B" font-size="11">Software cost rises while conversion stalls</text>
+      </g>
+    </g>
+
+    <g transform="translate(18, 288)">
+      <rect x="0" y="0" width="309" height="40" rx="10" fill="#FFFBEB" stroke="#FBBF24" stroke-width="1.2"/>
+      <text x="154" y="24" fill="#B45309" font-size="11.5" font-weight="800" text-anchor="middle">📉 QUOTA ATTAINMENT 34%</text>
+    </g>
+  </g>
+
+  <!-- CARD 3: AUTONOMOUS REVOPS -->
+  <g transform="translate(795, 138)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="345" height="345" rx="16" fill="#FFFFFF"/>
+    <path d="M 0 16 Q 0 0 16 0 L 329 0 Q 345 0 345 16 L 345 52 L 0 52 Z" fill="#059669"/>
+    <text x="18" y="27" fill="#FFFFFF" font-size="13.5" font-weight="800">⚡ STAGE 3: AUTONOMOUS REVOPS</text>
+    <text x="18" y="43" fill="#D1FAE5" font-size="10.5" font-weight="600">Speed-to-Lead &amp; AI-Powered Pipeline</text>
+
+    <g transform="translate(18, 70)">
+      <circle cx="14" cy="14" r="14" fill="#ECFDF5"/>
+      <text x="14" y="18" fill="#059669" font-size="13" font-weight="900" text-anchor="middle">✓</text>
+      <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Sub-3 Min Lead SLA</text>
+      <text x="38" y="29" fill="#059669" font-size="11" font-weight="600">Instant AI triage to best-converting rep</text>
+
+      <g transform="translate(0, 52)">
+        <circle cx="14" cy="14" r="14" fill="#ECFDF5"/>
+        <text x="14" y="18" fill="#059669" font-size="13" font-weight="900" text-anchor="middle">✓</text>
+        <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Automated Context Briefs</text>
+        <text x="38" y="29" fill="#059669" font-size="11" font-weight="600">Intent &amp; tech stack pre-scored</text>
+      </g>
+
+      <g transform="translate(0, 104)">
+        <circle cx="14" cy="14" r="14" fill="#ECFDF5"/>
+        <text x="14" y="18" fill="#059669" font-size="13" font-weight="900" text-anchor="middle">✓</text>
+        <text x="38" y="13" fill="#0F172A" font-size="13" font-weight="700">Retention-Tied Incentives</text>
+        <text x="38" y="29" fill="#059669" font-size="11" font-weight="600">Commissions grounded in gross margin</text>
+      </g>
+    </g>
+
+    <g transform="translate(18, 288)">
+      <rect x="0" y="0" width="309" height="40" rx="10" fill="#ECFDF5" stroke="#34D399" stroke-width="1.2"/>
+      <text x="154" y="24" fill="#047857" font-size="11.5" font-weight="800" text-anchor="middle">🏆 3.2X VELOCITY · NRR > 125%</text>
+    </g>
+  </g>
+
+  <!-- BOTTOM IMPACT STATS CAPSULE -->
+  <g transform="translate(60, 502)" filter="url(#pillShadow)">
+    <rect x="0" y="0" width="1080" height="52" rx="12" fill="#0D1527" stroke="rgba(0,240,255,0.25)" stroke-width="1"/>
+    
+    <g transform="translate(24, 12)">
+      <text x="0" y="18" fill="#00F0FF" font-size="18" font-weight="900">&lt; 3 MIN</text>
+      <text x="82" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">Speed-to-Lead SLA</text>
+    </g>
+    <line x1="285" y1="12" x2="285" y2="40" stroke="rgba(255,255,255,0.1)"/>
+
+    <g transform="translate(310, 12)">
+      <text x="0" y="18" fill="#10B981" font-size="18" font-weight="900">+140%</text>
+      <text x="70" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">Pipeline Capacity</text>
+    </g>
+    <line x1="550" y1="12" x2="550" y2="40" stroke="rgba(255,255,255,0.1)"/>
+
+    <g transform="translate(575, 12)">
+      <text x="0" y="18" fill="#FACC15" font-size="18" font-weight="900">3.2X</text>
+      <text x="50" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">Deal Velocity</text>
+    </g>
+    <line x1="810" y1="12" x2="810" y2="40" stroke="rgba(255,255,255,0.1)"/>
+
+    <g transform="translate(835, 12)">
+      <text x="0" y="18" fill="#F43F5E" font-size="18" font-weight="900">-38%</text>
+      <text x="56" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">Blended CAC</text>
+    </g>
+  </g>
+
+  <!-- Footer Branding -->
+  <g transform="translate(60, 580)">
+    <text x="0" y="18" fill="#64748B" font-size="11" font-weight="600">PRANAV SIGNAL · EXECUTIVE REVOPS FRAMEWORK · 1200 × 627 (1.91:1) ASSET</text>
+    <text x="1080" y="18" fill="#00F0FF" font-size="11" font-weight="700" text-anchor="end">AGENTVERSE GROWTH STUDIO · POWERED BY MCP</text>
+  </g>
 </svg>`;
 }
 
