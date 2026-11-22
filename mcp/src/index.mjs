@@ -22,6 +22,7 @@ import * as crm from './crm.mjs';
 import * as vani from './vani.mjs';
 import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
+import * as signal from './signal.mjs';
 
 const VERSION = '1.3.0';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -499,6 +500,20 @@ const TOOLS = [
   { name: 'decide_lead', title: 'Approve / skip / edit a lead', description: 'Owner decision on a lead. approve = the outreach agent emails it automatically from Gmail (daily cap, unsubscribe line, one follow-up). Only call after the owner says so.',
     inputSchema: { type: 'object', properties: { lead_id: { type: 'string' }, action: { type: 'string', enum: ['approve', 'skip', 'edit', 'won', 'lost', 'unsubscribe'] }, subject: { type: 'string' }, body: { type: 'string' } }, required: ['lead_id', 'action'], additionalProperties: false } },
   { name: 'delete_song_job', title: 'Delete song job', description: 'Delete a job and its files.', inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: true } },
+  // PRANAV SIGNAL — LinkedIn Growth Studio MCP tools
+  { name: 'linkedin_profile_audit', title: 'Audit LinkedIn profile & pillars', description: 'Analyze Pranav Kumar\'s LinkedIn profile positioning, pillar coverage, and content consistency.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'benchmark_profiles_refresh', title: 'Refresh benchmark profiles', description: 'Refresh or add leading operator profiles in RevOps, GTM, and AI for Business.', inputSchema: { type: 'object', properties: { profiles: { type: 'array', items: { type: 'object' } } }, additionalProperties: false } },
+  { name: 'benchmark_patterns_analyse', title: 'Analyze benchmark patterns', description: 'Extract recurring hook patterns, structural formulas, and dwell-time mechanics from top voices.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'global_ai_market_scan', title: 'Scan global AI & enterprise news', description: 'Scan credible developments in enterprise tech, B2B AI, GTM, and commercial operations.', inputSchema: { type: 'object', properties: { news: { type: 'array', items: { type: 'object' } } }, additionalProperties: false } },
+  { name: 'daily_signal_rank', title: 'Rank daily signals', description: 'Score candidate topics by relevance, freshness, business impact, and discussion potential.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'pranav_pov_generate', title: 'Generate Pranav operator POV', description: 'Synthesize Pranav Kumar\'s commercial operator perspective (IndiaMART, Justdial, Magicbricks, magicpin lens).', inputSchema: { type: 'object', properties: { topic_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_post_draft', title: 'Draft LinkedIn post', description: 'Draft an original daily LinkedIn post with hook, analysis, operator POV, framework, and discussion question.', inputSchema: { type: 'object', properties: { topic_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_visual_create', title: 'Create LinkedIn visual asset', description: 'Generate matching 1200x627 landscape (1.91:1) branded visual graphic (Navy, Cyan, Gold accents).', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_post_quality_check', title: 'Run post quality check', description: 'Run factuality, originality, character count, anti-pattern, and brand voice quality checks.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_post_submit_approval', title: 'Submit post for human approval', description: 'Submit draft post and visual to AgentVerse approval queue and send instant Telegram bot alert.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_post_publish', title: 'Publish or package LinkedIn post', description: 'Publish approved post via official LinkedIn API or package for 1-click manual publishing.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' }, mode: { type: 'string', enum: ['api', 'manual', 'draft_only'] } }, additionalProperties: false } },
+  { name: 'linkedin_post_performance', title: 'Track post performance', description: 'Track impressions, reactions, comments, reposts, and audience demographics.', inputSchema: { type: 'object', properties: { post_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_content_memory_update', title: 'Update LinkedIn content memory', description: 'Update strategic positioning rules, operator notes, or additional content pillars.', inputSchema: { type: 'object', properties: { note: { type: 'string' }, addPillars: { type: 'array', items: { type: 'object' } } }, additionalProperties: false } },
 ];
 async function callTool(env, request, name, a = {}) {
   const v = (j) => view(env, request, j);
@@ -523,6 +538,20 @@ async function callTool(env, request, name, a = {}) {
     case 'get_foliocraft_leads': return crm.ownerView(await crm.load(kv(env)), 60);
     case 'decide_lead': return crm.ownerView(await crm.decide(kv(env), a.lead_id, a), 60);
     case 'delete_song_job': { const j = await jobOf(env, a.job_id); await removeJob(env, j); return { deleted: j.id }; }
+    // PRANAV SIGNAL tool handlers
+    case 'linkedin_profile_audit': return signal.auditProfile(kv(env));
+    case 'benchmark_profiles_refresh': return signal.refreshBenchmarks(kv(env), a.profiles);
+    case 'benchmark_patterns_analyse': return signal.analyseBenchmarkPatterns(kv(env));
+    case 'global_ai_market_scan': return signal.scanGlobalAiMarket(kv(env), a.news);
+    case 'daily_signal_rank': return signal.rankDailySignal(kv(env));
+    case 'pranav_pov_generate': return signal.generatePranavPov(kv(env), a.topic_id);
+    case 'linkedin_post_draft': return signal.draftLinkedInPost(kv(env), a.topic_id);
+    case 'linkedin_visual_create': return signal.createLinkedInVisual(kv(env), a.draft_id);
+    case 'linkedin_post_quality_check': return signal.checkPostQuality(kv(env), a.draft_id);
+    case 'linkedin_post_submit_approval': return signal.submitForApproval(kv(env), env, a.draft_id);
+    case 'linkedin_post_publish': return signal.publishLinkedInPost(kv(env), env, a.draft_id, a);
+    case 'linkedin_post_performance': return signal.getPostPerformance(kv(env), a.post_id);
+    case 'linkedin_content_memory_update': return signal.updateContentMemory(kv(env), a);
     default: throw Object.assign(new Error(`Unknown tool: ${name}`), { rpc: -32602 });
   }
 }
@@ -542,8 +571,8 @@ async function mcp(request, env) {
     try {
       if (m.method === 'initialize') {
         const want = m.params?.protocolVersion;
-        ok({ protocolVersion: PROTOCOLS.includes(want) ? want : PROTOCOLS[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'agentverse-sunverse', title: 'AGENTVERSE · SUNVERSE Song → Video', version: VERSION },
-          instructions: 'Turns a Sunverse song into a finished music video. Always ask the owner before calling approve_song_job (it spends money on images) and before publish_to_youtube (it posts publicly on the channel). Show the owner the title/description first.' });
+        ok({ protocolVersion: PROTOCOLS.includes(want) ? want : PROTOCOLS[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'agentverse-sunverse', title: 'AGENTVERSE · SUNVERSE & PRANAV SIGNAL MCP', version: VERSION },
+          instructions: 'Turns a Sunverse song into a finished music video and powers PRANAV SIGNAL autonomous LinkedIn Growth Studio. Always ask the owner before publishing or spending money.' });
       } else if (m.method === 'ping') ok({});
       else if (m.method === 'tools/list') ok({ tools: TOOLS });
       else if (m.method === 'tools/call') {
@@ -555,8 +584,18 @@ async function mcp(request, env) {
         } catch (e) {
           ok({ content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true });
         }
-      } else if (m.method === 'resources/list') ok({ resources: [] });
-      else if (m.method === 'prompts/list') ok({ prompts: [] });
+      } else if (m.method === 'resources/list') {
+        ok({ resources: await signal.getResourcesList() });
+      } else if (m.method === 'resources/read') {
+        const uri = m.params?.uri;
+        if (!uri) { err(-32602, 'uri is required'); continue; }
+        try {
+          const content = await signal.readResource(kv(env), uri);
+          ok({ contents: [content] });
+        } catch (e) {
+          err(-32602, e.message);
+        }
+      } else if (m.method === 'prompts/list') ok({ prompts: [] });
       else err(-32601, `Method not found: ${m.method}`);
     } catch (e) {
       err(-32603, `Internal error: ${String(e?.message ?? e).slice(0, 200)}`);
@@ -736,7 +775,7 @@ async function route(request, env) {
     });
   }
 
-  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled, telegramBot: Boolean(env.TELEGRAM_BOT_TOKEN) }, 200, { 'access-control-allow-origin': '*' });
+  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, pranavSignal: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled, telegramBot: Boolean(env.TELEGRAM_BOT_TOKEN) }, 200, { 'access-control-allow-origin': '*' });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && seg[2] && method === 'GET') {
     const m = /^(\d{1,2})\.jpg$/.exec(seg[2]);
@@ -790,6 +829,16 @@ async function route(request, env) {
         if (type === 'crm') {
           return crm.decide(kv(env), id, { action });
         }
+        if (type === 'signal' || type === 'sig') {
+          if (action === 'approve') {
+            const pubRes = await signal.publishLinkedInPost(kv(env), env, id, { mode: env.LINKEDIN_ACCESS_TOKEN ? 'api' : 'manual' });
+            return { message: pubRes.mode === 'api' ? '🚀 LinkedIn post published!' : '✅ LinkedIn post approved for manual publish' };
+          } else {
+            const s = await signal.load(kv(env));
+            if (s.drafts[id]) { s.drafts[id].status = 'rejected'; await signal.save(kv(env), s); }
+            return { message: '❌ LinkedIn post rejected' };
+          }
+        }
         return { message: `${action} applied to ${type} ${id}` };
       });
       return json(res, 200, { 'access-control-allow-origin': '*' });
@@ -816,6 +865,53 @@ async function route(request, env) {
       owner(request, env);
       const { id, action } = await readJson(request);
       return json(await work.decide(k, id, action), 200, { 'access-control-allow-origin': '*' });
+    }
+    throw new HttpError(404, 'Not found');
+  }
+  if (seg[0] === 'api' && seg[1] === 'signal') {
+    const k = kv(env);
+    if (seg[2] === 'run' && method === 'POST') {
+      if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env);
+      else owner(request, env);
+      await signal.scanGlobalAiMarket(k);
+      await signal.rankDailySignal(k);
+      const draft = await signal.draftLinkedInPost(k);
+      await signal.createLinkedInVisual(k, draft.id);
+      await signal.checkPostQuality(k, draft.id);
+      await signal.submitForApproval(k, env, draft.id);
+      return json({ ok: true, draftId: draft.id, topic: draft.topic, status: 'waiting_approval' }, 200, { 'access-control-allow-origin': '*' });
+    }
+    if (seg[2] === 'auth' && seg[3] === 'url' && method === 'GET') {
+      owner(request, env);
+      const clientId = env.LINKEDIN_CLIENT_ID || 'mock_client_id';
+      const redirectUri = encodeURIComponent(`${url.origin}/api/signal/auth/callback`);
+      const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=openid%20profile%20w_member_social`;
+      return json({ url: authUrl, configured: Boolean(env.LINKEDIN_CLIENT_ID) }, 200, { 'access-control-allow-origin': '*' });
+    }
+    owner(request, env);
+    if (!seg[2] && method === 'GET') return json(signal.ownerView(await signal.load(k)), 200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+    if (seg[2] === 'draft' && method === 'POST') {
+      const { topic_id } = await readJson(request);
+      return json(await signal.draftLinkedInPost(k, topic_id), 200, { 'access-control-allow-origin': '*' });
+    }
+    if (seg[2] === 'visual' && method === 'POST') {
+      const { draft_id } = await readJson(request);
+      return json(await signal.createLinkedInVisual(k, draft_id), 200, { 'access-control-allow-origin': '*' });
+    }
+    if (seg[2] === 'decide' && method === 'POST') {
+      const { draft_id, action } = await readJson(request);
+      if (action === 'approve') {
+        const res = await signal.publishLinkedInPost(k, env, draft_id, { mode: env.LINKEDIN_ACCESS_TOKEN ? 'api' : 'manual' });
+        return json(res, 200, { 'access-control-allow-origin': '*' });
+      } else {
+        const s = await signal.load(k);
+        if (s.drafts[draft_id]) { s.drafts[draft_id].status = 'rejected'; s.drafts[draft_id].decidedAt = new Date().toISOString(); await signal.save(k, s); }
+        return json({ ok: true, status: 'rejected' }, 200, { 'access-control-allow-origin': '*' });
+      }
+    }
+    if (seg[2] === 'resource' && method === 'GET') {
+      const uri = url.searchParams.get('uri') || 'pranav://voice-card';
+      return json(await signal.readResource(k, uri), 200, { 'access-control-allow-origin': '*' });
     }
     throw new HttpError(404, 'Not found');
   }

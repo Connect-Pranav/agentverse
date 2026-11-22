@@ -1,0 +1,35 @@
+name: PRANAV SIGNAL — LinkedIn Growth Studio
+
+on:
+  schedule:
+    # 08:00 Asia/Kolkata = 02:30 UTC every day
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: signal-runner
+  cancel-in-progress: false
+
+jobs:
+  run-signal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run PRANAV SIGNAL Orchestrator Pipeline
+        env:
+          SV_MCP_URL: ${{ vars.SV_MCP_URL }}
+          SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN || secrets.MCP_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+        run: |
+          node scripts/signal-runner.mjs
