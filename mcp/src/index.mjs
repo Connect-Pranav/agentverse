@@ -902,7 +902,18 @@ async function route(request, env) {
     const k = kv(env);
 
     // Public JPEG Visual endpoint (direct image/jpeg binary)
-    if ((seg[2] === 'visual.jpg' || (seg[2] === 'visual' && (url.searchParams.get('format') === 'jpg' || url.searchParams.get('format') === 'jpeg'))) && method === 'GET') {
+    if ((seg[2] === 'visual.jpg' || (seg[2] === 'visual' && (url.searchParams.get('format') === 'jpg' || url.searchParams.get('format') === 'jpeg'))) && (method === 'GET' || method === 'HEAD')) {
+      if (method === 'HEAD') {
+        return new Response(null, {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/jpeg',
+            'Content-Disposition': 'attachment; filename="pranav-signal-revops-1200x627.jpg"',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600',
+          },
+        });
+      }
       const bin = atob(VISUAL_JPG_BASE64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -918,13 +929,13 @@ async function route(request, env) {
     }
 
     // Public SVG Visual preview endpoint (for <img> tags and direct browser view/download)
-    if (seg[2] === 'visual' && method === 'GET') {
+    if (seg[2] === 'visual' && (method === 'GET' || method === 'HEAD')) {
       const s = await signal.load(k);
       const dateParam = url.searchParams.get('date');
       const draftId = dateParam ? `post_${dateParam}` : null;
       const d = (draftId && s.drafts[draftId]) || s.drafts[`post_${signal.todayDate()}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
       const svg = d?.visual?.svg || signal.getDefaultSvg(d?.visual?.headline, d?.visual?.subline);
-      return new Response(svg, {
+      return new Response(method === 'HEAD' ? null : svg, {
         status: 200,
         headers: {
           'Content-Type': 'image/svg+xml; charset=utf-8',
