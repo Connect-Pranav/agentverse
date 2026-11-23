@@ -5,6 +5,7 @@
 
 import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
+import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
 
 const KEY = 'signal/state';
 const MAX_DRAFTS = 90;
@@ -923,12 +924,15 @@ export async function getResourcesList() {
     { uri: 'pranav://approved-posts', name: 'Approved Posts Ledger', description: 'History of approved and published LinkedIn posts', mimeType: 'application/json' },
     { uri: 'pranav://editorial-calendar', name: 'Editorial Calendar', description: 'Daily 09:30 IST schedule and upcoming topics', mimeType: 'application/json' },
     { uri: 'pranav://performance-history', name: 'LinkedIn Performance Analytics', description: 'Engagement metrics, impression benchmarks, and audience insights', mimeType: 'application/json' },
+    { uri: 'pranav://100-business-problems', name: '100 Business Problems Opportunity Library', description: 'Problem-first thought leadership library across 9 categories (Small Business, Sales, AI, Marketing, etc.)', mimeType: 'application/json' },
   ];
 }
 
 export async function readResource(kv, uri) {
   const s = await load(kv);
   switch (uri) {
+    case 'pranav://100-business-problems':
+      return { uri, mimeType: 'application/json', text: JSON.stringify(BUSINESS_PROBLEMS, null, 2) };
     case 'pranav://voice-card':
       return { uri, mimeType: 'application/json', text: JSON.stringify(s.positioning.toneGuidelines, null, 2) };
     case 'pranav://positioning':

@@ -23,6 +23,7 @@ import * as vani from './vani.mjs';
 import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
 import * as signal from './signal.mjs';
+import { VISUAL_JPG_BASE64 } from './visual_jpg.mjs';
 
 const VERSION = '1.3.0';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -900,6 +901,22 @@ async function route(request, env) {
   if (seg[0] === 'api' && seg[1] === 'signal') {
     const k = kv(env);
 
+    // Public JPEG Visual endpoint (direct image/jpeg binary)
+    if ((seg[2] === 'visual.jpg' || (seg[2] === 'visual' && (url.searchParams.get('format') === 'jpg' || url.searchParams.get('format') === 'jpeg'))) && method === 'GET') {
+      const bin = atob(VISUAL_JPG_BASE64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Content-Disposition': 'attachment; filename="pranav-signal-revops-1200x627.jpg"',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
+    }
+
     // Public SVG Visual preview endpoint (for <img> tags and direct browser view/download)
     if (seg[2] === 'visual' && method === 'GET') {
       const s = await signal.load(k);
@@ -915,6 +932,23 @@ async function route(request, env) {
           'Cache-Control': 'public, max-age=60',
         },
       });
+    }
+
+    // Direct Telegram notification trigger
+    if (seg[2] === 'notify-telegram' && (method === 'POST' || method === 'GET')) {
+      const photoUrl = 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg';
+      const msg = `⚡ <b>PRANAV SIGNAL — Visual & Playbook Ready!</b>\n\n` +
+        `🎯 <b>Topic:</b> The B2B Revenue Leakage Matrix\n` +
+        `📊 <b>Infographic:</b> High-contrast editorial matrix with 3 stage breakdown\n` +
+        `🖼 <b>JPG Image:</b> <a href="${photoUrl}">Download High-Res JPG</a>\n` +
+        `📚 <b>Playbook:</b> Integrated "100 Business Problems" library into AgentVerse.\n\n` +
+        `<i>Ready for your review at /#signal</i>`;
+      const okPhoto = await telegram.sendTelegramPhoto(env, photoUrl, msg).catch(() => false);
+      let okMsg = false;
+      if (!okPhoto) {
+        okMsg = await telegram.sendTelegramMessage(env, msg);
+      }
+      return json({ ok: true, photoSent: okPhoto, msgSent: okMsg }, 200, { 'access-control-allow-origin': '*' });
     }
 
     // Public / Viewer Read Endpoint (for AgentVerse Signal dashboard UI)

@@ -42,6 +42,37 @@ export async function sendTelegramMessage(env, text, replyMarkup = null, fetchIm
   }
 }
 
+export async function sendTelegramPhoto(env, photoUrl, caption = '', replyMarkup = null, fetchImpl = fetch, targetChatId = null) {
+  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  let chatId = targetChatId || env.TELEGRAM_CHAT_ID;
+  if (!chatId && env.KV) {
+    try {
+      chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id'));
+    } catch {}
+  }
+  if (!token || !chatId) return false;
+  const url = `${TG_API}/bot${token}/sendPhoto`;
+  const body = {
+    chat_id: chatId,
+    photo: photoUrl,
+    caption,
+    parse_mode: 'HTML',
+  };
+  if (replyMarkup) body.reply_markup = replyMarkup;
+
+  try {
+    const r = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return r.ok;
+  } catch (e) {
+    console.error('[telegram] sendPhoto failed:', e?.message);
+    return false;
+  }
+}
+
 export async function notifyApproval(env, { id, type, title, brand, summary, estCost }, fetchImpl = fetch, targetChatId = null) {
   const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
   let chatId = targetChatId || env.TELEGRAM_CHAT_ID;

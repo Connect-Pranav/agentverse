@@ -253,6 +253,27 @@ test('PRANAV SIGNAL: Public endpoints for UI visual, draft state, and OAuth call
   assert.ok(svgText.includes('<svg'));
   assert.ok(svgText.includes('PRANAV KUMAR'));
 
+  // Public GET /api/signal/visual.jpg returns binary JPEG
+  const jpgRes = await worker.fetch(new Request(BASE + '/api/signal/visual.jpg', { method: 'GET' }), env);
+  assert.equal(jpgRes.status, 200);
+  assert.match(jpgRes.headers.get('content-type'), /image\/jpeg/);
+  const jpgBytes = new Uint8Array(await jpgRes.arrayBuffer());
+  assert.ok(jpgBytes.length > 50000);
+  // JPEG magic bytes: FF D8 FF
+  assert.equal(jpgBytes[0], 0xFF);
+  assert.equal(jpgBytes[1], 0xD8);
+  assert.equal(jpgBytes[2], 0xFF);
+
+  // MCP resource: pranav://100-business-problems
+  const r100Res = await worker.fetch(new Request(BASE + '/mcp', {
+    method: 'POST',
+    headers: H_AUTH,
+    body: JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'resources/read', params: { uri: 'pranav://100-business-problems' } }),
+  }), env);
+  assert.equal(r100Res.status, 200);
+  const r100Data = JSON.parse((await r100Res.json()).result.contents[0].text);
+  assert.equal(r100Data.length, 100);
+
   // Public GET /api/signal/auth/callback returns instructional page
   const cbRes = await worker.fetch(new Request(BASE + '/api/signal/auth/callback?code=mock_code_123', { method: 'GET' }), env);
   assert.equal(cbRes.status, 200);
