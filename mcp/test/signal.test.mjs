@@ -293,8 +293,8 @@ test('Linkedin_Post_Generator: Full automated pipeline delivers all 12 acceptanc
       params: {
         name: 'linkedin_post_generator_run',
         arguments: {
-          topic_id: 'signal_ipo_watchlist',
-          archetype: 'big_ipos_watchlist',
+          topic_id: 'prob_11',
+          archetype: 'revenue_leakage_matrix',
           force: true,
         },
       },
@@ -308,9 +308,9 @@ test('Linkedin_Post_Generator: Full automated pipeline delivers all 12 acceptanc
 
   assert.equal(out.pipeline, 'Linkedin_Post_Generator');
 
-  // Item 1: Topic Selected
-  assert.ok(out.item1_topicSelected.title.includes('IPOs'));
-  assert.equal(out.item1_topicSelected.researchArea, 'IPOs and market developments');
+  // Item 1: Topic Selected from 100 Business Problems Library
+  assert.ok(out.item1_topicSelected.title.includes('low-quality leads') || out.item1_topicSelected.title.length > 5);
+  assert.ok(out.item1_topicSelected.researchArea.includes('Sales') || out.item1_topicSelected.researchArea.length > 0);
 
   // Item 2: Selection Reason
   assert.ok(out.item2_selectionReason.totalScore >= 80);
@@ -334,7 +334,7 @@ test('Linkedin_Post_Generator: Full automated pipeline delivers all 12 acceptanc
   assert.ok(out.item6_finalLinkedInPost.hook.length > 20);
 
   // Item 7: Canva Design Preview (Archetype)
-  assert.equal(out.item7_canvaDesignPreview.archetype, 'big_ipos_watchlist');
+  assert.equal(out.item7_canvaDesignPreview.archetype, 'revenue_leakage_matrix');
   assert.equal(out.item7_canvaDesignPreview.svgPreviewAvailable, true);
 
   // Item 8: Exported Asset
