@@ -26,11 +26,11 @@ export const RESEARCH_AREAS = [
 
 export const CANVA_DESIGNS = {
   revenue_leakage_matrix: {
-    designId: 'DAHbuXegh4g',
-    editUrl: 'https://canva.link/khjouf8lq46y7ak',
+    designId: 'DAHbu0ThXSo',
+    editUrl: 'https://canva.link/o3zl9h7m7iqhmow',
     exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
     archetype: 'revenue_leakage_matrix',
-    title: 'Sales Teams Waste Time on Low-Quality Leads (Problem #11)',
+    title: 'CRM Data is Incomplete or Inaccurate (Problem #16)',
   },
   big_ipos_watchlist: {
     designId: 'DAHbuJrihFk',
@@ -526,7 +526,23 @@ export async function generatePranavPov(kv, topicId = null) {
   let pranavTakeaways = [];
   let closingQuestion = '';
 
-  if (frameworkType === 'STAR') {
+  if (signal.problemNum === 16 || signal.id === 'signal_prob_16' || /crm data/i.test(signal.title)) {
+    situationText = `Across Indian B2B teams and scaling marketplaces, over 60% of CRM records are either outdated, missing decision-makers, or logged with placeholder deal stages just before Friday pipeline reviews.`;
+    frameworkData = {
+      framework: 'SBI',
+      situation: situationText,
+      behaviour: `Forcing sales reps to fill 30+ mandatory fields, prompting them to enter garbage data to satisfy activity quotas instead of capturing true buyer intent.`,
+      impact: `Distorted revenue forecasts, wasted marketing spend on unqualified leads, and blindsided leadership at quarter-end when "commit" deals vanish.`,
+    };
+    operatorPerspective = `Leading commercial operations across IndiaMART, Justdial, Magicbricks, and magicpin taught me one fundamental rule: threatening reps with CRM compliance never fixes dirty data. Process design does.`;
+    operatorTake = `If your sales forecast relies on rep memory rather than buyer evidence, you don't have a pipeline—you have a wishlist.`;
+    pranavTakeaways = [
+      `1. Cut 70% of mandatory fields: Keep only the 3 fields that directly correlate with deal velocity.`,
+      `2. Automate data capture at the glass: Use AI to log email, calendar, and WhatsApp cadences instead of expecting manual notes.`,
+      `3. Tie deal stages to verified buyer actions: A deal only moves forward when the customer takes a verifiable step (e.g. mutual action plan signed), not rep optimism.`,
+    ];
+    closingQuestion = `What percentage of your current sales forecast is backed by verified customer actions versus sales rep optimism?`;
+  } else if (frameworkType === 'STAR') {
     frameworkData = {
       framework: 'STAR',
       situation: situationText,
@@ -601,7 +617,30 @@ export async function draftLinkedInPost(kv, customTopicId = null, options = {}) 
   if (signal.problemId || signal.problemNum || signal.id.startsWith('signal_prob_')) {
     hook = `Most leaders treat "${problemTitle.toLowerCase()}" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.`;
 
-    if (pov.framework === 'STAR') {
+    if (signal.problemNum === 16 || signal.id === 'signal_prob_16' || /crm data/i.test(signal.title)) {
+      hook = `Most sales leaders believe their forecasting problem is a pipeline size problem.\n\nIn 90% of scaling companies, that is wrong. It is a CRM data integrity problem.`;
+      postBody = `${hook}
+
+Across B2B teams, over 60% of CRM records are either outdated, missing decision-makers, or logged with placeholder deal stages just before Friday pipeline reviews.
+
+The SBI breakdown:
+• Situation: Fast-scaling sales teams expanding across multiple commercial territories.
+• Behaviour: Forcing reps to fill 30+ mandatory fields, prompting them to enter garbage data to satisfy activity quotas.
+• Impact: Distorted revenue forecasts, wasted marketing spend on unqualified leads, and blindsided leadership at quarter-end.
+
+Leading commercial operations across IndiaMART, Justdial, Magicbricks, and magicpin taught me one fundamental rule: threatening reps with CRM compliance never fixes dirty data. Process design does.
+
+3 practical rules for operators:
+1. Cut 70% of mandatory fields: Keep only the 3 fields that directly correlate with deal velocity.
+2. Automate data capture at the glass: Use AI to log email, calendar, and WhatsApp cadences instead of expecting manual notes.
+3. Tie deal stages to verified buyer actions: A deal only moves forward when the customer takes a verifiable step (e.g. mutual action plan signed), not rep optimism.
+
+${pov.operatorTake}
+
+${pov.closingQuestion}
+
+#RevenueOperations #SalesLeadership #CRM #GTMStrategy #B2B`;
+    } else if (pov.framework === 'STAR') {
       postBody = `${hook}
 
 When scaling ${category.toLowerCase()} motions in competitive markets, unaddressed friction doesn't grow linearly—it compounds across every team member.
@@ -960,7 +999,7 @@ export function getDefaultSvg(headline = 'THE B2B REVENUE LEAKAGE MATRIX', subli
 
   <!-- Footer Branding -->
   <g transform="translate(60, 580)">
-    <text x="0" y="18" fill="#64748B" font-size="11" font-weight="600">PRANAV SIGNAL · EXECUTIVE REVOPS FRAMEWORK · 1200 × 627 (1.91:1) ASSET</text>
+    <text x="0" y="18" fill="#64748B" font-size="11" font-weight="600">PRANAV SIGNAL · EXECUTIVE REVOPS FRAMEWORK · CANVA DESIGN DAHbu0ThXSo · 1200 × 627 (1.91:1)</text>
     <text x="1080" y="18" fill="#00F0FF" font-size="11" font-weight="700" text-anchor="end">AGENTVERSE GROWTH STUDIO · POWERED BY MCP</text>
   </g>
 </svg>`;
@@ -1328,8 +1367,8 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
     subline = 'Ranked by team growth in the last 12 months · Data by Crustdata';
     svgVisual = getTierListSvg(headline, subline);
   } else {
-    headline = 'THE REVOPS PIPELINE LEAKAGE FRAMEWORK';
-    subline = 'Why buying more sales tools hides broken funnel mechanics';
+    headline = 'THE CRM DATA INTEGRITY MATRIX';
+    subline = 'Why 60% of Pipeline Forecasts Fail and How Operators Fix It';
     svgVisual = getDefaultSvg(headline, subline);
   }
 
