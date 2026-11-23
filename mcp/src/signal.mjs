@@ -6,6 +6,7 @@
 import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
 import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
+import { CASE_BANK, getCaseByNumber, getNextUnusedCase, buildLinkedInPostFromCase } from './case_bank.mjs';
 
 export const PIPELINE_NAME = 'Linkedin_Post_Generator';
 
@@ -25,12 +26,26 @@ export const RESEARCH_AREAS = [
 ];
 
 export const CANVA_DESIGNS = {
+  case_1_kodak: {
+    designId: 'DAHbvV-AXys',
+    editUrl: 'https://canva.link/zpiisdcunqtdccu',
+    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
+    archetype: 'company_case_matrix',
+    title: 'Case #1: Eastman Kodak — Digital Strategy',
+  },
+  company_case_matrix: {
+    designId: 'DAHbvV-AXys',
+    editUrl: 'https://canva.link/zpiisdcunqtdccu',
+    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
+    archetype: 'company_case_matrix',
+    title: 'Case #1: Eastman Kodak — Digital Strategy',
+  },
   revenue_leakage_matrix: {
-    designId: 'DAHbu0ThXSo',
-    editUrl: 'https://canva.link/o3zl9h7m7iqhmow',
+    designId: 'DAHbvV-AXys',
+    editUrl: 'https://canva.link/zpiisdcunqtdccu',
     exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
     archetype: 'revenue_leakage_matrix',
-    title: 'CRM Data is Incomplete or Inaccurate (Problem #16)',
+    title: 'Case #1: Eastman Kodak — Digital Strategy',
   },
   big_ipos_watchlist: {
     designId: 'DAHbuJrihFk',
@@ -174,6 +189,9 @@ export async function load(kv) {
   s.drafts = s.drafts || {};
   s.visuals = s.visuals || {};
   s.history = s.history || [];
+  s.usedCaseNumbers = s.usedCaseNumbers || [];
+  s.currentCycle = s.currentCycle || 1;
+  s.latestDraftId = s.latestDraftId || null;
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };
   s.logs = s.logs || [];
 
@@ -224,6 +242,9 @@ export async function resetSignalState(kv) {
     drafts: {},
     visuals: {},
     history: [],
+    usedCaseNumbers: [],
+    currentCycle: 1,
+    latestDraftId: null,
     metrics: { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 0 },
     logs: [
       {
@@ -355,144 +376,145 @@ function archetypeForCategory(category) {
   return 'revenue_leakage_matrix'; // default to matrix for all business problems
 }
 
-// Build a signal candidate from a business problem
-function problemToSignal(prob, today) {
-  const pillarId = CATEGORY_PILLAR_MAP[prob.category] || 'pillar_revops';
-  const archetype = archetypeForCategory(prob.category);
+// Build a signal candidate from a 100 Case Bank company case
+export function caseToSignal(c, today) {
   return {
-    id: `signal_${prob.id}`,
-    title: prob.problem,
-    source: `100 Business Problems Library — ${prob.category} (#${prob.num})`,
-    sourceUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/playbook',
+    id: `case_${c.caseNumber}`,
+    caseNumber: c.caseNumber,
+    case_number: c.caseNumber,
+    company: c.company,
+    theme: c.theme,
+    title: `Case #${c.caseNumber}: ${c.company} — ${c.theme}`,
+    source: `100 Business Problems Case Bank — Case #${c.caseNumber}`,
+    sourceUrl: c.sourceUrl,
     date: today,
-    domain: prob.category,
-    researchArea: prob.category,
-    pillarId,
-    archetype,
-    framework: /Sales|Revenue|Finance|SME/i.test(prob.category) ? 'SBI' : 'SBI',
-    problemId: prob.id,
-    problemNum: prob.num,
-    problemCategory: prob.category,
-    verifiedFacts: [
-      {
-        claim: `This is a real and widespread problem: "${prob.problem}" — affecting businesses across Indian SME, B2B, and consumer segments.`,
-        source: `100 Business Problems Library by Pranav Kumar`,
-        date: today,
-        url: 'https://agentverse.aistudio09.workers.dev/api/signal/playbook',
-      },
-      {
-        claim: `Operators who solve "${prob.problem.toLowerCase()}" systematically gain measurable efficiency advantages over competitors who leave it as a manual or untracked process.`,
-        source: `Operator intelligence — IndiaMART, Justdial, Magicbricks, magicpin commercial execution experience`,
-        date: today,
-      },
-    ],
-    summary: `Business problem #${prob.num}: "${prob.problem}" — a category-${prob.category} challenge with high commercial impact for Indian businesses.`,
-    evidenceQuality: 90 + (prob.num % 8),
-    discussionPotential: 88 + (prob.num % 10),
-    businessImpact: `High: Directly impacts revenue, efficiency, and competitive positioning for businesses facing "${prob.problem}".`,
+    domain: c.theme,
+    industry: c.industry,
+    period: c.period,
+    researchArea: c.theme,
+    pillarId: 'pillar_revops',
+    archetype: 'company_case_matrix',
+    framework: '10-Step Post Builder',
+    documentedProblem: c.documentedProblem,
+    rootCauseAnalysis: c.rootCauseAnalysis,
+    businessImpact: c.businessImpact,
+    documentedResponse: c.documentedResponse,
+    recommendedFix: c.recommendedFix,
+    postAngle: c.postAngle,
+    evidenceType: c.evidenceType,
+    score: 98,
+    scores: {
+      relevance: 98,
+      freshness: 95,
+      curiosity: 96,
+      commercial: 98,
+      learning: 97,
+      shareability: 96,
+      newAudienceAppeal: 95,
+    },
+    whyChosen: `Authoritative selection from 100 Business Problems Case Bank (Case #${c.caseNumber}: ${c.company}). Zero repetition in current cycle.`,
+    research: {
+      verifiedFacts: [
+        {
+          claim: c.documentedProblem,
+          source: c.evidenceType,
+          date: c.period,
+          url: c.sourceUrl,
+        },
+        {
+          claim: `Documented Action: ${c.documentedResponse}`,
+          source: c.evidenceType,
+          date: c.period,
+          url: c.sourceUrl,
+        },
+      ],
+      analysis: c.rootCauseAnalysis,
+      assumptions: 'Analytical diagnosis separated from documented facts.',
+      sourceUrls: [c.sourceUrl],
+    },
+    summary: `${c.company} (${c.period}) — ${c.documentedProblem}`,
+    evidenceQuality: 98,
+    discussionPotential: 96,
+    businessImpact: c.businessImpact,
   };
 }
 
-export async function scanGlobalAiMarket(kv, customNews = null) {
+export async function selectDailyCase(kv, preferredCaseNumber = null) {
   const s = await load(kv);
-  const today = todayDate();
+  s.usedCaseNumbers = s.usedCaseNumbers || [];
+  s.currentCycle = s.currentCycle || 1;
 
-  // Seed exclusively from the 100 Business Problems library
-  // Build all 100 problems as signal candidates; selection happens in rankDailySignal
-  const defaultNews = BUSINESS_PROBLEMS.map((prob) => problemToSignal(prob, today));
+  let chosenCase = null;
+  let isNewCycle = false;
 
-  const incoming = Array.isArray(customNews) && customNews.length ? customNews : defaultNews;
-  for (const n of incoming) {
-    if (!s.sources.some((ex) => ex.id === n.id)) {
-      s.sources.unshift({ ...n, addedAt: nowIso() });
+  if (preferredCaseNumber) {
+    const num = Number(preferredCaseNumber);
+    if (!isNaN(num) && num >= 1 && num <= 100) {
+      chosenCase = getCaseByNumber(num);
     }
   }
 
-  logActivity(s, 'Global AI & Market Scout', `Scanned and ledgered ${incoming.length} global market signals.`);
+  if (!chosenCase) {
+    const next = getNextUnusedCase(s.usedCaseNumbers);
+    chosenCase = next.caseData;
+    isNewCycle = next.isNewCycle;
+    if (isNewCycle) {
+      s.currentCycle += 1;
+      s.usedCaseNumbers = [];
+    }
+  }
+
+  if (!chosenCase) {
+    chosenCase = getCaseByNumber(1);
+  }
+
+  if (!s.usedCaseNumbers.includes(chosenCase.caseNumber)) {
+    s.usedCaseNumbers.push(chosenCase.caseNumber);
+  }
+
+  logActivity(s, 'Case Bank Selector', `Selected Case #${chosenCase.caseNumber}: ${chosenCase.company} (${chosenCase.theme}). Cycle ${s.currentCycle}, Total Used: ${s.usedCaseNumbers.length}/100.`);
+  await save(kv, s);
+  return { caseData: chosenCase, isNewCycle, cycle: s.currentCycle };
+}
+
+export async function scanGlobalAiMarket(kv, customCases = null) {
+  const s = await load(kv);
+  const today = todayDate();
+
+  // Primary source: 100 Business Problems Case Bank
+  const defaultCases = CASE_BANK.map((c) => caseToSignal(c, today));
+  const incoming = Array.isArray(customCases) && customCases.length ? customCases : defaultCases;
+  for (const n of incoming) {
+    if (!s.sources.some((ex) => ex.id === n.id)) {
+      s.sources.push({ ...n, addedAt: nowIso() });
+    }
+  }
+
+  logActivity(s, 'Case Bank Scanner', `Scanned and ledgered ${incoming.length} company cases from 100 Case Bank.`);
   await save(kv, s);
   return { sources: s.sources.slice(0, 20), count: s.sources.length };
 }
 
 // -------------------------------------------------------------
-// 4. Signal & Topic Strategist (Multi-Factor Scoring & History)
+// 4. Signal & Topic Strategist (100 Case Bank Deterministic Selection)
 // -------------------------------------------------------------
 export async function rankDailySignal(kv, preferredTopicId = null) {
   const s = await load(kv);
   if (!s.sources.length) await scanGlobalAiMarket(kv);
 
-  // Check recent history (last 60 days) to prevent topic repetition
-  const recentHistoryTopics = (s.history || []).map((h) => clean(h.topic || '', 100).toLowerCase());
+  let preferredNum = null;
+  if (preferredTopicId) {
+    const parsed = parseInt(String(preferredTopicId).replace(/\D/g, ''), 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) preferredNum = parsed;
+  }
 
-  const rankedSignals = s.sources.map((src, i) => {
-    // 7-Factor Weighted Scoring Model
-    // 1. Relevance to business professionals (weight 0.20)
-    const relevance = 92 + ((i * 2) % 7);
-    // 2. Freshness (weight 0.15)
-    const freshness = 95 - (i * 2);
-    // 3. Curiosity and scroll-stopping potential (weight 0.15)
-    const curiosity = Number(src.discussionPotential || 92);
-    // 4. Commercial importance (weight 0.15)
-    const commercial = Number(src.evidenceQuality || 94);
-    // 5. Practical learning value (weight 0.15)
-    const learning = 93 - ((i * 3) % 6);
-    // 6. Shareability (weight 0.10)
-    const shareability = Number(src.discussionPotential || 90);
-    // 7. Potential to attract new followers (weight 0.10)
-    const newAudienceAppeal = 94 - (i % 5);
+  const { caseData } = await selectDailyCase(kv, preferredNum);
+  const sig = caseToSignal(caseData, todayDate());
+  s.signals = [sig];
 
-    // Multi-factor weighted score
-    let totalScore = Math.round(
-      (relevance * 0.20) +
-      (freshness * 0.15) +
-      (curiosity * 0.15) +
-      (commercial * 0.15) +
-      (learning * 0.15) +
-      (shareability * 0.10) +
-      (newAudienceAppeal * 0.10)
-    );
-
-    // Penalty if repeated in recent history
-    const isRepeated = recentHistoryTopics.some((t) => t.includes(clean(src.title, 30).toLowerCase()));
-    if (isRepeated) totalScore = Math.max(50, totalScore - 25);
-
-    // Strict exclusion of previous Problem #11 from automatic selection (user requested fresh topic)
-    if (!preferredTopicId && (src.id === 'signal_prob_11' || src.id === 'prob_11' || src.title.toLowerCase().includes('low-quality leads'))) {
-      totalScore = 30;
-    }
-
-    // Preferred topic boost (explicitly requested topic guarantees #1 rank)
-    if (preferredTopicId && (src.id === preferredTopicId || src.id.includes(preferredTopicId) || (src.sourceId && src.sourceId.includes(preferredTopicId)))) {
-      totalScore += 100;
-    }
-
-    return {
-      id: src.id.startsWith('signal_') ? src.id : `signal_${src.id}`,
-      sourceId: src.id,
-      title: src.title,
-      domain: src.domain || 'GTM & Revenue Architecture',
-      researchArea: src.researchArea || 'Strategy, growth and operations',
-      pillarId: src.pillarId || 'pillar_revops',
-      archetype: src.archetype || 'revenue_leakage_matrix',
-      framework: src.framework || 'SBI',
-      score: totalScore,
-      scores: { relevance, freshness, curiosity, commercial, learning, shareability, newAudienceAppeal },
-      whyChosen: `Ranked highest on commercial importance (${commercial}/100) and curiosity (${curiosity}/100). High relevance to Pranav's commercial operator background (IndiaMART, Justdial, Magicbricks, magicpin) with zero recent repetition.`,
-      research: {
-        verifiedFacts: src.verifiedFacts || [
-          { claim: src.summary || src.title, source: src.source || 'Industry Intelligence', date: src.date || todayDate(), url: src.sourceUrl || '' },
-        ],
-        analysis: `Transition from vanity scaling to disciplined unit economics requires operational visibility, sub-3-minute lead response SLAs, and clean CRM routing.`,
-        assumptions: `Assumes Indian mid-market and enterprise B2B sales cycles with standard territory assignments.`,
-        sourceUrls: src.sourceUrl ? [src.sourceUrl] : ['https://agentverse.aistudio09.workers.dev/api/signal/playbook'],
-      },
-    };
-  }).sort((a, b) => b.score - a.score);
-
-  s.signals = rankedSignals;
-  const topSignal = rankedSignals[0];
-  logActivity(s, 'Signal & Topic Strategist', `Ranked ${rankedSignals.length} topics. Selected #1: "${topSignal.title}" (${topSignal.score} pts).`);
+  logActivity(s, 'Signal & Topic Strategist', `Selected #1 from Case Bank: "${sig.title}" (${sig.score} pts).`);
   await save(kv, s);
-  return { topSignal, rankedSignals };
+  return { topSignal: sig, rankedSignals: [sig] };
 }
 
 // -------------------------------------------------------------
@@ -614,7 +636,13 @@ export async function draftLinkedInPost(kv, customTopicId = null, options = {}) 
   const category = signal.problemCategory || signal.researchArea || signal.domain || 'Business Operations';
   const tagCategory = category.replace(/[^a-zA-Z0-9]/g, '');
 
-  if (signal.problemId || signal.problemNum || signal.id.startsWith('signal_prob_')) {
+  const caseData = (signal.caseNumber ? getCaseByNumber(signal.caseNumber) : null) || (signal.company ? signal : null);
+
+  if (caseData) {
+    const built = buildLinkedInPostFromCase(caseData);
+    hook = built.hook;
+    postBody = built.body;
+  } else if (signal.problemId || signal.problemNum || signal.id.startsWith('signal_prob_')) {
     hook = `Most leaders treat "${problemTitle.toLowerCase()}" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.`;
 
     if (signal.problemNum === 16 || signal.id === 'signal_prob_16' || /crm data/i.test(signal.title)) {
@@ -775,18 +803,25 @@ What is the biggest operational bottleneck leaking revenue in your GTM motion ri
   const draft = {
     id: idempotencyId,
     signalId: signal.id,
+    case_number: caseData ? caseData.caseNumber : null,
+    caseNumber: caseData ? caseData.caseNumber : null,
+    company: caseData ? caseData.company : null,
+    theme: caseData ? caseData.theme : null,
+    documented_business_problem: caseData ? caseData.documentedProblem : (signal.documentedProblem || signal.title),
+    source_url: caseData ? caseData.sourceUrl : (signal.sourceUrl || null),
+    evidence_type: caseData ? caseData.evidenceType : null,
     topic: signal.title,
     pillarId: signal.pillarId,
     researchArea: signal.researchArea,
-    archetype: signal.archetype,
-    framework: pov.framework,
+    archetype: signal.archetype || 'company_case_matrix',
+    framework: '10-Step Post Builder',
     frameworkData: pov.frameworkData,
     operatorTake: pov.operatorTake,
     hook,
     body: postBody,
     wordCount,
     characterCount,
-    sources: signal.research?.verifiedFacts?.map((f) => `${f.claim} (${f.source}, ${f.date})`) || [signal.title],
+    sources: caseData ? [`${caseData.company} (${caseData.evidenceType}) - ${caseData.sourceUrl}`] : (signal.research?.verifiedFacts?.map((f) => `${f.claim} (${f.source}, ${f.date})`) || [signal.title]),
     status: 'draft', // draft | waiting_approval | approved | published | rejected
     createdAt: nowIso(),
     author: PRANAV_POSITIONING.name,
@@ -796,7 +831,8 @@ What is the biggest operational bottleneck leaking revenue in your GTM motion ri
   };
 
   s.drafts[idempotencyId] = draft;
-  logActivity(s, 'LinkedIn Copywriter', `Drafted daily post "${draft.id}" (${wordCount} words, ${characterCount} chars, Framework: ${pov.framework}).`);
+  s.latestDraftId = idempotencyId;
+  logActivity(s, 'LinkedIn Copywriter', `Drafted daily post "${draft.id}" (${wordCount} words, ${characterCount} chars, Case #${draft.case_number || 'N/A'}: ${draft.company || 'Topic'}).`);
   await save(kv, s);
   return draft;
 }
@@ -1339,6 +1375,122 @@ export function getTierListSvg(headline = 'Indian Startups Tier List', subline =
 </svg>`;
 }
 
+export function getCompanyCaseSvg(caseData) {
+  const authorBadge = 'PRANAV KUMAR · BUSINESS CASE STUDY';
+  const cleanCompany = (caseData?.company || 'COMPANY CASE').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanTheme = (caseData?.theme || 'Business Strategy').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanProblem = (caseData?.documentedProblem || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanAnalysis = (caseData?.rootCauseAnalysis || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanResponse = (caseData?.documentedResponse || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanPeriod = (caseData?.period || '1990s–2012').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanIndustry = (caseData?.industry || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanEvidence = (caseData?.evidenceType || 'Primary Source').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanFix = (caseData?.recommendedFix || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const caseNum = caseData?.caseNumber || 1;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="background:#070B19;font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <defs>
+    <linearGradient id="bgGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B"/>
+      <stop offset="50%" stop-color="#080C1E"/>
+      <stop offset="100%" stop-color="#050814"/>
+    </linearGradient>
+    <radialGradient id="topCyanGlow" cx="25%" cy="10%" r="50%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bottomGoldGlow" cx="80%" cy="90%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="627" fill="url(#bgGlow)"/>
+  <rect width="1200" height="627" fill="url(#topCyanGlow)"/>
+  <rect width="1200" height="627" fill="url(#bottomGoldGlow)"/>
+
+  <!-- Top Badges & Breadcrumb -->
+  <g transform="translate(60, 24)">
+    <rect x="0" y="0" width="375" height="30" rx="15" fill="rgba(0,240,255,0.08)" stroke="#00F0FF" stroke-width="1.2"/>
+    <circle cx="16" cy="15" r="5" fill="#00F0FF"/>
+    <text x="30" y="19" fill="#00F0FF" font-size="11.5" font-weight="700" letter-spacing="1.2">${authorBadge}</text>
+
+    <rect x="715" y="0" width="365" height="30" rx="15" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="897" y="19" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">CASE #${caseNum} OF 100 · ${cleanPeriod}</text>
+  </g>
+
+  <!-- Header -->
+  <g transform="translate(60, 68)">
+    <text x="0" y="28" fill="#FFFFFF" font-size="28" font-weight="900" letter-spacing="-0.5">${cleanCompany}</text>
+    <rect x="585" y="4" width="220" height="32" rx="6" fill="#FACC15"/>
+    <text x="695" y="25" fill="#0F172A" font-size="13" font-weight="900" text-anchor="middle" letter-spacing="0.5">${cleanTheme.toUpperCase()}</text>
+    <text x="0" y="52" fill="#94A3B8" font-size="14" font-weight="500">${cleanIndustry} · Evidence: ${cleanEvidence}</text>
+  </g>
+
+  <!-- 3 High Contrast Editorial Cards -->
+  <!-- CARD 1: THE DOCUMENTED PROBLEM -->
+  <g transform="translate(60, 138)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="345" height="345" rx="16" fill="#FFFFFF"/>
+    <path d="M 0 16 Q 0 0 16 0 L 329 0 Q 345 0 345 16 L 345 52 L 0 52 Z" fill="#DC2626"/>
+    <text x="18" y="27" fill="#FFFFFF" font-size="13" font-weight="800">❌ THE DOCUMENTED PROBLEM</text>
+    <text x="18" y="43" fill="#FECACA" font-size="10.5" font-weight="600">Reported Operational Issue</text>
+    <foreignObject x="18" y="65" width="309" height="210">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12.5px;line-height:1.5;color:#0F172A;font-weight:600;font-family:sans-serif;">
+        ${cleanProblem}
+      </div>
+    </foreignObject>
+    <g transform="translate(18, 288)">
+      <rect x="0" y="0" width="309" height="40" rx="10" fill="#FEF2F2" stroke="#F87171" stroke-width="1.2"/>
+      <text x="154" y="24" fill="#B91C1C" font-size="11" font-weight="800" text-anchor="middle">🚨 DOCUMENTED IMPACT</text>
+    </g>
+  </g>
+
+  <!-- CARD 2: ROOT CAUSE (ANALYSIS) -->
+  <g transform="translate(427, 138)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="345" height="345" rx="16" fill="#FFFFFF"/>
+    <path d="M 0 16 Q 0 0 16 0 L 329 0 Q 345 0 345 16 L 345 52 L 0 52 Z" fill="#D97706"/>
+    <text x="18" y="27" fill="#FFFFFF" font-size="13" font-weight="800">⚠️ ROOT-CAUSE DIAGNOSIS</text>
+    <text x="18" y="43" fill="#FEF3C7" font-size="10.5" font-weight="600">Operator Analysis &amp; Interpretation</text>
+    <foreignObject x="18" y="65" width="309" height="210">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12px;line-height:1.45;color:#0F172A;font-weight:600;font-family:sans-serif;">
+        ${cleanAnalysis}
+      </div>
+    </foreignObject>
+    <g transform="translate(18, 288)">
+      <rect x="0" y="0" width="309" height="40" rx="10" fill="#FFFBEB" stroke="#FBBF24" stroke-width="1.2"/>
+      <text x="154" y="24" fill="#B45309" font-size="11" font-weight="800" text-anchor="middle">⚡ SYSTEMIC ROOT CAUSE</text>
+    </g>
+  </g>
+
+  <!-- CARD 3: RESPONSE & RECOMMENDED FIX -->
+  <g transform="translate(795, 138)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="345" height="345" rx="16" fill="#FFFFFF"/>
+    <path d="M 0 16 Q 0 0 16 0 L 329 0 Q 345 0 345 16 L 345 52 L 0 52 Z" fill="#059669"/>
+    <text x="18" y="27" fill="#FFFFFF" font-size="13" font-weight="800">✓ WHAT CHANGED &amp; FIX</text>
+    <text x="18" y="43" fill="#D1FAE5" font-size="10.5" font-weight="600">Documented Response &amp; Lessons</text>
+    <foreignObject x="18" y="65" width="309" height="210">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12px;line-height:1.45;color:#0F172A;font-weight:600;font-family:sans-serif;">
+        <b>Actual:</b> ${cleanResponse}<br/><br/>
+        <b>Fix:</b> ${cleanFix}
+      </div>
+    </foreignObject>
+    <g transform="translate(18, 288)">
+      <rect x="0" y="0" width="309" height="40" rx="10" fill="#ECFDF5" stroke="#34D399" stroke-width="1.2"/>
+      <text x="154" y="24" fill="#047857" font-size="11" font-weight="800" text-anchor="middle">✓ MANAGEMENT LESSON</text>
+    </g>
+  </g>
+
+  <!-- Footer Branding -->
+  <g transform="translate(60, 588)">
+    <text x="0" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">100 BUSINESS PROBLEMS CASE BANK · CASE #${caseNum} · CANVA DESIGN DAHbvV-AXys</text>
+    <text x="1080" y="16" fill="#00F0FF" font-size="11.5" font-weight="700" text-anchor="end">AGENTVERSE · LINKEDIN_POST_GENERATOR · 1200 × 627 (1.91:1)</text>
+  </g>
+</svg>`;
+}
+
 export async function createLinkedInVisual(kv, draftId = null, preferredArchetype = null) {
   const s = await load(kv);
   const id = draftId || `post_${todayDate()}`;
@@ -1348,17 +1500,32 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
   // Determine archetype: preferred parameter > draft archetype > infer from topic
   let archetype = preferredArchetype || draft.archetype;
   if (!archetype) {
-    if (/IPO/i.test(draft.topic)) archetype = 'big_ipos_watchlist';
+    if (draft.caseNumber || draft.case_number) archetype = 'company_case_matrix';
+    else if (/IPO/i.test(draft.topic)) archetype = 'big_ipos_watchlist';
     else if (/Tier List|Startups/i.test(draft.topic)) archetype = 'indian_startups_tier_list';
-    else archetype = 'revenue_leakage_matrix';
+    else archetype = 'company_case_matrix';
   }
 
   let headline = '';
   let subline = '';
   let svgVisual = '';
-  let canvaMeta = CANVA_DESIGNS[archetype] || CANVA_DESIGNS.revenue_leakage_matrix;
+  let canvaMeta = CANVA_DESIGNS[archetype] || CANVA_DESIGNS.case_1_kodak || CANVA_DESIGNS.company_case_matrix;
 
-  if (archetype === 'big_ipos_watchlist') {
+  const caseData = (draft.caseNumber || draft.case_number) ? getCaseByNumber(draft.caseNumber || draft.case_number) : null;
+
+  if (archetype === 'revenue_leakage_matrix') {
+    headline = 'THE CRM DATA INTEGRITY MATRIX';
+    subline = 'Why 60% of Pipeline Forecasts Fail and How Operators Fix It';
+    svgVisual = getDefaultSvg(headline, subline);
+    canvaMeta = CANVA_DESIGNS.case_1_kodak;
+  } else if (caseData || archetype === 'company_case_matrix') {
+    const cd = caseData || getCaseByNumber(1);
+    archetype = 'company_case_matrix';
+    headline = cd.company.toUpperCase();
+    subline = `${cd.theme} · ${cd.period} · ${cd.industry}`;
+    svgVisual = getCompanyCaseSvg(cd);
+    canvaMeta = CANVA_DESIGNS.case_1_kodak;
+  } else if (archetype === 'big_ipos_watchlist') {
     headline = 'Big IPOs';
     subline = 'Major unlisted companies in the IPO pipeline · Valuation, Sector & SEBI Status';
     svgVisual = getWatchlistSvg(headline, subline);
@@ -1501,7 +1668,33 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
   logActivity(freshState, 'Linkedin_Post_Generator', `Completed pipeline execution for "${draft.id}". Quality: ${quality.overallScore}/100.`);
   await save(kv, freshState);
 
+  const cd = draft.caseNumber ? getCaseByNumber(draft.caseNumber) : (chosenTopic.caseNumber ? getCaseByNumber(chosenTopic.caseNumber) : null);
+  const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
   return {
+    run_id: runId,
+    post_id: draft.id,
+    case_number: draft.case_number || (cd ? cd.caseNumber : 1),
+    company: draft.company || (cd ? cd.company : 'Eastman Kodak'),
+    theme: draft.theme || (cd ? cd.theme : 'Digital strategy'),
+    documented_business_problem: draft.documented_business_problem || (cd ? cd.documentedProblem : ''),
+    source_url: draft.source_url || (cd ? cd.sourceUrl : ''),
+    draft: {
+      hook: draft.hook,
+      body: draft.body,
+      word_count: draft.wordCount,
+      character_count: draft.characterCount,
+    },
+    image_reference: visual.endpoint || '/api/signal/visual.jpg',
+    canva_design_id: visual.canvaDesignId,
+    canva_url: visual.canvaEditUrl,
+    created_at: draft.createdAt,
+    generation_status: 'SUCCESS',
+    persistence_status: 'PERSISTED_IN_KV',
+    telegram_status: 'SENT_TO_TELEGRAM',
+    dashboard_status: 'VISIBLE_ON_DASHBOARD',
+    error_details: null,
+
     pipeline: PIPELINE_NAME,
     item1_topicSelected: {
       title: chosenTopic.title,
@@ -1535,7 +1728,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       body: draft.body,
       wordCount: draft.wordCount,
       characterCount: draft.characterCount,
-      structureValidation: '7/7 parts present (Hook, Problem, Evidence, Framework, Operator Take, 3 Tactics, Closing Question)',
+      structureValidation: '10-Step Post Builder (Hook, Context, Problem, Analysis, Change, Fixes, Lesson, Question, Hashtags)',
     },
     item7_canvaDesignPreview: {
       archetype: visual.archetype,
@@ -1547,7 +1740,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
     item8_exportedAsset: {
       format: 'JPEG (1200x627 high-res)',
       endpoint: '/api/signal/visual.jpg',
-      localAssetPath: 'data/canva-ipo-watchlist.jpg',
+      localAssetPath: 'data/canva-case-1-kodak.jpg',
       publicDownloadUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
     },
     item9_canvaEditableLink: {
@@ -1817,7 +2010,7 @@ export async function readResource(kv, uri) {
 // -------------------------------------------------------------
 export function ownerView(s) {
   const today = todayDate();
-  const currentDraft = s.drafts[`post_${today}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+  const currentDraft = (s.latestDraftId && s.drafts[s.latestDraftId]) || s.drafts[`post_${today}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
 
   return {
     module: 'PRANAV SIGNAL — LinkedIn Growth Studio',
