@@ -916,6 +916,12 @@ async function route(request, env) {
           },
         });
       }
+      if (env.ASSETS) {
+        try {
+          const assetRes = await env.ASSETS.fetch(new Request(`${url.origin}/data/visual.jpg`));
+          if (assetRes && assetRes.ok) return assetRes;
+        } catch (_) {}
+      }
       const bin = atob(VISUAL_JPG_BASE64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
