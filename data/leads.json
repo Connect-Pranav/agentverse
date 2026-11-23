@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-23T07:32:32.644Z",
+ "updated": "2026-11-23T23:51:14.831Z",
  "count": 3,
  "health": {
   "reddit": {
@@ -31,24 +31,6 @@
  "reddit": "public",
  "leads": [
   {
-   "id": "md_117654608558394982",
-   "source": "mastodon #hiring",
-   "title": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract with Turing. Pay discussed during scre",
-   "text": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract with Turing. Pay discussed during screening. ✅ Curating code for LLM training and benchmarks ✅ Evaluating Python and JavaScript code across full stack ✅ Building verification agents for code quality Do you work across Python and JavaScript? 👉 Apply here: https:// nearskill.in/jobs/senior-pytho n-engineer-llm-evaluation-us-based-73090?utm_source=mastodon&utm_medium=social # Python # RemoteJobs # Hiring # AIJobs",
-   "url": "https://mastodon.social/@nearskill/117654608558394982",
-   "author": "nearskill",
-   "created": "2026-11-21T13:14:14.231Z",
-   "product": "NIKHILs TECH STUDIO",
-   "products": [
-    "NIKHILs TECH STUDIO"
-   ],
-   "score": 6,
-   "matched": [
-    "llm"
-   ],
-   "firstSeen": "2026-11-21T19:12:38.108Z"
-  },
-  {
    "id": "md_117649142566619467",
    "source": "mastodon #hiring",
    "title": "Research Manager (Frontier LLM) Thomson Reuters · Eagan, Minnesota $171,000 # Journalism # Hiring # GetFediHir",
@@ -65,6 +47,24 @@
     "llm"
    ],
    "firstSeen": "2026-11-20T20:12:31.028Z"
+  },
+  {
+   "id": "md_117654608558394982",
+   "source": "mastodon #hiring",
+   "title": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract with Turing. Pay discussed during scre",
+   "text": "🚀 Now Hiring! | Senior Python Engineer, LLM Evaluation Remote contract with Turing. Pay discussed during screening. ✅ Curating code for LLM training and benchmarks ✅ Evaluating Python and JavaScript code across full stack ✅ Building verification agents for code quality Do you work across Python and JavaScript? 👉 Apply here: https:// nearskill.in/jobs/senior-pytho n-engineer-llm-evaluation-us-based-73090?utm_source=mastodon&utm_medium=social # Python # RemoteJobs # Hiring # AIJobs",
+   "url": "https://mastodon.social/@nearskill/117654608558394982",
+   "author": "nearskill",
+   "created": "2026-11-21T13:14:14.231Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 5,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-21T19:12:38.108Z"
   },
   {
    "id": "md_117630692133374479",
