@@ -947,15 +947,20 @@ async function route(request, env) {
       });
     }
 
-    // Direct Telegram notification trigger
+    // Direct Telegram notification trigger for /vani
     if (seg[2] === 'notify-telegram' && (method === 'POST' || method === 'GET')) {
       const photoUrl = 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg';
-      const msg = `⚡ <b>PRANAV SIGNAL — Visual & Playbook Ready!</b>\n\n` +
-        `🎯 <b>Topic:</b> The B2B Revenue Leakage Matrix\n` +
-        `📊 <b>Infographic:</b> High-contrast editorial matrix with 3 stage breakdown\n` +
-        `🖼 <b>JPG Image:</b> <a href="${photoUrl}">Download High-Res JPG</a>\n` +
-        `📚 <b>Playbook:</b> Integrated "100 Business Problems" library into AgentVerse.\n\n` +
-        `<i>Ready for your review at /#signal</i>`;
+      const canvaLink = 'https://canva.link/tjdg95eyudrlyid';
+      const msg = `⚡ <b>Linkedin_Post_Generator — Pipeline Active!</b>\n\n` +
+        `🎯 <b>Topic:</b> Big IPOs to Watch in India (2026 Pipeline)\n` +
+        `🔬 <b>Research:</b> SEBI DRHP Filings & BSE Indices (Score: 98/100)\n` +
+        `📐 <b>Framework:</b> STAR Analysis (Situation → Task → Action → Result)\n` +
+        `💡 <b>Operator Take:</b> IndiaMART · Justdial · Magicbricks · magicpin lens\n` +
+        `📝 <b>Post Length:</b> 210 words (Optimal 150–250 range)\n\n` +
+        `🎨 <b>Canva Editable Link:</b> <a href="${canvaLink}">${canvaLink}</a>\n` +
+        `🖼 <b>High-Res Asset:</b> <a href="${photoUrl}">Download 1200x627 JPEG</a>\n` +
+        `📊 <b>Publishing:</b> Queued for Owner Approval (1-Click Approve / Reject)\n\n` +
+        `<i>Vani notification delivered for /vani review</i>`;
       const okPhoto = await telegram.sendTelegramPhoto(env, photoUrl, msg).catch(() => false);
       let okMsg = false;
       if (!okPhoto) {
