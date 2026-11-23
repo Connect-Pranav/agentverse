@@ -1,21 +1,12 @@
 #!/usr/bin/env node
-// PRANAV SIGNAL — Daily 09:30 IST LinkedIn Growth Studio Runner
-// Orchestrates 9 specialist agents:
-// 1. LinkedIn Profile Analyst
-// 2. Domain Leader Intelligence
-// 3. Global AI & Market Scout
-// 4. Signal & Topic Strategist
-// 5. Pranav Voice & POV Agent
-// 6. LinkedIn Copywriter
-// 7. Visual Creative Agent
-// 8. Fact-check & Brand Guardian
-// 9. Publisher & Performance Analyst
+// Linkedin_Post_Generator — Daily 09:30 IST Content Generation & Publishing Runner
+// Integrated into PRANAV SIGNAL / Agentverse Architecture
 
 import * as signal from '../mcp/src/signal.mjs';
 
 async function main() {
   console.log('====================================================');
-  console.log('⚡ PRANAV SIGNAL — LinkedIn Growth Studio Runner');
+  console.log('⚡ Linkedin_Post_Generator — Execution Runner');
   console.log(`📅 Execution Date: ${new Date().toISOString()}`);
   console.log('====================================================');
 
@@ -24,7 +15,6 @@ async function main() {
 
   if (mcpUrl && mcpToken) {
     console.log(`🌐 Connecting to remote AgentVerse Worker: ${mcpUrl}`);
-    // Remote execution via API
     try {
       const res = await fetch(`${mcpUrl.replace(/\/+$/, '')}/api/signal/run`, {
         method: 'POST',
@@ -35,7 +25,7 @@ async function main() {
         body: JSON.stringify({ trigger: 'scheduled_runner', time: new Date().toISOString() }),
       });
       const data = await res.json();
-      console.log('✅ Remote Signal Pipeline Completed:', JSON.stringify(data, null, 2));
+      console.log('✅ Remote Linkedin_Post_Generator Pipeline Completed:', JSON.stringify(data, null, 2));
       return;
     } catch (e) {
       console.warn('⚠️ Remote call failed, running in standalone memory mode:', e.message);
@@ -43,7 +33,7 @@ async function main() {
   }
 
   // Standalone in-memory execution fallback
-  console.log('🚀 Running Signal Orchestrator pipeline locally...');
+  console.log('🚀 Running Linkedin_Post_Generator pipeline locally...');
   const memKvStore = new Map();
   const kv = {
     get: async (k, type) => {
@@ -62,49 +52,21 @@ async function main() {
     LINKEDIN_PERSON_URN: process.env.LINKEDIN_PERSON_URN,
   };
 
-  // Step 1: Profile audit
-  console.log('[1/8] Running LinkedIn Profile Analyst...');
-  const audit = await signal.auditProfile(kv);
-  console.log(`      ✓ Profile analyzed: ${audit.profile.name} (${audit.profile.coreDomains.length} domains)`);
-
-  // Step 2 & 3: Market scan & benchmarks
-  console.log('[2/8] Scanning Global AI & Market developments...');
-  const news = await signal.scanGlobalAiMarket(kv);
-  console.log(`      ✓ Scanned ${news.count} market developments.`);
-
-  console.log('[3/8] Benchmarking Domain Leaders & Hook Patterns...');
-  const patterns = await signal.analyseBenchmarkPatterns(kv);
-  console.log(`      ✓ Analyzed ${patterns.profilesCount} benchmark operators.`);
-
-  // Step 4: Rank signals
-  console.log('[4/8] Ranking Daily Signals...');
-  const ranking = await signal.rankDailySignal(kv);
-  console.log(`      ✓ Top Signal: "${ranking.topSignal.title}" (Score: ${ranking.topSignal.score})`);
-
-  // Step 5 & 6: Operator POV & Copywriting
-  console.log('[5/8] Synthesizing Pranav Operator POV & Drafting Post...');
-  const draft = await signal.draftLinkedInPost(kv, ranking.topSignal.id);
-  console.log(`      ✓ Draft post generated (${draft.characterCount} characters).`);
-
-  // Step 7: Visual generation
-  console.log('[6/8] Generating 1200x627 Landscape LinkedIn Graphic...');
-  const visual = await signal.createLinkedInVisual(kv, draft.id);
-  console.log(`      ✓ Branded graphic generated: ${visual.width}x${visual.height} (${visual.aspectRatio}).`);
-
-  // Step 8: Fact-check & Quality check
-  console.log('[7/8] Running Fact-check & Brand Voice Guardian...');
-  const check = await signal.checkPostQuality(kv, draft.id);
-  console.log(`      ✓ Quality Score: ${check.overallScore}/100 (Passed: ${check.passed})`);
-
-  // Step 9: Submit to AgentVerse Approval Queue
-  console.log('[8/8] Submitting to AgentVerse Work Board & Telegram Queue...');
-  const sub = await signal.submitForApproval(kv, env, draft.id);
-  console.log(`      ✓ Submitted successfully. Status: ${sub.status}`);
-
-  console.log('====================================================');
-  console.log('🎉 PRANAV SIGNAL run complete! Post is waiting for human approval.');
+  const pipelineResult = await signal.runLinkedinPostGenerator(kv, env, { force: true });
+  console.log('✅ Pipeline Execution Finished:');
+  console.log(`   Topic: ${pipelineResult.item1_topicSelected.title}`);
+  console.log(`   Framework: ${pipelineResult.item4_frameworkAnalysis.type}`);
+  console.log(`   Word Count: ${pipelineResult.item6_finalLinkedInPost.wordCount} words`);
+  console.log(`   Canva Link: ${pipelineResult.item9_canvaEditableLink.canvaEditUrl}`);
+  console.log(`   Visual Asset: ${pipelineResult.item8_exportedAsset.endpoint}`);
+  console.log(`   Approval Status: ${pipelineResult.item10_publishingResult.status}`);
   console.log('====================================================');
 }
+
+main().catch((err) => {
+  console.error('❌ Pipeline run failed:', err);
+  process.exit(1);
+});
 
 main().catch((err) => {
   console.error('❌ Pipeline run failed:', err);
