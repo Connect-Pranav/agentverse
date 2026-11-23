@@ -3795,47 +3795,27 @@ function sigApi(method, path, body){
 }
 
 function sigLoad(){
-  sigApi("GET", "/api/signal/draft").then(function(r){
+  sigApi("GET", "/api/signal/draft?t=" + Date.now()).then(function(r){
     if(r && r.state){
       SIG.state = r.state;
       sigRender();
+      if($("sigRefreshBtn")) $("sigRefreshBtn").title = "Last synced: " + new Date().toLocaleTimeString();
     }
   }).catch(function(err){
     console.warn("Signal draft fetch fallback:", err.message);
     if(!SIG.state){
       SIG.state = {
         date: new Date().toISOString().slice(0, 10),
-        status: "draft",
-        score: 95,
-        topic: "Sales teams waste time on low-quality leads",
-        category: "Sales & Revenue (Problem #11)",
-        draft: {
-          hook: "Most leaders treat \"sales teams waste time on low-quality leads\" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.",
-          body: "Most leaders treat \"sales teams waste time on low-quality leads\" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.\n\nIn high-velocity Indian businesses, leadership often searches for growth in top-line demand while ignoring internal workflow friction.\n\nThe SBI breakdown:\n• Situation: Fast-growing teams attempting to expand capacity across multiple commercial hubs.\n• Behaviour: Treating \"sales teams waste time on low-quality leads\" with ad-hoc manual workarounds instead of systematic redesign.\n• Impact: High operational drag, frontline team fatigue, and hidden customer satisfaction drop-offs.\n\nOver a decade leading commercial execution at IndiaMART, Justdial, Magicbricks, and magicpin, I saw this pattern repeatedly: sustainable scale is built on clean operational mechanics, not heroic daily firefighting.\n\n3 actionable rules for operators:\n1. Track the operational baseline: Put a simple daily metric on this bottleneck before spending capital.\n2. Remove manual handoffs: Build clear rules so routine decisions do not require executive intervention.\n3. Tie solutions to unit economics: Ground process improvements in realized contribution margin.\n\nFixing \"Sales teams waste time on low-quality leads\" is not about tools. It is about process clarity, ownership, and measurable accountability at every operational layer.\n\nIs \"Sales teams waste time on low-quality leads\" something your team is actively tracking and fixing — or is it still treated as normal background noise?\n\n#BusinessOperations #SalesRevenue #Leadership #Operations #Productivity",
-          pov: "Executive Operator POV grounded in commercial operations at IndiaMART, Justdial, Magicbricks, and magicpin.",
-          framework: "1. Track operational baseline\n2. Remove manual handoffs\n3. Tie solutions to unit economics",
-          question: "Is \"Sales teams waste time on low-quality leads\" something your team is actively tracking and fixing — or is it still treated as normal background noise?",
-          tags: ["#BusinessOperations", "#SalesRevenue", "#Leadership", "#Operations", "#Productivity"]
-        },
-        quality_check: { fact_check_passed: true, brand_voice_score: 98, originality_passed: true, overall_score: 96 },
-        sources: [
-          { title: "Gartner 2026 Enterprise AI Operations Survey", url: "https://gartner.com", relevance: "High", impact_score: 92 },
-          { title: "B2B SaaS GTM Productivity Benchmark", url: "https://saastr.com", relevance: "Critical", impact_score: 96 }
-        ],
-        benchmarks: [
-          { name: "Kunal Shah", role: "Consumer & Systems", hook_style: "First-principles mental models" },
-          { name: "Gokul Rajaram", role: "Product & GTM", hook_style: "Actionable executive memos" },
-          { name: "Kyle Poyar", role: "Product-Led Growth", hook_style: "Data-led tear downs" },
-          { name: "Jacco van der Kooij", role: "Revenue Architecture", hook_style: "Bowtie funnel systems" }
-        ],
-        calendar: [
-          { date: "Mon", topic: "B2B AI RevOps Guardrails", pillar: "AI for Business", status: "ready" },
-          { date: "Tue", topic: "P&L Ownership in High Velocity Market", pillar: "P&L & Scale", status: "scheduled" },
-          { date: "Wed", topic: "Funnel Friction & Triage Automation", pillar: "Funnel Optimization", status: "scheduled" },
-          { date: "Thu", topic: "Sales Incentive Engineering", pillar: "GTM Strategy", status: "scheduled" },
-          { date: "Fri", topic: "Weekly Operator Retrospective", pillar: "Leadership", status: "scheduled" }
-        ],
-        audit_log: ["09:30 IST cycle initialized", "Benchmarked 6 public revenue leaders", "Generated branded 1200x627 visual", "Submitted to Work Board and Telegram @VaniPro_Bot"]
+        status: "NO_POST_GENERATED_YET",
+        score: null,
+        topic: "NO_POST_GENERATED_YET",
+        category: "Ready for Fresh Run",
+        draft: { hook: "", body: "", tags: [] },
+        quality_check: null,
+        sources: [],
+        benchmarks: [],
+        calendar: [],
+        audit_log: ["Ready for fresh execution."]
       };
       sigRender();
     }
@@ -3845,6 +3825,40 @@ function sigLoad(){
 function sigRender(){
   if(!SIG.state) return;
   var s = SIG.state;
+  var d = s.draft || {};
+  var isClean = (s.status === "NO_POST_GENERATED_YET" || !d.body);
+
+  if(isClean){
+    if($("sigScoreVal")) $("sigScoreVal").innerHTML = '--<span style="font-size:14px;color:var(--mut)">/100</span>';
+    if($("sigScoreAngle")) $("sigScoreAngle").textContent = "Ready for Run";
+    if($("sigTopicVal")) $("sigTopicVal").textContent = "NO_POST_GENERATED_YET (Ready for Fresh Execution)";
+    if($("sigTopicDate")) $("sigTopicDate").textContent = (s.date || new Date().toISOString().slice(0, 10)) + " · Idle";
+    if($("sigApprovalStatus")) $("sigApprovalStatus").textContent = "NO_POST_GENERATED_YET";
+    if($("sigDraftStatusBadge")){
+      $("sigDraftStatusBadge").textContent = "NO POST GENERATED YET";
+      $("sigDraftStatusBadge").className = "sig-badge";
+    }
+    if($("sigHook")) $("sigHook").value = "";
+    if($("sigBody")) $("sigBody").value = "";
+    if($("sigTags")) $("sigTags").value = "";
+    if($("qcFmt")) $("qcFmt").innerHTML = icon("git-commit") + " Framework: Not Generated";
+    if($("qcWords")) $("qcWords").innerHTML = icon("file-text") + " 0 words";
+    if($("sigArchetypeBadge")) $("sigArchetypeBadge").textContent = "Ready";
+    if($("sigVisualContainer")) $("sigVisualContainer").innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:300px;color:#94a3b8;font-size:14px;text-align:center;"><p style="font-size:18px;font-weight:700;color:#38bdf8;margin:0 0 8px;">NO POST GENERATED YET</p><p style="margin:0;">Click "Run Pipeline Now" to generate today\'s fresh LinkedIn post.</p></div>';
+    if($("sigPubMode")) $("sigPubMode").textContent = s.linkedin_connected ? "Direct API" : "1-Click Copy";
+    if($("sigPubDetail")) $("sigPubDetail").textContent = s.linkedin_connected ? "LinkedIn Account Connected" : "Safe / 1-Click Copy";
+    if($("sigAuthBtn")){
+      if(s.linkedin_connected){
+        $("sigAuthBtn").innerHTML = icon("check-circle") + " LinkedIn Linked";
+        $("sigAuthBtn").className = "sig-btn live";
+      } else {
+        $("sigAuthBtn").innerHTML = icon("key-round") + " LinkedIn Auth";
+        $("sigAuthBtn").className = "sig-btn gold";
+      }
+    }
+    return;
+  }
+
   if($("sigScoreVal")) $("sigScoreVal").innerHTML = (s.score || 94) + '<span style="font-size:14px;color:var(--mut)">/100</span>';
   if($("sigScoreAngle")) $("sigScoreAngle").textContent = s.category || "Enterprise AI & RevOps GTM";
   if($("sigTopicVal")) $("sigTopicVal").textContent = s.topic || "Big IPOs to Watch in India";

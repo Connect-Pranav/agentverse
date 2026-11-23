@@ -207,6 +207,40 @@ export async function save(kv, s) {
   return s;
 }
 
+export async function resetSignalState(kv) {
+  const cleanState = {
+    positioning: PRANAV_POSITIONING,
+    settings: {
+      dailySchedule: '09:30 Asia/Kolkata',
+      autoDraft: true,
+      requireApproval: true,
+      publishMode: 'api',
+      visualStyle: 'business_editorial',
+      accentColor: '#38BDF8',
+    },
+    benchmarks: DEFAULT_BENCHMARKS,
+    sources: [],
+    signals: [],
+    drafts: {},
+    visuals: {},
+    history: [],
+    metrics: { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 0 },
+    logs: [
+      {
+        at: nowIso(),
+        agent: 'System Guardian',
+        message: 'LinkedIn module clean reset completed: all obsolete drafts, topic selections, and cache entries purged (NO_POST_GENERATED_YET).',
+        meta: { status: 'NO_POST_GENERATED_YET' },
+      },
+    ],
+    status: 'NO_POST_GENERATED_YET',
+    updatedAt: nowIso(),
+  };
+
+  await kv.put(KEY, JSON.stringify(cleanState));
+  return cleanState;
+}
+
 export function logActivity(s, agent, message, meta = {}) {
   s.logs = s.logs || [];
   s.logs.unshift({
@@ -420,6 +454,11 @@ export async function rankDailySignal(kv, preferredTopicId = null) {
     // Penalty if repeated in recent history
     const isRepeated = recentHistoryTopics.some((t) => t.includes(clean(src.title, 30).toLowerCase()));
     if (isRepeated) totalScore = Math.max(50, totalScore - 25);
+
+    // Strict exclusion of previous Problem #11 from automatic selection (user requested fresh topic)
+    if (!preferredTopicId && (src.id === 'signal_prob_11' || src.id === 'prob_11' || src.title.toLowerCase().includes('low-quality leads'))) {
+      totalScore = 30;
+    }
 
     // Preferred topic boost (explicitly requested topic guarantees #1 rank)
     if (preferredTopicId && (src.id === preferredTopicId || src.id.includes(preferredTopicId) || (src.sourceId && src.sourceId.includes(preferredTopicId)))) {

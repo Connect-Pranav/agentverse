@@ -1,6 +1,6 @@
 // AGENTVERSE app: offline shell + background notifications + automatic updates.
 // Live data (/api, /mcp, /sv, /u, /health, data/*.json) always comes from the network.
-const CACHE = 'agentverse-v6';
+const CACHE = 'agentverse-v7';
 const META = 'agentverse-meta';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });

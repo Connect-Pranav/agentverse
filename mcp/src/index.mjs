@@ -1012,26 +1012,26 @@ async function route(request, env) {
         tags: activeDraft.tags,
         visual: { svg: svgVisual },
       } : {
-        id: `post_${today}`,
-        hook: "Most leaders treat \"sales teams waste time on low-quality leads\" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.",
-        body: "Most leaders treat \"sales teams waste time on low-quality leads\" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.\n\nIn high-velocity Indian businesses, leadership often searches for growth in top-line demand while ignoring internal workflow friction.\n\nThe SBI breakdown:\n• Situation: Fast-growing teams attempting to expand capacity across multiple commercial hubs.\n• Behaviour: Treating \"sales teams waste time on low-quality leads\" with ad-hoc manual workarounds instead of systematic redesign.\n• Impact: High operational drag, frontline team fatigue, and hidden customer satisfaction drop-offs.\n\nOver a decade leading commercial execution at IndiaMART, Justdial, Magicbricks, and magicpin, I saw this pattern repeatedly: sustainable scale is built on clean operational mechanics, not heroic daily firefighting.\n\n3 actionable rules for operators:\n1. Track the operational baseline: Put a simple daily metric on this bottleneck before spending capital.\n2. Remove manual handoffs: Build clear rules so routine decisions do not require executive intervention.\n3. Tie solutions to unit economics: Ground process improvements in realized contribution margin.\n\nFixing \"Sales teams waste time on low-quality leads\" is not about tools. It is about process clarity, ownership, and measurable accountability at every operational layer.\n\nIs \"Sales teams waste time on low-quality leads\" something your team is actively tracking and fixing — or is it still treated as normal background noise?\n\n#BusinessOperations #SalesRevenue #Leadership #Operations #Productivity",
-        pov: "Executive Operator POV grounded in commercial operations at IndiaMART, Justdial, Magicbricks, and magicpin.",
-        framework: "SBI Framework (Situation, Behaviour, Impact)",
-        question: "Is \"Sales teams waste time on low-quality leads\" something your team is actively tracking and fixing — or is it still treated as normal background noise?",
-        tags: ["#BusinessOperations", "#SalesRevenue", "#Leadership", "#Operations", "#Productivity"],
-        visual: { svg: svgVisual },
+        id: null,
+        hook: '',
+        body: '',
+        pov: '',
+        framework: '',
+        question: '',
+        tags: [],
+        visual: null,
       };
 
       return json({
         ok: true,
         state: {
           date: activeDraft?.date || today,
-          status: effStatus,
-          score: freshState.signals[0]?.score || 94,
-          topic: activeDraft?.topic || freshState.signals[0]?.title || "Sales teams waste time on low-quality leads",
-          category: activeDraft?.category || freshState.signals[0]?.category || 'Sales & Revenue',
+          status: activeDraft ? effStatus : 'NO_POST_GENERATED_YET',
+          score: activeDraft ? (freshState.signals[0]?.score || 94) : null,
+          topic: activeDraft ? (activeDraft.topic || freshState.signals[0]?.title) : 'NO_POST_GENERATED_YET',
+          category: activeDraft ? (activeDraft.category || freshState.signals[0]?.category) : 'Ready for Fresh Run',
           draft: draftObj,
-          visual: { svg: svgVisual },
+          visual: activeDraft ? { svg: svgVisual } : null,
           linkedin_connected: hasLinkedInToken,
           approval_source: workItem?.status === 'ready' ? 'telegram' : (isApproved ? 'system' : null),
           quality_check: activeDraft?.qualityCheck ? {
@@ -1039,19 +1039,10 @@ async function route(request, env) {
             brand_voice_score: activeDraft.qualityCheck.checks?.brandVoiceScore || 98,
             originality_passed: activeDraft.qualityCheck.checks?.originalityPassed !== false,
             overall_score: activeDraft.qualityCheck.overallScore || 96,
-          } : { fact_check_passed: true, brand_voice_score: 98, originality_passed: true, overall_score: 96 },
-          sources: (freshState.sources || []).length ? freshState.sources.slice(0, 15) : [
-            { title: "Gartner 2026 Enterprise AI Operations Survey", url: "https://gartner.com", relevance: "High", impact_score: 92 },
-            { title: "B2B SaaS GTM Productivity Benchmark", url: "https://saastr.com", relevance: "Critical", impact_score: 96 },
-          ],
+          } : null,
+          sources: (freshState.sources || []).slice(0, 15),
           benchmarks: freshState.benchmarks || [],
-          calendar: [
-            { date: "Mon", topic: "B2B AI RevOps Guardrails", pillar: "AI for Business", status: "ready" },
-            { date: "Tue", topic: "P&L Ownership in High Velocity Market", pillar: "P&L & Scale", status: "scheduled" },
-            { date: "Wed", topic: "Funnel Friction & Triage Automation", pillar: "Funnel Optimization", status: "scheduled" },
-            { date: "Thu", topic: "Sales Incentive Engineering", pillar: "GTM Strategy", status: "scheduled" },
-            { date: "Fri", topic: "Weekly Operator Retrospective", pillar: "Leadership", status: "scheduled" },
-          ],
+          calendar: [],
           audit_log: (freshState.logs || []).slice(0, 10).map((l) => (typeof l === 'string' ? l : `${l.action || l.event || 'Activity'}: ${l.details || ''}`)),
         },
         overview: signal.ownerView(freshState),
@@ -1217,6 +1208,22 @@ async function route(request, env) {
     // 100 Business Problems Playbook endpoint
     if (seg[2] === 'playbook' && (method === 'GET' || method === 'HEAD')) {
       return json(await signal.readResource(k, 'pranav://100-business-problems'), 200, { 'access-control-allow-origin': '*' });
+    }
+
+    // Clean Reset Endpoint — Purge all obsolete LinkedIn generation data
+    if (seg[2] === 'reset' && method === 'POST') {
+      const cleanState = await signal.resetSignalState(k);
+      const w = await work.load(k);
+      if (Array.isArray(w.items)) {
+        w.items = w.items.filter((item) => !String(item.id).startsWith('sig_') && item.type !== 'signal' && !String(item.id).startsWith('post_'));
+        await work.save(k, w);
+      }
+      return json({
+        ok: true,
+        status: 'NO_POST_GENERATED_YET',
+        message: 'LinkedIn workflow state successfully reset. Ready for fresh execution.',
+        state: signal.ownerView(cleanState),
+      }, 200, { 'access-control-allow-origin': '*' });
     }
 
     // Run Pipeline (Runner or Owner) — Linkedin_Post_Generator
