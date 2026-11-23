@@ -501,7 +501,8 @@ const TOOLS = [
   { name: 'decide_lead', title: 'Approve / skip / edit a lead', description: 'Owner decision on a lead. approve = the outreach agent emails it automatically from Gmail (daily cap, unsubscribe line, one follow-up). Only call after the owner says so.',
     inputSchema: { type: 'object', properties: { lead_id: { type: 'string' }, action: { type: 'string', enum: ['approve', 'skip', 'edit', 'won', 'lost', 'unsubscribe'] }, subject: { type: 'string' }, body: { type: 'string' } }, required: ['lead_id', 'action'], additionalProperties: false } },
   { name: 'delete_song_job', title: 'Delete song job', description: 'Delete a job and its files.', inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'], additionalProperties: false }, annotations: { destructiveHint: true } },
-  // PRANAV SIGNAL — LinkedIn Growth Studio MCP tools
+  // PRANAV SIGNAL & Linkedin_Post_Generator MCP tools
+  { name: 'linkedin_post_generator_run', title: 'Run Linkedin_Post_Generator Pipeline', description: 'Execute the full automated Linkedin_Post_Generator pipeline: topic discovery, research, STAR/SBI, copy, Canva design, quality check, and Telegram approval.', inputSchema: { type: 'object', properties: { topic_id: { type: 'string' }, archetype: { type: 'string', enum: ['big_ipos_watchlist', 'indian_startups_tier_list', 'revenue_leakage_matrix'] }, force: { type: 'boolean' } }, additionalProperties: false } },
   { name: 'linkedin_profile_audit', title: 'Audit LinkedIn profile & pillars', description: 'Analyze Pranav Kumar\'s LinkedIn profile positioning, pillar coverage, and content consistency.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'benchmark_profiles_refresh', title: 'Refresh benchmark profiles', description: 'Refresh or add leading operator profiles in RevOps, GTM, and AI for Business.', inputSchema: { type: 'object', properties: { profiles: { type: 'array', items: { type: 'object' } } }, additionalProperties: false } },
   { name: 'benchmark_patterns_analyse', title: 'Analyze benchmark patterns', description: 'Extract recurring hook patterns, structural formulas, and dwell-time mechanics from top voices.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -539,7 +540,8 @@ async function callTool(env, request, name, a = {}) {
     case 'get_foliocraft_leads': return crm.ownerView(await crm.load(kv(env)), 60);
     case 'decide_lead': return crm.ownerView(await crm.decide(kv(env), a.lead_id, a), 60);
     case 'delete_song_job': { const j = await jobOf(env, a.job_id); await removeJob(env, j); return { deleted: j.id }; }
-    // PRANAV SIGNAL tool handlers
+    // PRANAV SIGNAL & Linkedin_Post_Generator tool handlers
+    case 'linkedin_post_generator_run': return signal.runLinkedinPostGenerator(kv(env), env, a);
     case 'linkedin_profile_audit': return signal.auditProfile(kv(env));
     case 'benchmark_profiles_refresh': return signal.refreshBenchmarks(kv(env), a.profiles);
     case 'benchmark_patterns_analyse': return signal.analyseBenchmarkPatterns(kv(env));
@@ -1207,17 +1209,27 @@ async function route(request, env) {
       return json({ ok: true, connected: true }, 200, { 'access-control-allow-origin': '*' });
     }
 
-    // Run Pipeline (Runner or Owner)
+    // 100 Business Problems Playbook endpoint
+    if (seg[2] === 'playbook' && (method === 'GET' || method === 'HEAD')) {
+      return json(await signal.readResource(k, 'pranav://100-business-problems'), 200, { 'access-control-allow-origin': '*' });
+    }
+
+    // Run Pipeline (Runner or Owner) — Linkedin_Post_Generator
     if (seg[2] === 'run' && method === 'POST') {
       if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env);
       else if (env.MCP_TOKEN) owner(request, env);
-      await signal.scanGlobalAiMarket(k);
-      await signal.rankDailySignal(k);
-      const draft = await signal.draftLinkedInPost(k);
-      await signal.createLinkedInVisual(k, draft.id);
-      await signal.checkPostQuality(k, draft.id);
-      await signal.submitForApproval(k, env, draft.id);
-      return json({ ok: true, draftId: draft.id, topic: draft.topic, status: 'waiting_approval' }, 200, { 'access-control-allow-origin': '*' });
+      const payload = await readJson(request).catch(() => ({}));
+      const pipelineRes = await signal.runLinkedinPostGenerator(k, env, payload);
+      const s = await signal.load(k);
+      return json({
+        ok: true,
+        pipeline: 'Linkedin_Post_Generator',
+        draftId: pipelineRes.item6_finalLinkedInPost.id,
+        topic: pipelineRes.item1_topicSelected.title,
+        result: pipelineRes,
+        state: signal.ownerView(s),
+        status: 'waiting_approval',
+      }, 200, { 'access-control-allow-origin': '*' });
     }
 
     // Decide (Approve / Reject)
@@ -1253,8 +1265,8 @@ async function route(request, env) {
       return json(await signal.draftLinkedInPost(k, topic_id), 200, { 'access-control-allow-origin': '*' });
     }
     if (seg[2] === 'visual' && method === 'POST') {
-      const { draft_id } = await readJson(request);
-      return json(await signal.createLinkedInVisual(k, draft_id), 200, { 'access-control-allow-origin': '*' });
+      const { draft_id, archetype } = await readJson(request);
+      return json(await signal.createLinkedInVisual(k, draft_id, archetype), 200, { 'access-control-allow-origin': '*' });
     }
     throw new HttpError(404, 'Not found');
   }

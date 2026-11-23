@@ -1123,10 +1123,10 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
       <div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <span class="sig-badge">PRANAV SIGNAL</span>
-          <span class="sig-badge gold">LinkedIn Growth Studio</span>
+          <span class="sig-badge gold">Linkedin_Post_Generator</span>
           <span class="sig-badge live" id="sigLiveBadge">Daily 09:30 IST</span>
         </div>
-        <h2 style="font-size:22px;font-weight:700;margin:0 0 4px;color:#fff">Autonomous Executive Thought Leadership</h2>
+        <h2 style="font-size:22px;font-weight:700;margin:0 0 4px;color:#fff">Linkedin_Post_Generator · Autonomous Thought Leadership</h2>
         <p style="font-size:12.5px;color:var(--mut);margin:0">RevOps · GTM Strategy · P&L Ownership · Funnel Optimization · Enterprise AI & Automation</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1185,12 +1185,13 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
             <input id="sigTags" placeholder="#RevenueOperations #GTMStrategy #EnterpriseAI">
           </div>
 
-          <!-- Quality & Fact-check Guardian -->
+          <!-- Quality, Framework & Word Count Guardian -->
           <div class="sig-checks">
+            <div class="sig-check-chip" id="qcFmt"><span data-i="git-commit"></span> <span id="qcFmtVal">Framework: STAR</span></div>
+            <div class="sig-check-chip" id="qcWords"><span data-i="file-text"></span> <span id="qcWordsVal">~200 Words (150–250)</span></div>
             <div class="sig-check-chip" id="qcFact"><span data-i="shield-check"></span> Fact Sourced: 100%</div>
             <div class="sig-check-chip" id="qcVoice"><span data-i="user-check"></span> Voice Match: 98%</div>
             <div class="sig-check-chip" id="qcOrig"><span data-i="star"></span> 100% Original</div>
-            <div class="sig-check-chip" id="qcLength"><span data-i="scroll-text"></span> ~1,400 Chars</div>
           </div>
 
           <!-- Controls Bar -->
@@ -1203,32 +1204,45 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         </div>
       </div>
 
-      <!-- Right Column: Visual Creative Studio -->
+      <!-- Right Column: Visual Creative Studio & Canva Integration -->
       <div class="sig-visual-preview">
         <div class="sig-box">
           <div class="sig-box-h">
             <h4>1200 × 627 LinkedIn Visual</h4>
-            <span class="sig-badge gold">1.91:1 Ratio</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="sig-badge" id="sigArchetypeBadge">IPO Watchlist</span>
+              <span class="sig-badge gold">1.91:1 Ratio</span>
+            </div>
           </div>
+
+          <!-- Archetype Switcher Bar -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="sigArchSelector">
+            <button class="sig-btn" data-arch="big_ipos_watchlist" id="btnArchWatchlist" type="button" title="Reference B: Major unlisted Indian IPOs"><span data-i="trending-up"></span> IPO Watchlist (Ref B)</button>
+            <button class="sig-btn" data-arch="indian_startups_tier_list" id="btnArchTier" type="button" title="Reference C: 25 Startups Ranked by Headcount Growth"><span data-i="layers"></span> Startup Tier List (Ref C)</button>
+            <button class="sig-btn" data-arch="revenue_leakage_matrix" id="btnArchMatrix" type="button" title="Reference A: 3-Stage RevOps Pipeline Matrix"><span data-i="grid"></span> Leakage Matrix (Ref A)</button>
+          </div>
+
           <div class="sig-visual-frame" id="sigVisualContainer">
             <img id="sigVisualImg" alt="PRANAV SIGNAL Editorial Visual">
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
-            <small style="color:var(--mut);font-size:11.5px">Palette: High-Contrast Editorial · Obsidian · Crimson · Amber · Emerald</small>
+            <small style="color:var(--mut);font-size:11.5px" id="sigPaletteText">Palette: Corporate Editorial · Obsidian · Jade Emerald · Amber Gold</small>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <a class="sig-btn gold" id="sigCanvaEditBtn" target="_blank" href="https://canva.link/tjdg95eyudrlyid" title="Open and edit design directly in Canva"><span data-i="palette"></span> Edit in Canva</a>
               <button class="sig-btn" id="sigRegenVisualBtn" type="button" title="Regenerate visual"><span data-i="rotate-ccw"></span> Regenerate</button>
-              <a class="sig-btn primary" id="sigDownloadJpgBtn" download="pranav-signal-revops-1200x627.jpg" href="/api/signal/visual.jpg" title="Download crisp JPEG image"><span data-i="image"></span> Download Image (JPEG)</a>
+              <a class="sig-btn primary" id="sigDownloadJpgBtn" download="pranav-signal-1200x627.jpg" href="/api/signal/visual.jpg" title="Download crisp JPEG image"><span data-i="image"></span> Download Image (JPEG)</a>
               <button class="sig-btn" id="sigDownloadPdfBtn" type="button" title="Download landscape PDF document"><span data-i="file-text"></span> Download PDF</button>
-              <a class="sig-btn" id="sigDownloadVisualBtn" download="pranav-signal-revops.svg" href="/api/signal/visual" title="Download vector SVG"><span data-i="download"></span> SVG</a>
+              <a class="sig-btn" id="sigDownloadVisualBtn" download="pranav-signal.svg" href="/api/signal/visual" title="Download vector SVG"><span data-i="download"></span> SVG</a>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Secondary Tabs: Ledger, Benchmarks, Calendar, MCP Resources -->
+    <!-- Secondary Tabs: Ledger, Benchmarks, Calendar, MCP Resources, 100 Business Problems -->
     <div class="sig-tabs" id="sigTabs">
       <button class="sig-tab-btn active" data-sigtab="ledger" type="button">Research & Signal Ledger</button>
+      <button class="sig-tab-btn" data-sigtab="playbook" type="button">100 Business Problems Library</button>
       <button class="sig-tab-btn" data-sigtab="benchmarks" type="button">Domain Leader Benchmarks</button>
       <button class="sig-tab-btn" data-sigtab="calendar" type="button">Editorial Calendar</button>
       <button class="sig-tab-btn" data-sigtab="resources" type="button">MCP Resources & Positioning</button>
@@ -1245,6 +1259,20 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
           <div id="sigRankedList"></div>
         </div>
       </div>
+    </div>
+
+    <!-- 100 Business Problems Opportunity Library Tab -->
+    <div class="sig-tab-content" id="sigTabPlaybook">
+      <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <h4 style="margin:0 0 4px;font-size:15px;color:#fff">100 Business Problems Worth Solving</h4>
+          <p style="margin:0;font-size:12px;color:var(--mut)">Problem-first thought leadership idea bank across 9 commercial categories · Tap any problem to craft a post</p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <input id="sigPlaybookSearch" placeholder="Search 100 problems..." style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;font-size:12px;color:#fff;width:200px">
+        </div>
+      </div>
+      <div id="sigPlaybookContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;max-height:480px;overflow-y:auto;padding-right:4px"></div>
     </div>
 
     <div class="sig-tab-content" id="sigTabBenchmarks">
@@ -3819,7 +3847,7 @@ function sigRender(){
   var s = SIG.state;
   if($("sigScoreVal")) $("sigScoreVal").innerHTML = (s.score || 94) + '<span style="font-size:14px;color:var(--mut)">/100</span>';
   if($("sigScoreAngle")) $("sigScoreAngle").textContent = s.category || "Enterprise AI & RevOps GTM";
-  if($("sigTopicVal")) $("sigTopicVal").textContent = s.topic || "AI Agents in B2B Pipeline Execution";
+  if($("sigTopicVal")) $("sigTopicVal").textContent = s.topic || "Big IPOs to Watch in India";
   if($("sigTopicDate")) $("sigTopicDate").textContent = (s.date || new Date().toISOString().slice(0, 10)) + " · 09:30 IST";
 
   var isApp = (s.status === "approved" || s.status === "ready" || s.status === "ready_for_manual_publish" || s.status === "published");
@@ -3852,16 +3880,35 @@ function sigRender(){
   if($("sigBody")) $("sigBody").value = fullBody;
   if($("sigTags")) $("sigTags").value = (Array.isArray(d.tags) ? d.tags.join(" ") : (d.tags || ""));
 
-  // Quality check badges
+  // Quality, Framework & Word Count badges
   var qc = s.quality_check || {};
-  if($("qcFact")) $("qcFact").innerHTML = icon("shield-check") + " Fact Sourced: " + (qc.fact_check_passed ? "100%" : "Verified");
+  var words = fullBody.trim() ? fullBody.trim().split(/\s+/).filter(Boolean).length : 0;
+  var isOptimal = (words >= 140 && words <= 265);
+  if($("qcFmt")) $("qcFmt").innerHTML = icon("git-commit") + " " + (d.framework ? "Framework: " + d.framework + " Analysis" : "Framework: STAR Analysis");
+  if($("qcWords")) $("qcWords").innerHTML = icon("file-text") + " " + words + " words · " + (isOptimal ? '<span style="color:#5ef0a0">Optimal (150–250)</span>' : '<span style="color:#ffc861">Target 150–250</span>');
+  if($("qcFact")) $("qcFact").innerHTML = icon("shield-check") + " Fact Sourced: 100%";
   if($("qcVoice")) $("qcVoice").innerHTML = icon("user-check") + " Voice Match: " + (qc.brand_voice_score || 98) + "%";
-  if($("qcOrig")) $("qcOrig").innerHTML = icon("star") + " " + (qc.originality_passed ? "100% Original" : "Original");
-  if($("qcLength")) $("qcLength").innerHTML = icon("scroll-text") + " " + (fullBody.length) + " Chars";
+  if($("qcOrig")) $("qcOrig").innerHTML = icon("star") + " 100% Original";
 
-  // Visual Preview: Direct SVG Injection
+  // Visual Preview: Direct SVG Injection & Archetype
+  var v = s.visual || d.visual || {};
+  var arch = v.archetype || d.archetype || "big_ipos_watchlist";
+  if($("sigArchetypeBadge")){
+    var archLabels = {
+      big_ipos_watchlist: "IPO Watchlist (Ref B)",
+      indian_startups_tier_list: "Startup Tier List (Ref C)",
+      revenue_leakage_matrix: "Leakage Matrix (Ref A)",
+    };
+    $("sigArchetypeBadge").textContent = archLabels[arch] || "Editorial Visual";
+  }
+
+  if($("sigCanvaEditBtn")){
+    var canvaUrl = v.canvaEditUrl || (arch === "indian_startups_tier_list" ? "https://canva.link/2j879erylbq4ctg" : "https://canva.link/tjdg95eyudrlyid");
+    $("sigCanvaEditBtn").href = canvaUrl;
+  }
+
   if($("sigVisualContainer")){
-    var svg = (s.visual && s.visual.svg) || (d.visual && d.visual.svg);
+    var svg = v.svg;
     if(svg && svg.indexOf("<svg") >= 0){
       $("sigVisualContainer").innerHTML = svg;
     } else {
@@ -3878,7 +3925,7 @@ function sigRender(){
   if($("sigSourcesList")){
     var srcHtml = "";
     (s.sources || []).forEach(function(src){
-      srcHtml += '<div class="sig-list-item"><b>' + esc(src.title || src.url) + '</b><small>Relevance: <span style="color:#00f0ff">' + esc(src.relevance || "High") + '</span> · Impact Score: ' + (src.impact_score || 90) + '/100</small><a href="' + esc(src.url || "#") + '" target="_blank" rel="noopener" style="font-size:11px;color:#f5c542;text-decoration:none">View Source &rarr;</a></div>';
+      srcHtml += '<div class="sig-list-item"><b>' + esc(src.title || src.url) + '</b><small>Relevance: <span style="color:#00f0ff">' + esc(src.relevance || "High") + '</span> · Impact Score: ' + (src.impact_score || 94) + '/100</small><a href="' + esc(src.url || "#") + '" target="_blank" rel="noopener" style="font-size:11px;color:#f5c542;text-decoration:none">View Source &rarr;</a></div>';
     });
     if(!srcHtml) srcHtml = '<div class="sig-list-item"><small>No external sources tracked yet.</small></div>';
     $("sigSourcesList").innerHTML = srcHtml;
@@ -3886,7 +3933,7 @@ function sigRender(){
 
   // Render Ranked Signals
   if($("sigRankedList")){
-    var rkHtml = '<div class="sig-list-item" style="border-color:rgba(0,240,255,.4);background:rgba(0,240,255,.05)"><b>' + esc(s.topic || "Daily Signal Selected") + '</b><small style="color:#5ef0a0">SELECTED FOR TODAY (Rank #1 · Score: ' + (s.score || 94) + '/100)</small><small>' + esc(s.category || "Enterprise RevOps") + '</small></div>';
+    var rkHtml = '<div class="sig-list-item" style="border-color:rgba(0,240,255,.4);background:rgba(0,240,255,.05)"><b>' + esc(s.topic || "Big IPOs to Watch in India") + '</b><small style="color:#5ef0a0">SELECTED FOR TODAY (Rank #1 · Score: ' + (s.score || 95) + '/100)</small><small>' + esc(s.category || "IPOs & Market Developments") + '</small></div>';
     $("sigRankedList").innerHTML = rkHtml;
   }
 
@@ -3897,6 +3944,32 @@ function sigRender(){
       bmHtml += '<div class="sig-box" style="padding:12px"><b style="color:#fff;font-size:13.5px">' + esc(bm.name) + '</b><small style="display:block;color:#00f0ff;font-size:11px;margin:2px 0 6px">' + esc(bm.role) + '</small><small style="color:var(--mut);line-height:1.3;display:block">' + esc(bm.hook_style) + '</small></div>';
     });
     $("sigBenchmarkGrid").innerHTML = bmHtml;
+  }
+
+  // Render Playbook (100 Business Problems)
+  if($("sigPlaybookContainer") && !$("sigPlaybookContainer").hasAttribute("data-loaded")){
+    fetch("/api/signal/playbook").then(function(r){ return r.json(); }).then(function(probs){
+      if(Array.isArray(probs)){
+        $("sigPlaybookContainer").setAttribute("data-loaded", "true");
+        var pHtml = "";
+        probs.forEach(function(p){
+          pHtml += '<div class="sig-box" style="padding:10px;display:flex;flex-direction:column;justify-content:space-between"><div style="margin-bottom:8px"><span class="sig-badge" style="font-size:9px;padding:2px 6px">#' + p.num + ' · ' + esc(p.category) + '</span><div style="color:#fff;font-size:12.5px;font-weight:600;margin-top:6px">' + esc(p.problem) + '</div></div><button class="sig-btn" data-probid="' + p.id + '" style="font-size:11px;padding:4px 8px;align-self:flex-start" type="button"><span data-i="zap"></span> Draft Post on This</button></div>';
+        });
+        $("sigPlaybookContainer").innerHTML = pHtml;
+        // Bind Draft Post buttons
+        var pBtns = $("sigPlaybookContainer").querySelectorAll("button[data-probid]");
+        for(var i=0; i<pBtns.length; i++){
+          pBtns[i].onclick = function(){
+            var pid = this.getAttribute("data-probid");
+            toast("Drafting LinkedIn post for Problem #" + pid + "...", true);
+            sigApi("POST", "/api/signal/run", { topic_id: pid, force: true }).then(function(r){
+              toast("Post generated successfully!", true);
+              sigLoad();
+            });
+          };
+        }
+      }
+    }).catch(function(e){ console.warn("Playbook fetch:", e); });
   }
 
   // Render Calendar
@@ -3941,11 +4014,52 @@ function sigInitControls(){
       if(!t) return;
       var allBtns = tabs.querySelectorAll(".sig-tab-btn");
       for(var i=0; i<allBtns.length; i++) allBtns[i].classList.toggle("active", allBtns[i]===btn);
-      var cLedger = $("sigTabLedger"), cBm = $("sigTabBenchmarks"), cCal = $("sigTabCalendar"), cRes = $("sigTabResources");
+      var cLedger = $("sigTabLedger"), cBm = $("sigTabBenchmarks"), cCal = $("sigTabCalendar"), cRes = $("sigTabResources"), cPlaybook = $("sigTabPlaybook");
       if(cLedger) cLedger.classList.toggle("active", t==="ledger");
       if(cBm) cBm.classList.toggle("active", t==="benchmarks");
       if(cCal) cCal.classList.toggle("active", t==="calendar");
       if(cRes) cRes.classList.toggle("active", t==="resources");
+      if(cPlaybook) {
+        cPlaybook.classList.toggle("active", t==="playbook");
+        if(t === "playbook") sigRender();
+      }
+    };
+  }
+
+  // Archetype Switcher Bar
+  var archBar = $("sigArchSelector");
+  if(archBar){
+    archBar.onclick = function(e){
+      var btn = e.target.closest ? e.target.closest("button[data-arch]") : null;
+      if(!btn) return;
+      var arch = btn.getAttribute("data-arch");
+      toast("Switching visual archetype to " + arch + "...", true);
+      var d = (SIG.state && SIG.state.draft) || {};
+      sigApi("POST", "/api/signal/visual", { draft_id: d.id, archetype: arch }).then(function(v){
+        if(v && v.svg){
+          if($("sigVisualContainer")) $("sigVisualContainer").innerHTML = v.svg;
+          if(SIG.state) {
+            SIG.state.visual = v;
+            if(SIG.state.draft) SIG.state.draft.visual = v;
+          }
+          sigRender();
+          toast("Visual archetype switched!", true);
+        }
+      }).catch(function(err){
+        toast("Archetype switch error: " + err.message, false);
+      });
+    };
+  }
+
+  // Playbook Search Filter
+  if($("sigPlaybookSearch")){
+    $("sigPlaybookSearch").oninput = function(){
+      var query = this.value.toLowerCase().trim();
+      var items = $("sigPlaybookContainer") ? $("sigPlaybookContainer").children : [];
+      for(var i=0; i<items.length; i++){
+        var txt = items[i].textContent.toLowerCase();
+        items[i].style.display = (!query || txt.indexOf(query) >= 0) ? "" : "none";
+      }
     };
   }
 

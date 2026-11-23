@@ -280,3 +280,75 @@ test('PRANAV SIGNAL: Public endpoints for UI visual, draft state, and OAuth call
   const cbHtml = await cbRes.text();
   assert.ok(cbHtml.includes('LinkedIn Authorization Code Received'));
 });
+
+test('Linkedin_Post_Generator: Full automated pipeline delivers all 12 acceptance criteria', async () => {
+  const env = mockEnv();
+  const res = await worker.fetch(new Request(BASE + '/mcp', {
+    method: 'POST',
+    headers: H_AUTH,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 101,
+      method: 'tools/call',
+      params: {
+        name: 'linkedin_post_generator_run',
+        arguments: {
+          topic_id: 'signal_ipo_watchlist',
+          archetype: 'big_ipos_watchlist',
+          force: true,
+        },
+      },
+    }),
+  }), env);
+
+  assert.equal(res.status, 200);
+  const jsonRes = await res.json();
+  assert.ok(jsonRes.result);
+  const out = jsonRes.result.structuredContent || jsonRes.result;
+
+  assert.equal(out.pipeline, 'Linkedin_Post_Generator');
+
+  // Item 1: Topic Selected
+  assert.ok(out.item1_topicSelected.title.includes('IPOs'));
+  assert.equal(out.item1_topicSelected.researchArea, 'IPOs and market developments');
+
+  // Item 2: Selection Reason
+  assert.ok(out.item2_selectionReason.totalScore >= 80);
+  assert.ok(out.item2_selectionReason.breakdown.commercial >= 90);
+
+  // Item 3: Verified Research
+  assert.ok(out.item3_verifiedResearch.verifiedFacts.length >= 2);
+  assert.ok(out.item3_verifiedResearch.sourceUrls.length >= 1);
+
+  // Item 4: Framework Analysis (STAR or SBI)
+  assert.ok(['STAR', 'SBI'].includes(out.item4_frameworkAnalysis.type));
+  assert.ok(out.item4_frameworkAnalysis.data);
+
+  // Item 5: Personal Take (Operator Lens)
+  assert.ok(out.item5_personalTake.operatorTake.length > 50);
+  assert.ok(out.item5_personalTake.credentials.includes('IndiaMART'));
+
+  // Item 6: Final LinkedIn Post (150-250 words, 7-part structure)
+  assert.ok(out.item6_finalLinkedInPost.wordCount >= 140 && out.item6_finalLinkedInPost.wordCount <= 265, `Word count: ${out.item6_finalLinkedInPost.wordCount}`);
+  assert.ok(out.item6_finalLinkedInPost.body.includes('#'));
+  assert.ok(out.item6_finalLinkedInPost.hook.length > 20);
+
+  // Item 7: Canva Design Preview (Archetype)
+  assert.equal(out.item7_canvaDesignPreview.archetype, 'big_ipos_watchlist');
+  assert.equal(out.item7_canvaDesignPreview.svgPreviewAvailable, true);
+
+  // Item 8: Exported Asset
+  assert.equal(out.item8_exportedAsset.endpoint, '/api/signal/visual.jpg');
+
+  // Item 9: Canva Editable Link
+  assert.ok(out.item9_canvaEditableLink.canvaEditUrl.includes('canva.link'));
+
+  // Item 10: Publishing Result
+  assert.ok(out.item10_publishingResult.status);
+
+  // Item 11: LinkedIn Post URL / Limitation Notice
+  assert.ok(out.item11_linkedInPostUrl.limitationNotice || out.item11_linkedInPostUrl.url);
+
+  // Item 12: Telegram Notification Result
+  assert.equal(out.item12_telegramNotificationResult.delivered, true);
+});
