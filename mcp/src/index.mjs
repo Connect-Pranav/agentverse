@@ -971,26 +971,12 @@ async function route(request, env) {
 
     // Public / Viewer Read Endpoint (for AgentVerse Signal dashboard UI)
     if (seg[2] === 'draft' && method === 'GET') {
-      const s = await signal.load(k);
-      const today = signal.todayDate();
-      let currentDraft = s.drafts[`post_${today}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
-
-      // Auto-initialize today's draft if KV is fresh
-      if (!currentDraft) {
-        try {
-          await signal.scanGlobalAiMarket(k);
-          await signal.rankDailySignal(k);
-          currentDraft = await signal.draftLinkedInPost(k);
-          await signal.createLinkedInVisual(k, currentDraft.id);
-          await signal.checkPostQuality(k, currentDraft.id);
-          await signal.submitForApproval(k, env, currentDraft.id);
-        } catch (e) {
-          console.error('[signal] auto-draft creation:', e);
-        }
-      }
-
       const freshState = await signal.load(k);
-      const activeDraft = currentDraft || freshState.drafts[`post_${today}`] || Object.values(freshState.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+      const today = signal.todayDate();
+      const activeDraft = (freshState.latestDraftId && freshState.drafts[freshState.latestDraftId]) ||
+        freshState.drafts[`post_${today}`] ||
+        Object.values(freshState.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] ||
+        null;
 
       // Check Work Board status for human approvals (e.g. from Telegram)
       const w = await work.load(k);
@@ -1000,7 +986,7 @@ async function route(request, env) {
       const effStatus = isPublished ? 'published' : (isApproved ? 'approved' : 'waiting_approval');
       const hasLinkedInToken = Boolean(env.LINKEDIN_ACCESS_TOKEN || (await k.get('signal/linkedin_token')));
 
-      const svgVisual = activeDraft?.visual?.svg || signal.getDefaultSvg(activeDraft?.visual?.headline, activeDraft?.visual?.subline);
+      const svgVisual = activeDraft?.visual?.svg || (activeDraft ? signal.getDefaultSvg(activeDraft?.visual?.headline, activeDraft?.visual?.subline) : null);
 
       const draftObj = activeDraft ? {
         id: activeDraft.id,
