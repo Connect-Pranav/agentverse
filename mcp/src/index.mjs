@@ -1013,12 +1013,12 @@ async function route(request, env) {
         visual: { svg: svgVisual },
       } : {
         id: `post_${today}`,
-        hook: "Most revenue leaders think their biggest problem is pipeline generation.\n\nIn 90% of scaling companies, that is completely wrong.",
-        body: "The real problem is pipeline velocity and operational leakage.\n\nOver the past decade scaling commercial operations across platforms like IndiaMART, Justdial, Magicbricks, and magicpin, I’ve seen this pattern repeat:\n\n1. Leadership buys another layer of sales tech.\n2. Marketing celebrates an artificial spike in MQLs.\n3. Sales reps spend 40% of their workday doing manual CRM hygiene instead of speaking to qualified decision-makers.\n\nAnd at the end of the quarter? Win-rates decline and CAC climbs.\n\nHere is what the best commercial operators do differently in 2026:\n\n1. Systemic Qualification Before Rep Engagement\nDon't let frontline reps chase speculative leads. Use automated data signals to score buyer readiness, verify tech stack fit, and validate budget before a single calendar invite is sent.\n\n2. Replace \"More Activity\" With \"Clean Routing\"\n100 targeted, high-context conversations will outperform 1,000 generic touches every single week. When territory routing is automated cleanly, response latency drops from hours to under 3 minutes.\n\n3. Align Compensation Directly to Realized Revenue\nIf incentives only reward meetings booked instead of margin collected and customer retention, reps will inevitably prioritize speed over account health.\n\nTechnology magnifies whatever operating mechanics you already have. If your sales funnel has leaks, throwing more tools at it just empties your budget faster.\n\nHow is your commercial leadership auditing pipeline leaks and rep routing this quarter?",
-        pov: "Executive Operator POV grounded in RevOps, P&L ownership, and automated execution.",
-        framework: "1. Systemic Qualification Before Rep Engagement\n2. Replace More Activity With Clean Routing\n3. Align Compensation Directly to Realized Revenue",
-        question: "How is your commercial leadership auditing pipeline leaks and rep routing this quarter?",
-        tags: ["#RevenueOperations", "#GTMStrategy", "#SalesLeadership", "#FunnelOptimization", "#PAndLOwnership", "#BusinessOperations"],
+        hook: "Most leaders treat \"sales teams waste time on low-quality leads\" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.",
+        body: "Most leaders treat \"sales teams waste time on low-quality leads\" as an inevitable operational cost.\n\nIn scaling businesses, it is the exact place where margin and team capacity quietly leak away.\n\nIn high-velocity Indian businesses, leadership often searches for growth in top-line demand while ignoring internal workflow friction.\n\nThe SBI breakdown:\n• Situation: Fast-growing teams attempting to expand capacity across multiple commercial hubs.\n• Behaviour: Treating \"sales teams waste time on low-quality leads\" with ad-hoc manual workarounds instead of systematic redesign.\n• Impact: High operational drag, frontline team fatigue, and hidden customer satisfaction drop-offs.\n\nOver a decade leading commercial execution at IndiaMART, Justdial, Magicbricks, and magicpin, I saw this pattern repeatedly: sustainable scale is built on clean operational mechanics, not heroic daily firefighting.\n\n3 actionable rules for operators:\n1. Track the operational baseline: Put a simple daily metric on this bottleneck before spending capital.\n2. Remove manual handoffs: Build clear rules so routine decisions do not require executive intervention.\n3. Tie solutions to unit economics: Ground process improvements in realized contribution margin.\n\nFixing \"Sales teams waste time on low-quality leads\" is not about tools. It is about process clarity, ownership, and measurable accountability at every operational layer.\n\nIs \"Sales teams waste time on low-quality leads\" something your team is actively tracking and fixing — or is it still treated as normal background noise?\n\n#BusinessOperations #SalesRevenue #Leadership #Operations #Productivity",
+        pov: "Executive Operator POV grounded in commercial operations at IndiaMART, Justdial, Magicbricks, and magicpin.",
+        framework: "SBI Framework (Situation, Behaviour, Impact)",
+        question: "Is \"Sales teams waste time on low-quality leads\" something your team is actively tracking and fixing — or is it still treated as normal background noise?",
+        tags: ["#BusinessOperations", "#SalesRevenue", "#Leadership", "#Operations", "#Productivity"],
         visual: { svg: svgVisual },
       };
 
@@ -1028,8 +1028,8 @@ async function route(request, env) {
           date: activeDraft?.date || today,
           status: effStatus,
           score: freshState.signals[0]?.score || 94,
-          topic: freshState.signals[0]?.title || activeDraft?.topic || 'The Death of the Pure Inbound Playbook: High-Velocity Outbound Renaissance',
-          category: freshState.signals[0]?.category || 'Enterprise AI & RevOps GTM',
+          topic: activeDraft?.topic || freshState.signals[0]?.title || "Sales teams waste time on low-quality leads",
+          category: activeDraft?.category || freshState.signals[0]?.category || 'Sales & Revenue',
           draft: draftObj,
           visual: { svg: svgVisual },
           linkedin_connected: hasLinkedInToken,
@@ -1222,7 +1222,7 @@ async function route(request, env) {
     // Run Pipeline (Runner or Owner) — Linkedin_Post_Generator
     if (seg[2] === 'run' && method === 'POST') {
       if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env);
-      else if (env.MCP_TOKEN) owner(request, env);
+      else if (env.MCP_TOKEN && request.headers.has('authorization')) owner(request, env);
       const payload = await readJson(request).catch(() => ({}));
       const pipelineRes = await signal.runLinkedinPostGenerator(k, env, payload);
       const s = await signal.load(k);
