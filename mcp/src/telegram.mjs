@@ -73,6 +73,26 @@ export async function sendTelegramPhoto(env, photoUrl, caption = '', replyMarkup
   }
 }
 
+export async function sendTelegramDocument(env, filename, content, mime = 'image/svg+xml', caption = '', fetchImpl = fetch) {
+  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  let chatId = env.TELEGRAM_CHAT_ID;
+  if (!chatId && env.KV) {
+    try { chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id')); } catch {}
+  }
+  if (!token || !chatId) return false;
+  const form = new FormData();
+  form.append('chat_id', String(chatId));
+  if (caption) form.append('caption', caption.slice(0, 1000));
+  form.append('document', new Blob([content], { type: mime }), filename);
+  try {
+    const r = await fetchImpl(`${TG_API}/bot${token}/sendDocument`, { method: 'POST', body: form });
+    return r.ok;
+  } catch (e) {
+    console.error('[telegram] sendDocument failed:', e?.message);
+    return false;
+  }
+}
+
 export async function notifyApproval(env, { id, type, title, brand, summary, estCost }, fetchImpl = fetch, targetChatId = null) {
   const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
   let chatId = targetChatId || env.TELEGRAM_CHAT_ID;

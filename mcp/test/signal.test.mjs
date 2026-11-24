@@ -224,7 +224,7 @@ test('PRANAV SIGNAL: REST endpoints /api/signal and decision flow', async () => 
   // Adobe Express is not configured in this Worker, so the honest status is PARTIAL (never SUCCESS).
   assert.equal(runData.status, 'PARTIAL');
   assert.equal(runData.run.case_number, 1);
-  assert.equal(runData.run.image_generation_status, 'ADOBE_EXPRESS_NOT_CONFIGURED');
+  assert.equal(runData.run.image_generation_status, 'WORKER_RENDERED');
 
   // POST /api/signal/decide approve
   const decRes = await worker.fetch(new Request(BASE + '/api/signal/decide', {
@@ -287,6 +287,7 @@ function tgStub() {
   const sent = [];
   const f = async (url, init) => {
     if (String(url).includes('api.telegram.org')) {
+      if (String(url).includes('sendDocument')) { sent.docs = (sent.docs || 0) + 1; return { ok: true, json: async () => ({ ok: true }) }; }
       sent.push(JSON.parse(init.body));
       return { ok: true, json: async () => ({ ok: true }) };
     }
@@ -345,8 +346,9 @@ test('Telegram receives the exact persisted post; no Canva anywhere; Adobe Expre
   // Adobe Express: nothing invented
   assert.equal(r.adobe_express_project_id, null);
   assert.equal(r.adobe_express_url, null);
-  assert.equal(r.image_generation_status, 'ADOBE_EXPRESS_NOT_CONFIGURED');
-  assert.equal(r.generation_status, 'PARTIAL');
+  assert.equal(r.image_generation_status, 'WORKER_RENDERED');
+  assert.equal(r.generation_status, 'SUCCESS');
+  assert.equal(sent.docs, 1, 'case SVG is delivered to Telegram once');
   assert.ok(!/canva/i.test(JSON.stringify(s.drafts[r.post_id].visual)));
   assert.ok(!/canva/i.test(d.visual.svg));
 });

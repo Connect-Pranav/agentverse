@@ -1660,18 +1660,22 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
     if (ax.status === 'CREATED') {
       Object.assign(v, { image_generation_status: 'ADOBE_EXPRESS_CREATED', image_generation_error: null, adobe_express_project_id: ax.project_id, adobe_express_url: ax.url, adobe_express_thumbnail: ax.thumbnail });
     } else {
-      Object.assign(v, { image_generation_status: ax.status === 'FAILED' ? 'ADOBE_EXPRESS_FAILED' : 'ADOBE_EXPRESS_NOT_CONFIGURED', image_generation_error: ax.error });
+      const failed = ax.status === 'FAILED';
+      Object.assign(v, {
+        image_generation_status: failed ? 'ADOBE_EXPRESS_FAILED' : 'WORKER_RENDERED',
+        image_generation_error: failed ? ax.error : 'Adobe Express API is not available for this account (disabled in Adobe Developer Console); the case visual is rendered by the Worker itself.',
+      });
     }
     st.visuals[postId] = v;
     await save(kv, st);
-    run.stages.visual = ax.status === 'CREATED' ? 'DONE' : (ax.status === 'FAILED' ? 'FAILED' : 'BLOCKED');
+    run.stages.visual = ax.status === 'FAILED' ? 'FAILED' : 'DONE';
     await patch({
       stages: run.stages,
       image_reference: ax.status === 'CREATED' ? (ax.thumbnail || ax.url) : vis.image_reference,
       image_generation_status: v.image_generation_status,
       adobe_express_project_id: v.adobe_express_project_id,
       adobe_express_url: v.adobe_express_url,
-      error_details: ax.status === 'CREATED' ? run.error_details : `visual: ${ax.error}`,
+      error_details: ax.status === 'FAILED' ? `visual: ${ax.error}` : run.error_details,
     });
   }
 
@@ -1720,6 +1724,10 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       }
     } catch (e) {
       console.error('[signal] Telegram error:', e?.message);
+    }
+    if (sent && d.visual?.svg && run.stages.telegram_visual !== 'DONE') {
+      const okDoc = await telegram.sendTelegramDocument(env, `case-${run.case_number}-${String(run.company).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.svg`, d.visual.svg, 'image/svg+xml', `Visual — Case #${run.case_number} ${run.company} (${run.image_generation_status})`, fetchImpl);
+      if (okDoc) run.stages.telegram_visual = 'DONE';
     }
     run.stages.telegram = sent ? 'DONE' : 'FAILED';
     await patch({
