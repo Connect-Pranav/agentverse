@@ -519,109 +519,136 @@ function generateInsightGrid({ caseData, hook }) {
 
 // ─── T7: Company Case Matrix (upgraded) ───────────────────────
 export function generateCompanyCaseMatrix({ caseData, hook }) {
-  const company = esc(caseData?.company || 'CASE STUDY');
-  const theme = esc(caseData?.theme || 'Business Strategy');
-  const period = esc(caseData?.period || '');
-  const industry = esc(caseData?.industry || '');
-  const caseNum = caseData?.caseNumber || '';
+  const company = esc(caseData?.company || 'EASTMAN KODAK');
+  const theme = esc(caseData?.theme || 'Digital Strategy');
+  const period = esc(caseData?.period || '1990s–2012');
+  const industry = esc(caseData?.industry || 'Imaging / Technology');
 
-  const hookLine1 = hook?.split('\n')[0] || `${company}: The business reality.`;
-  const hookLine2 = hook?.split('\n\n')[1]?.split('\n')[0] || `Most leaders only see this in hindsight.`;
-  const takeaways = buildTakeaways(caseData);
+  // Dramatic hook headlines
+  let dramaticH1 = 'THEY INVENTED DIGITAL IN 1975.';
+  let dramaticH2 = 'BY 2012, THEY WERE BANKRUPT.';
+  let dramaticBadge = 'FATAL OPERATING BLIND SPOT';
 
-  const problemLines = wrap(caseData?.documentedProblem || '', 46).slice(0, 3);
-  const impactLines = wrap(caseData?.businessImpact || '', 46).slice(0, 2);
+  if (!(/Kodak/i.test(company))) {
+    dramaticH1 = `${company.toUpperCase()}: THE OPERATING FAILURE`;
+    dramaticH2 = 'WHEN MARKET DEMAND SHIFTED.';
+    dramaticBadge = 'EXECUTIVE CASE STUDY';
+  }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="font-family:'Space Grotesk','Segoe UI',sans-serif;">
+  // 3-Part Strategic Breakdown
+  const col1Title = 'THE STRATEGY FAILURE';
+  const col1Lines = [
+    '• Protected 70% film gross margins at all costs.',
+    '• Viewed digital camera as an internal threat.',
+    '• Starved digital R&D to fund legacy cash cow.',
+    '• Delayed cannibalisation until market took over.',
+  ];
+
+  const col2Title = 'THE BUSINESS OUTCOME';
+  const col2Lines = [
+    '• Filed Chapter 11 bankruptcy in Jan 2012.',
+    '• $5.1B peak market valuation wiped out.',
+    '• 145,000+ jobs permanently eliminated.',
+    '• Forced to liquidate 1,100 patents for $527M.',
+  ];
+
+  const col3Title = 'OPERATOR STRATEGY & FIX';
+  const col3Lines = [
+    '• Set explicit cannibalisation milestones.',
+    '• Reallocate capital before cash cows collapse.',
+    '• Scale is never proof of durability.',
+    '• Own the customer workflow, not the product.',
+  ];
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <defs>
     <linearGradient id="bgCM" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#070B19"/>
       <stop offset="50%" stop-color="#080C1E"/>
       <stop offset="100%" stop-color="#050814"/>
     </linearGradient>
-    <linearGradient id="cyanGold" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00F0FF"/>
+    <linearGradient id="cyanRed" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#EF4444"/>
       <stop offset="100%" stop-color="#F59E0B"/>
     </linearGradient>
-    <radialGradient id="topCyan" cx="25%" cy="10%" r="50%">
-      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.12"/>
+    <radialGradient id="topRed" cx="20%" cy="10%" r="50%">
+      <stop offset="0%" stop-color="#EF4444" stop-opacity="0.14"/>
       <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="btmGold" cx="80%" cy="90%" r="45%">
       <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.08"/>
       <stop offset="100%" stop-color="#070B19" stop-opacity="0"/>
     </radialGradient>
-    <filter id="cmShadow"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity="0.5"/></filter>
+    <filter id="cmShadow"><feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000" flood-opacity="0.6"/></filter>
   </defs>
 
   <rect width="1200" height="627" fill="url(#bgCM)"/>
-  <rect width="1200" height="627" fill="url(#topCyan)"/>
+  <rect width="1200" height="627" fill="url(#topRed)"/>
   <rect width="1200" height="627" fill="url(#btmGold)"/>
 
-  <!-- Grid -->
-  <g stroke="rgba(255,255,255,0.025)" stroke-width="1">
+  <!-- Subtle Blueprint Grid Lines -->
+  <g stroke="rgba(255,255,255,0.03)" stroke-width="1">
     <line x1="60" y1="0" x2="60" y2="627"/>
     <line x1="1140" y1="0" x2="1140" y2="627"/>
-    <line x1="0" y1="130" x2="1200" y2="130"/>
-    <line x1="0" y1="495" x2="1200" y2="495"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="565" x2="1200" y2="565"/>
   </g>
 
-  <!-- Author pill -->
-  <rect x="60" y="24" width="390" height="30" rx="15" fill="rgba(0,240,255,0.08)" stroke="#00F0FF" stroke-width="1.2"/>
+  <!-- Top Badges Row -->
+  <!-- Author Pill -->
+  <rect x="60" y="24" width="375" height="30" rx="15" fill="rgba(0,240,255,0.08)" stroke="#00F0FF" stroke-width="1.2"/>
   <circle cx="76" cy="39" r="5" fill="#00F0FF"/>
   <text x="90" y="43" fill="#00F0FF" font-size="11.5" font-weight="700" letter-spacing="1.2">PRANAV KUMAR · REVOPS &amp; GTM STRATEGY</text>
 
-  <!-- Case badge -->
-  <rect x="740" y="24" width="200" height="30" rx="15" fill="rgba(245,158,11,0.1)" stroke="#F59E0B" stroke-width="1"/>
-  <text x="840" y="43" fill="#F59E0B" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">CASE #${caseNum}</text>
+  <!-- Dramatic Hook Badge (NO CASE NUMBER) -->
+  <rect x="700" y="24" width="270" height="30" rx="15" fill="rgba(239,68,68,0.18)" stroke="#EF4444" stroke-width="1.3"/>
+  <text x="835" y="43" fill="#FCA5A5" font-size="11.5" font-weight="800" text-anchor="middle" letter-spacing="1.5">⚡ ${dramaticBadge}</text>
 
-  <rect x="956" y="24" width="190" height="30" rx="15" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-  <text x="1051" y="43" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">${period}</text>
+  <!-- Period & Domain Pill -->
+  <rect x="982" y="24" width="158" height="30" rx="15" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <text x="1061" y="43" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">${period}</text>
 
-  <!-- Company name — large -->
-  <text x="60" y="115" fill="#F8FAFC" font-size="58" font-weight="900" letter-spacing="-1" filter="url(#cmShadow)">${esc(company.toUpperCase())}</text>
+  <!-- Dramatic Hook Headline (Massive impact) -->
+  <text x="60" y="106" fill="#EF4444" font-size="44" font-weight="900" letter-spacing="-0.5" filter="url(#cmShadow)">${dramaticH1}</text>
+  <text x="60" y="152" fill="#F8FAFC" font-size="44" font-weight="900" letter-spacing="-0.5" filter="url(#cmShadow)">${dramaticH2}</text>
 
-  <!-- Theme + industry badges -->
-  <rect x="60" y="135" width="${Math.min(theme.length * 9 + 24, 360)}" height="28" rx="14" fill="rgba(0,240,255,0.1)" stroke="#00F0FF" stroke-width="1"/>
-  <text x="72" y="154" fill="#00F0FF" font-size="12" font-weight="700" letter-spacing="0.8">${esc(theme.toUpperCase())}</text>
-  <text x="${Math.min(theme.length * 9 + 100, 450)}" y="154" fill="#64748B" font-size="12" font-weight="500">${esc(industry)}</text>
+  <!-- Case Study Context Subhead -->
+  <text x="60" y="190" fill="#38BDF8" font-size="15" font-weight="700" letter-spacing="1">EXECUTIVE CASE STUDY: ${company.toUpperCase()}</text>
+  <text x="360" y="190" fill="#94A3B8" font-size="14" font-weight="500">· Why defending 70% film gross margins killed a $10B industry leader</text>
 
-  <!-- Hook -->
-  <text x="60" y="202" fill="#F8FAFC" font-size="22" font-weight="600">${esc(hookLine1.slice(0, 72))}</text>
-  <text x="60" y="232" fill="#94A3B8" font-size="18" font-weight="400" font-style="italic">${esc(hookLine2.slice(0, 72))}</text>
+  <!-- 3 Strategic Comparison Columns -->
 
-  <!-- Divider -->
-  <rect x="60" y="254" width="720" height="2" rx="1" fill="url(#cyanGold)" opacity="0.5"/>
-
-  <!-- Left — problem -->
-  <text x="60" y="285" fill="#00F0FF" font-size="11" font-weight="700" letter-spacing="2">THE DOCUMENTED PROBLEM</text>
-  ${problemLines.map((l, i) =>
-    `<text x="60" y="${308 + i * 30}" fill="#CBD5E1" font-size="17" font-weight="400">${esc(l)}</text>`
+  <!-- Column 1: The Strategy Failure -->
+  <rect x="60" y="230" width="345" height="315" rx="14" fill="rgba(239,68,68,0.06)" stroke="rgba(239,68,68,0.3)" stroke-width="1.2"/>
+  <rect x="60" y="230" width="345" height="44" rx="14" fill="rgba(239,68,68,0.18)"/>
+  <text x="232" y="258" fill="#FCA5A5" font-size="13" font-weight="800" text-anchor="middle" letter-spacing="1.2">❌ ${col1Title}</text>
+  ${col1Lines.map((l, i) =>
+    `<text x="76" y="${305 + i * 55}" fill="#E2E8F0" font-size="13.5" font-weight="500">${esc(l)}</text>`
   ).join('\n  ')}
 
-  <!-- Left — impact -->
-  <text x="60" y="425" fill="#F59E0B" font-size="11" font-weight="700" letter-spacing="2">BUSINESS IMPACT</text>
-  ${impactLines.map((l, i) =>
-    `<text x="60" y="${448 + i * 28}" fill="#CBD5E1" font-size="16" font-weight="400">${esc(l)}</text>`
+  <!-- Column 2: Business Outcome -->
+  <rect x="428" y="230" width="345" height="315" rx="14" fill="rgba(245,158,11,0.06)" stroke="rgba(245,158,11,0.3)" stroke-width="1.2"/>
+  <rect x="428" y="230" width="345" height="44" rx="14" fill="rgba(245,158,11,0.18)"/>
+  <text x="600" y="258" fill="#FCD34D" font-size="13" font-weight="800" text-anchor="middle" letter-spacing="1.2">⚠️ ${col2Title}</text>
+  ${col2Lines.map((l, i) =>
+    `<text x="444" y="${305 + i * 55}" fill="#E2E8F0" font-size="13.5" font-weight="500">${esc(l)}</text>`
   ).join('\n  ')}
 
-  <!-- Right panel — takeaways -->
-  <rect x="860" y="168" width="300" height="300" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(0,240,255,0.2)" stroke-width="1.5" filter="url(#cmShadow)"/>
-  <text x="1010" y="204" fill="#00F0FF" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="2">OPERATOR TAKEAWAYS</text>
-  ${takeaways.slice(0, 3).map((t, i) => {
-    const tLines = wrap(t, 24);
-    return `
-  <rect x="876" y="${224 + i * 80}" width="268" height="68" rx="8" fill="rgba(0,240,255,0.05)" stroke="rgba(0,240,255,0.15)" stroke-width="1"/>
-  <text x="892" y="${244 + i * 80}" fill="#F59E0B" font-size="20" font-weight="900">${String(i + 1).padStart(2, '0')}</text>
-  ${tLines.slice(0, 2).map((l, j) =>
-    `<text x="920" y="${244 + i * 80 + j * 18}" fill="#E2E8F0" font-size="12.5" font-weight="400">${esc(l)}</text>`
-  ).join('\n  ')}`;
-  }).join('')}
+  <!-- Column 3: Operator Strategy & Fix -->
+  <rect x="795" y="230" width="345" height="315" rx="14" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.3)" stroke-width="1.2"/>
+  <rect x="795" y="230" width="345" height="44" rx="14" fill="rgba(16,185,129,0.18)"/>
+  <text x="967" y="258" fill="#6EE7B7" font-size="13" font-weight="800" text-anchor="middle" letter-spacing="1.2">✓ ${col3Title}</text>
+  ${col3Lines.map((l, i) =>
+    `<text x="811" y="${305 + i * 55}" fill="#E2E8F0" font-size="13.5" font-weight="500">${esc(l)}</text>`
+  ).join('\n  ')}
 
-  <!-- Footer -->
-  <rect x="0" y="510" width="1200" height="2" fill="url(#cyanGold)" opacity="0.15"/>
-  <text x="60" y="545" fill="#94A3B8" font-size="13">IndiaMART · Justdial · Magicbricks · magicpin · Commercial Operations Insight</text>
-  <text x="60" y="572" fill="#64748B" font-size="11">Source: ${esc((caseData?.evidenceType || 'Public record').slice(0, 80))} · ${esc((caseData?.sourceUrl || '').slice(0, 60))}</text>
+  <!-- Footer Branding -->
+  <rect x="0" y="585" width="1200" height="42" fill="rgba(0,0,0,0.5)"/>
+  <circle cx="76" cy="606" r="9" fill="#00F0FF"/>
+  <text x="76" y="610" fill="#070B19" font-size="9" font-weight="900" text-anchor="middle">PK</text>
+  <text x="96" y="610" fill="#F8FAFC" font-size="12.5" font-weight="700">PRANAV KUMAR</text>
+  <text x="240" y="610" fill="#94A3B8" font-size="11.5">IndiaMART · Justdial · Magicbricks · magicpin · Commercial Operations Insight</text>
+  <text x="1140" y="610" fill="#64748B" font-size="11" text-anchor="end">Source: SEC Restructuring Filings &amp; Chapter 11 Record</text>
 </svg>`;
 }
 

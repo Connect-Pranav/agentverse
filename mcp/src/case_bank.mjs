@@ -1635,42 +1635,63 @@ export function formatFixPoints(recommendedFix) {
 }
 
 export function buildLinkedInPostFromCase(c) {
-  const cleanProfile = c.companyProfile ? c.companyProfile.replace(/\.$/, '') : '';
-  const cleanAngle = c.postAngle ? c.postAngle.replace(/\?$/, '.') : '';
+  let hook = '';
+  let strategy = '';
+  let outcome = '';
 
-  const hook = `Most leaders assume ${c.company}’s challenge was an execution delay.\n\nThe documented case of ${c.company} reveals a much deeper operating lesson: ${cleanAngle}`;
+  if (c.caseNumber === 1 || /Kodak/i.test(c.company)) {
+    hook = `They invented the digital camera in 1975. By 2012, they were completely bankrupt.
 
-  const context = `${c.company} (${c.industry}) — ${cleanProfile}. In ${c.period}, ${c.businessImpact}`;
+Eastman Kodak didn't fail because they lacked technology. They failed because leadership chose to protect a 70% gross-margin film monopoly instead of owning the customer's digital future.`;
+    
+    strategy = `The Strategy Trap:
+• Flawed Strategy: Defend high-margin film consumables at all costs while starving digital R&D.
+• Operator Reality: When unit economics shift, delaying cannibalisation doesn't protect margin—it guarantees obsolescence.`;
 
-  const problem = `The documented problem: ${c.documentedProblem}`;
+    outcome = `The Business Outcome:
+• Filed Chapter 11 bankruptcy in January 2012.
+• Peak $5.1B market cap decimated; 145,000+ jobs eliminated.
+• Forced to fire-sale 1,100 digital imaging patents for just $527M to survive.`;
+  } else {
+    hook = `When ${c.company} hit a wall in ${c.period}, the problem wasn't market demand.
 
-  const analysis = `My analysis: ${c.rootCauseAnalysis}`;
+It was a structural operating failure: ${c.postAngle || c.documentedProblem}`;
+    
+    strategy = `The Strategy Failure:
+• Root Cause: ${c.rootCauseAnalysis}
+• Operator Reality: Defending legacy workflows always costs more than proactive transformation.`;
 
-  const whatChanged = `What actually changed: ${c.documentedResponse}`;
+    outcome = `The Business Outcome:
+• Documented Impact: ${c.businessImpact}
+• Company Response: ${c.documentedResponse}`;
+  }
+
+  const caseStudyContext = `Executive Case Study: ${c.company} (${c.period} · ${c.industry})
+${c.companyProfile || ''}`;
+
+  const operatorLesson = `The Management Lesson:
+Across high-velocity commercial businesses like IndiaMART, Justdial, Magicbricks, and magicpin, I saw this pattern repeat: scale is never proof of durability. If you don't cannibalise your own cash cow, the market will do it for you.`;
 
   const fixPoints = formatFixPoints(c.recommendedFix);
-  const fixSection = `What I would fix next:\n${fixPoints}`;
+  const fixSection = `Operator Fix:
+${fixPoints}`;
 
-  const lesson = `The management lesson: Across high-velocity commercial businesses like IndiaMART, Justdial, Magicbricks, and magicpin, I saw this clearly: scale is not proof of durability. When customer habits or unit economics shift, defending the legacy channel only accelerates the decline.`;
+  const conversation = `What strategic milestone would you have enforced to pivot before the legacy profit pool collapsed?`;
 
-  const conversation = `What would you have prioritised first if you were leading ${c.company} during this transition?`;
-
-  const tagTheme = c.theme.replace(/[^a-zA-Z0-9]/g, '');
+  const tagTheme = (c.theme || 'Strategy').replace(/[^a-zA-Z0-9]/g, '');
   const hashtags = `#BusinessStrategy #Operations #Leadership #${tagTheme} #100BusinessProblems`;
 
   const body = `${hook}
 
-${context}
+${caseStudyContext}
 
-${problem}
+${strategy}
 
-${analysis}
-
-${whatChanged}
+${outcome}
 
 ${fixSection}
 
-${lesson}
+${operatorLesson}
 
 ${conversation}
 
