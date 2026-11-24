@@ -408,3 +408,46 @@ test('case bank: 100 cases, numbered 1..100, each with a source URL', async () =
   assert.deepEqual(CASE_BANK.map((c) => c.caseNumber), Array.from({ length: 100 }, (_, i) => i + 1));
   assert.ok(CASE_BANK.every((c) => /^https?:\/\//.test(c.sourceUrl) && c.company && c.documentedProblem));
 });
+
+test('Adobe Express: configured run creates a real variation via the API (stubbed) and stores URN + URL', async () => {
+  const kv = memKv();
+  const calls = [];
+  const f = async (url, init = {}) => {
+    const u = String(url); calls.push(u);
+    const ok = (j) => ({ ok: true, status: 200, json: async () => j, text: async () => JSON.stringify(j) });
+    if (u.includes('api.telegram.org')) return ok({ ok: true });
+    if (u.includes('adobelogin.com')) return ok({ access_token: 'tok', expires_in: 3600 });
+    if (u.includes('/beta/tagged-documents/')) return ok({ id: 'T', documentPages: [{ taggedElements: [{ name: 'company', type: 'text' }, { name: 'problem', type: 'text' }, { name: 'photo', type: 'image' }] }] });
+    if (u.endsWith('/beta/generate-variation')) {
+      const b = JSON.parse(init.body);
+      assert.deepEqual(Object.keys(b.variationDetails.tagMappings).sort(), ['company', 'problem']);
+      assert.equal(b.variationDetails.tagMappings.company, 'Eastman Kodak');
+      return ok({ jobId: 'J1', statusUrl: 'https://express-api.adobe.io/status/J1' });
+    }
+    if (u.includes('/status/J1')) return ok({ jobId: 'J1', status: 'succeeded', document: { id: 'urn:aaid:sc:EU:abc', name: 'x', thumbnailUrl: 'https://t/x.png' } });
+    return { ok: false, status: 500, text: async () => 'unexpected', json: async () => ({}) };
+  };
+  const env = { ...envFor(), ADOBE_CLIENT_ID: 'id', ADOBE_CLIENT_SECRET: 's', ADOBE_EXPRESS_TEMPLATE_ID: 'urn:aaid:sc:EU:tmpl' };
+  const r = await signal.runLinkedinPostGenerator(kv, env, {}, f);
+  assert.equal(r.image_generation_status, 'ADOBE_EXPRESS_CREATED');
+  assert.equal(r.adobe_express_project_id, 'urn:aaid:sc:EU:abc');
+  assert.equal(r.adobe_express_url, 'https://express.adobe.com/id/urn:aaid:sc:EU:abc');
+  assert.equal(r.generation_status, 'SUCCESS');
+  assert.ok(calls.every((c) => !/canva/i.test(c)));
+});
+
+test('Adobe Express: API error is recorded, post kept, run is not SUCCESS', async () => {
+  const kv = memKv();
+  const f = async (url) => {
+    const u = String(url);
+    if (u.includes('api.telegram.org')) return { ok: true, json: async () => ({}) };
+    return { ok: false, status: 401, text: async () => 'unauthorized', json: async () => ({}) };
+  };
+  const env = { ...envFor(), ADOBE_CLIENT_ID: 'id', ADOBE_CLIENT_SECRET: 's', ADOBE_EXPRESS_TEMPLATE_ID: 'T' };
+  const r = await signal.runLinkedinPostGenerator(kv, env, {}, f);
+  assert.equal(r.image_generation_status, 'ADOBE_EXPRESS_FAILED');
+  assert.equal(r.adobe_express_url, null);
+  assert.notEqual(r.generation_status, 'SUCCESS');
+  assert.ok(r.error_details.includes('401'));
+  assert.equal(r.persistence_status, 'PERSISTED_IN_KV');
+});

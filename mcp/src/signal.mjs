@@ -5,6 +5,7 @@
 
 import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
+import * as adobe from './adobe_express.mjs';
 import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
 import { CASE_BANK, getCaseByNumber, getNextUnusedCase, buildLinkedInPostFromCase } from './case_bank.mjs';
 
@@ -1650,16 +1651,27 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
     return finalizeRun(kv, run.run_id);
   }
 
-  // ---- Stage 3: visual (Adobe Express — reports its real status, never silently falls back to Canva)
+  // ---- Stage 3: visual — Adobe Express API (generate variation from the tagged template). No Canva, no fake IDs.
   if (run.stages.visual !== 'DONE') {
     const vis = await createLinkedInVisual(kv, postId, 'company_case_matrix');
-    run.stages.visual = vis.image_generation_status === 'ADOBE_EXPRESS_NOT_CONFIGURED' ? 'BLOCKED' : 'DONE';
+    const ax = await adobe.generateCaseDesign(env, caseData, fetchImpl, options.adobeOpts);
+    const st = await load(kv);
+    const v = st.drafts[postId].visual;
+    if (ax.status === 'CREATED') {
+      Object.assign(v, { image_generation_status: 'ADOBE_EXPRESS_CREATED', image_generation_error: null, adobe_express_project_id: ax.project_id, adobe_express_url: ax.url, adobe_express_thumbnail: ax.thumbnail });
+    } else {
+      Object.assign(v, { image_generation_status: ax.status === 'FAILED' ? 'ADOBE_EXPRESS_FAILED' : 'ADOBE_EXPRESS_NOT_CONFIGURED', image_generation_error: ax.error });
+    }
+    st.visuals[postId] = v;
+    await save(kv, st);
+    run.stages.visual = ax.status === 'CREATED' ? 'DONE' : (ax.status === 'FAILED' ? 'FAILED' : 'BLOCKED');
     await patch({
       stages: run.stages,
-      image_reference: vis.image_reference,
-      image_generation_status: vis.image_generation_status,
-      adobe_express_project_id: vis.adobe_express_project_id,
-      adobe_express_url: vis.adobe_express_url,
+      image_reference: ax.status === 'CREATED' ? (ax.thumbnail || ax.url) : vis.image_reference,
+      image_generation_status: v.image_generation_status,
+      adobe_express_project_id: v.adobe_express_project_id,
+      adobe_express_url: v.adobe_express_url,
+      error_details: ax.status === 'CREATED' ? run.error_details : `visual: ${ax.error}`,
     });
   }
 
@@ -1727,6 +1739,7 @@ async function finalizeRun(kv, runId) {
   const problems = [];
   if (!draft) problems.push('draft');
   if (run.stages.visual === 'BLOCKED') problems.push('visual (Adobe Express not configured)');
+  if (run.stages.visual === 'FAILED') problems.push('visual (Adobe Express API error)');
   if (run.telegram_status !== 'SENT') problems.push('telegram');
   if (run.persistence_status !== 'PERSISTED_IN_KV') problems.push('persistence');
 

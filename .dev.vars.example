@@ -3,3 +3,9 @@
 MCP_TOKEN=
 # VANI voice: Sarvam AI key from https://dashboard.sarvam.ai (₹100 free credits on sign-up, then paid per character).
 SARVAM_API_KEY=
+# Adobe Express API (beta) — Developer Console OAuth Server-to-Server credential + tagged template
+ADOBE_CLIENT_ID=
+ADOBE_CLIENT_SECRET=
+ADOBE_EXPRESS_TEMPLATE_ID=
+# optional: shared project URN so end users can open the variations; ADOBE_TAG_MAP='{"headline":"..."}'
+ADOBE_EXPRESS_PROJECT_ID=
