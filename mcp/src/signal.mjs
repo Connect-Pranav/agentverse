@@ -25,44 +25,6 @@ export const RESEARCH_AREAS = [
   { id: 'area_industry_trends', title: 'Industry trends and opportunities', pillarId: 'pillar_operator_ai' },
 ];
 
-export const CANVA_DESIGNS = {
-  case_1_kodak: {
-    designId: 'DAHbvV-AXys',
-    editUrl: 'https://canva.link/zpiisdcunqtdccu',
-    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
-    archetype: 'company_case_matrix',
-    title: 'Case #1: Eastman Kodak — Digital Strategy',
-  },
-  company_case_matrix: {
-    designId: 'DAHbvV-AXys',
-    editUrl: 'https://canva.link/zpiisdcunqtdccu',
-    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
-    archetype: 'company_case_matrix',
-    title: 'Case #1: Eastman Kodak — Digital Strategy',
-  },
-  revenue_leakage_matrix: {
-    designId: 'DAHbvV-AXys',
-    editUrl: 'https://canva.link/zpiisdcunqtdccu',
-    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
-    archetype: 'revenue_leakage_matrix',
-    title: 'Case #1: Eastman Kodak — Digital Strategy',
-  },
-  big_ipos_watchlist: {
-    designId: 'DAHbuJrihFk',
-    editUrl: 'https://canva.link/tjdg95eyudrlyid',
-    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
-    archetype: 'big_ipos_watchlist',
-    title: 'Big IPOs to Watch in India',
-  },
-  indian_startups_tier_list: {
-    designId: 'DAHbuHPscYY',
-    editUrl: 'https://canva.link/2j879erylbq4ctg',
-    exportUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
-    archetype: 'indian_startups_tier_list',
-    title: 'Indian Startups Tier List',
-  },
-};
-
 const KEY = 'signal/state';
 const MAX_DRAFTS = 90;
 const MAX_SOURCES = 150;
@@ -194,18 +156,8 @@ export async function load(kv) {
   s.latestDraftId = s.latestDraftId || null;
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };
   s.logs = s.logs || [];
-
-  // Auto-upgrade any legacy dark visual to the new vibrant high-contrast editorial matrix
-  for (const d of Object.values(s.drafts || {})) {
-    if (d?.visual && (!d.visual.svg || d.visual.svg.includes('aurora') || !d.visual.svg.includes('STAGE 1: BROKEN MOTION'))) {
-      d.visual.svg = getDefaultSvg(d.visual.headline, d.visual.subline);
-      d.visual.dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(d.visual.svg)}`;
-      if (s.visuals && s.visuals[d.id]) {
-        s.visuals[d.id].svg = d.visual.svg;
-        s.visuals[d.id].dataUri = d.visual.dataUri;
-      }
-    }
-  }
+  s.runs = s.runs || {};
+  s.latestRunId = s.latestRunId || null;
 
   return s;
 }
@@ -216,6 +168,10 @@ export async function save(kv, s) {
   if (Array.isArray(s.sources)) s.sources = s.sources.slice(0, MAX_SOURCES);
   if (Array.isArray(s.signals)) s.signals = s.signals.slice(0, 100);
   if (Array.isArray(s.history)) s.history = s.history.slice(-120);
+  if (s.runs) {
+    const keep = Object.values(s.runs).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 60);
+    s.runs = Object.fromEntries(keep.map((r) => [r.run_id, r]));
+  }
 
   // Keep latest drafts
   const draftList = Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -226,13 +182,24 @@ export async function save(kv, s) {
 }
 
 export async function resetSignalState(kv) {
+  // Back up the previous module state inside KV before wiping it.
+  let backupKey = null;
+  try {
+    const prev = await kv.get(KEY);
+    if (prev) {
+      backupKey = `signal/backup/${nowIso()}`;
+      await kv.put(backupKey, typeof prev === 'string' ? prev : JSON.stringify(prev));
+    }
+  } catch (e) {
+    console.error('[signal] reset backup failed:', e?.message);
+  }
   const cleanState = {
     positioning: PRANAV_POSITIONING,
     settings: {
       dailySchedule: '09:30 Asia/Kolkata',
       autoDraft: true,
       requireApproval: true,
-      publishMode: 'api',
+      publishMode: 'draft_only',
       visualStyle: 'business_editorial',
       accentColor: '#38BDF8',
     },
@@ -245,13 +212,15 @@ export async function resetSignalState(kv) {
     usedCaseNumbers: [],
     currentCycle: 1,
     latestDraftId: null,
+    runs: {},
+    latestRunId: null,
     metrics: { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 0 },
     logs: [
       {
         at: nowIso(),
         agent: 'System Guardian',
         message: 'LinkedIn module clean reset completed: all obsolete drafts, topic selections, and cache entries purged (NO_POST_GENERATED_YET).',
-        meta: { status: 'NO_POST_GENERATED_YET' },
+        meta: { status: 'NO_POST_GENERATED_YET', backupKey },
       },
     ],
     status: 'NO_POST_GENERATED_YET',
@@ -439,21 +408,19 @@ export function caseToSignal(c, today) {
   };
 }
 
-export async function selectDailyCase(kv, preferredCaseNumber = null) {
-  const s = await load(kv);
-  s.usedCaseNumbers = s.usedCaseNumbers || [];
+// Pure selection on an already-loaded state object. Mutates `s` only; the caller saves ONCE.
+// (Previously selectDailyCase() loaded/saved its own copy and rankDailySignal() then saved a stale copy
+// over it, so usedCaseNumbers was lost on every run and Case #1 was selected forever.)
+export function pickCase(s, preferredCaseNumber = null) {
+  s.usedCaseNumbers = Array.isArray(s.usedCaseNumbers) ? s.usedCaseNumbers.map(Number) : [];
   s.currentCycle = s.currentCycle || 1;
-
   let chosenCase = null;
   let isNewCycle = false;
 
-  if (preferredCaseNumber) {
-    const num = Number(preferredCaseNumber);
-    if (!isNaN(num) && num >= 1 && num <= 100) {
-      chosenCase = getCaseByNumber(num);
-    }
+  const num = Number(preferredCaseNumber);
+  if (preferredCaseNumber && Number.isInteger(num) && num >= 1 && num <= CASE_BANK.length) {
+    chosenCase = getCaseByNumber(num);
   }
-
   if (!chosenCase) {
     const next = getNextUnusedCase(s.usedCaseNumbers);
     chosenCase = next.caseData;
@@ -463,18 +430,17 @@ export async function selectDailyCase(kv, preferredCaseNumber = null) {
       s.usedCaseNumbers = [];
     }
   }
-
-  if (!chosenCase) {
-    chosenCase = getCaseByNumber(1);
-  }
-
-  if (!s.usedCaseNumbers.includes(chosenCase.caseNumber)) {
-    s.usedCaseNumbers.push(chosenCase.caseNumber);
-  }
-
-  logActivity(s, 'Case Bank Selector', `Selected Case #${chosenCase.caseNumber}: ${chosenCase.company} (${chosenCase.theme}). Cycle ${s.currentCycle}, Total Used: ${s.usedCaseNumbers.length}/100.`);
-  await save(kv, s);
+  if (!chosenCase) throw new SignalError(500, 'Case bank is empty or the selected case number is invalid.');
+  if (!s.usedCaseNumbers.includes(chosenCase.caseNumber)) s.usedCaseNumbers.push(chosenCase.caseNumber);
+  logActivity(s, 'Case Bank Selector', `Selected Case #${chosenCase.caseNumber}: ${chosenCase.company} (${chosenCase.theme}). Cycle ${s.currentCycle}, used ${s.usedCaseNumbers.length}/${CASE_BANK.length}.`);
   return { caseData: chosenCase, isNewCycle, cycle: s.currentCycle };
+}
+
+export async function selectDailyCase(kv, preferredCaseNumber = null) {
+  const s = await load(kv);
+  const r = pickCase(s, preferredCaseNumber);
+  await save(kv, s);
+  return r;
 }
 
 export async function scanGlobalAiMarket(kv, customCases = null) {
@@ -500,20 +466,16 @@ export async function scanGlobalAiMarket(kv, customCases = null) {
 // -------------------------------------------------------------
 export async function rankDailySignal(kv, preferredTopicId = null) {
   const s = await load(kv);
-  if (!s.sources.length) await scanGlobalAiMarket(kv);
-
   let preferredNum = null;
   if (preferredTopicId) {
     const parsed = parseInt(String(preferredTopicId).replace(/\D/g, ''), 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) preferredNum = parsed;
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= CASE_BANK.length) preferredNum = parsed;
   }
-
-  const { caseData } = await selectDailyCase(kv, preferredNum);
+  const { caseData } = pickCase(s, preferredNum);
   const sig = caseToSignal(caseData, todayDate());
   s.signals = [sig];
-
-  logActivity(s, 'Signal & Topic Strategist', `Selected #1 from Case Bank: "${sig.title}" (${sig.score} pts).`);
-  await save(kv, s);
+  logActivity(s, 'Signal & Topic Strategist', `Selected from Case Bank: "${sig.title}".`);
+  await save(kv, s); // single save: selection + usedCaseNumbers persist together
   return { topSignal: sig, rankedSignals: [sig] };
 }
 
@@ -1035,7 +997,7 @@ export function getDefaultSvg(headline = 'THE B2B REVENUE LEAKAGE MATRIX', subli
 
   <!-- Footer Branding -->
   <g transform="translate(60, 580)">
-    <text x="0" y="18" fill="#64748B" font-size="11" font-weight="600">PRANAV SIGNAL · EXECUTIVE REVOPS FRAMEWORK · CANVA DESIGN DAHbu0ThXSo · 1200 × 627 (1.91:1)</text>
+    <text x="0" y="18" fill="#64748B" font-size="11" font-weight="600">PRANAV SIGNAL · EXECUTIVE REVOPS FRAMEWORK · 1200 × 627 (1.91:1)</text>
     <text x="1080" y="18" fill="#00F0FF" font-size="11" font-weight="700" text-anchor="end">AGENTVERSE GROWTH STUDIO · POWERED BY MCP</text>
   </g>
 </svg>`;
@@ -1176,7 +1138,7 @@ export function getWatchlistSvg(headline = 'Big IPOs', subline = 'Major unlisted
   <g transform="translate(60, 545)">
     <rect x="0" y="0" width="260" height="32" rx="16" fill="rgba(16,185,129,0.15)" stroke="#10B981" stroke-width="1.2"/>
     <text x="24" y="21" fill="#10B981" font-size="13" font-weight="900">▲ +38% IPO PIPELINE MOMENTUM</text>
-    <text x="1080" y="22" fill="#94A3B8" font-size="11.5" font-weight="600" text-anchor="end">PRANAV SIGNAL · BSE &amp; SEBI FILINGS INTELLIGENCE · CANVA DESIGN DAHbuJrihFk</text>
+    <text x="1080" y="22" fill="#94A3B8" font-size="11.5" font-weight="600" text-anchor="end">PRANAV SIGNAL · BSE &amp; SEBI FILINGS INTELLIGENCE</text>
   </g>
 </svg>`;
 }
@@ -1369,7 +1331,7 @@ export function getTierListSvg(headline = 'Indian Startups Tier List', subline =
 
   <!-- Footer Branding -->
   <g transform="translate(60, 588)">
-    <text x="0" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">DATA BY: CRUSTDATA · HEADCOUNT GROWTH INTELLIGENCE · CANVA DESIGN DAHbuHPscYY</text>
+    <text x="0" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">DATA BY: CRUSTDATA · HEADCOUNT GROWTH INTELLIGENCE</text>
     <text x="1080" y="16" fill="#00F0FF" font-size="11.5" font-weight="700" text-anchor="end">AGENTVERSE · LINKEDIN_POST_GENERATOR · 1200 × 627 (1.91:1)</text>
   </g>
 </svg>`;
@@ -1485,7 +1447,7 @@ export function getCompanyCaseSvg(caseData) {
 
   <!-- Footer Branding -->
   <g transform="translate(60, 588)">
-    <text x="0" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">100 BUSINESS PROBLEMS CASE BANK · CASE #${caseNum} · CANVA DESIGN DAHbvV-AXys</text>
+    <text x="0" y="16" fill="#94A3B8" font-size="11.5" font-weight="600">100 BUSINESS PROBLEMS CASE BANK · CASE #${caseNum}</text>
     <text x="1080" y="16" fill="#00F0FF" font-size="11.5" font-weight="700" text-anchor="end">AGENTVERSE · LINKEDIN_POST_GENERATOR · 1200 × 627 (1.91:1)</text>
   </g>
 </svg>`;
@@ -1509,22 +1471,14 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
   let headline = '';
   let subline = '';
   let svgVisual = '';
-  let canvaMeta = CANVA_DESIGNS[archetype] || CANVA_DESIGNS.case_1_kodak || CANVA_DESIGNS.company_case_matrix;
 
   const caseData = (draft.caseNumber || draft.case_number) ? getCaseByNumber(draft.caseNumber || draft.case_number) : null;
 
-  if (archetype === 'revenue_leakage_matrix') {
-    headline = 'THE CRM DATA INTEGRITY MATRIX';
-    subline = 'Why 60% of Pipeline Forecasts Fail and How Operators Fix It';
-    svgVisual = getDefaultSvg(headline, subline);
-    canvaMeta = CANVA_DESIGNS.case_1_kodak;
-  } else if (caseData || archetype === 'company_case_matrix') {
-    const cd = caseData || getCaseByNumber(1);
+  if (caseData) {
     archetype = 'company_case_matrix';
-    headline = cd.company.toUpperCase();
-    subline = `${cd.theme} · ${cd.period} · ${cd.industry}`;
-    svgVisual = getCompanyCaseSvg(cd);
-    canvaMeta = CANVA_DESIGNS.case_1_kodak;
+    headline = caseData.company.toUpperCase();
+    subline = `${caseData.theme} · ${caseData.period} · ${caseData.industry}`;
+    svgVisual = getCompanyCaseSvg(caseData);
   } else if (archetype === 'big_ipos_watchlist') {
     headline = 'Big IPOs';
     subline = 'Major unlisted companies in the IPO pipeline · Valuation, Sector & SEBI Status';
@@ -1539,6 +1493,8 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
     svgVisual = getDefaultSvg(headline, subline);
   }
 
+  // Adobe Express is the intended design tool. No Adobe Express API/MCP/connector exists in this
+  // Worker, so nothing is claimed here: the IDs stay null and the status says exactly why.
   const visual = {
     id: `vis_${id}`,
     draftId: id,
@@ -1548,9 +1504,11 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
     archetype,
     headline,
     subline,
-    canvaDesignId: canvaMeta.designId,
-    canvaEditUrl: canvaMeta.editUrl,
-    canvaExportUrl: canvaMeta.exportUrl,
+    image_generation_status: 'ADOBE_EXPRESS_NOT_CONFIGURED',
+    image_generation_error: 'No Adobe Express integration (API, MCP or connected account) is configured for this Worker. Local SVG preview rendered from the selected case only; no Adobe Express design was created.',
+    adobe_express_project_id: null,
+    adobe_express_url: null,
+    image_reference: `/api/signal/visual?post_id=${encodeURIComponent(id)}`,
     svg: svgVisual,
     dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(svgVisual)}`,
     createdAt: nowIso(),
@@ -1558,7 +1516,7 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
 
   draft.visual = visual;
   s.visuals[id] = visual;
-  logActivity(s, 'Visual Creative Agent', `Generated 1200x627 visual asset (${archetype}, Canva ID: ${canvaMeta.designId}) for draft "${id}".`);
+  logActivity(s, 'Visual Creative Agent', `Rendered local 1200x627 preview (${archetype}) for draft "${id}". Adobe Express: ${visual.image_generation_status}.`);
   await save(kv, s);
   return visual;
 }
@@ -1588,7 +1546,7 @@ export async function checkPostQuality(kv, draftId = null) {
     characterCount,
     isWordCountOptimal: wordCount >= 140 && wordCount <= 265,
     visualAttached: Boolean(draft.visual),
-    canvaConnected: Boolean(draft.visual?.canvaEditUrl),
+    adobeExpressConnected: Boolean(draft.visual?.adobe_express_url),
     scores: {
       originality: 98,
       factuality: 99,
@@ -1614,162 +1572,179 @@ export async function checkPostQuality(kv, draftId = null) {
 // -------------------------------------------------------------
 // 11. Master Automation Pipeline: Linkedin_Post_Generator
 // -------------------------------------------------------------
+const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function newRunRecord(caseData, postId) {
+  return {
+    run_id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    post_id: postId,
+    case_number: caseData.caseNumber,
+    company: caseData.company,
+    theme: caseData.theme,
+    business_problem: caseData.documentedProblem,
+    source_url: caseData.sourceUrl,
+    draft: null,
+    image_reference: null,
+    adobe_express_project_id: null,
+    adobe_express_url: null,
+    image_generation_status: 'PENDING',
+    created_at: nowIso(),
+    generation_status: 'IN_PROGRESS',
+    persistence_status: 'PENDING',
+    telegram_status: 'PENDING',
+    dashboard_status: 'PENDING',
+    error_details: null,
+    stages: {},
+  };
+}
+
+// Linkedin_Post_Generator: one Excel/CSV case per day -> draft -> visual -> persist -> Telegram.
+// Idempotent per post_id: re-running the same day RESUMES the stored run (same run_id / post_id /
+// case_number) and only repeats stages that have not completed. Pass { new_case: true } or { topic_id }
+// to deliberately start a different run.
 export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl = fetch) {
-  // Step 1: Scan market & ledger candidate topics
-  await scanGlobalAiMarket(kv);
+  const today = todayDate();
+  const postId = options.draftId || `post_${today}`;
+  let s = await load(kv);
 
-  // Step 2: Topic Discovery & Multi-factor scoring
-  const { topSignal, rankedSignals } = await rankDailySignal(kv, options.topic_id || options.topicId);
-  const chosenTopic = topSignal;
+  const wantNew = Boolean(options.new_case || options.newCase || options.topic_id || options.topicId);
+  let run = s.latestRunId ? s.runs[s.latestRunId] : null;
+  const resume = run && run.post_id === postId && !wantNew;
 
-  // Step 3: STAR / SBI Framework Analysis & Operator Take
-  const pov = await generatePranavPov(kv, chosenTopic.id);
+  // ---- Stage 1: case selection (persisted immediately, fixed for any retry)
+  if (!resume) {
+    const preferred = options.topic_id || options.topicId || options.case_number || null;
+    const num = preferred ? parseInt(String(preferred).replace(/\D/g, ''), 10) : null;
+    const { caseData } = pickCase(s, Number.isInteger(num) ? num : null);
+    run = newRunRecord(caseData, postId);
+    run.stages.case_selection = 'DONE';
+    s.runs[run.run_id] = run;
+    s.latestRunId = run.run_id;
+    s.signals = [caseToSignal(caseData, today)];
+    delete s.drafts[postId]; // never mix an older draft with the new case
+    await save(kv, s);
+  }
+  const caseData = getCaseByNumber(run.case_number);
+  const patch = async (fields) => {
+    const st = await load(kv);
+    Object.assign(st.runs[run.run_id], fields);
+    await save(kv, st);
+    run = st.runs[run.run_id];
+  };
 
-  // Step 4: Personal LinkedIn Post Generator (150–250 words, 7-part structure)
-  const draft = await draftLinkedInPost(kv, chosenTopic.id, { force: options.force });
-
-  // Step 5: Canva Design Agent & Visual Asset Creation (Matrix, Watchlist, or Tier List)
-  const chosenArchetype = options.archetype || chosenTopic.archetype || draft.archetype || 'big_ipos_watchlist';
-  const visual = await createLinkedInVisual(kv, draft.id, chosenArchetype);
-
-  // Step 6: Fact-Check & Brand Guardian Quality Verification
-  const quality = await checkPostQuality(kv, draft.id);
-
-  // Step 7: Work Board & Telegram Approval Submission
-  const approvalRes = await submitForApproval(kv, env, draft.id, fetchImpl);
-
-  // Step 8: Personal LinkedIn Publishing Evaluation
-  const pubRes = await publishLinkedInPost(kv, env, draft.id, options, fetchImpl);
-
-  // Step 9: History and Performance Tracking
-  const perf = await getPostPerformance(kv, draft.id);
-
-  // Step 10: Deliver Telegram notification via @VaniPro_Bot
-  const photoUrl = 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg';
-  const tgCaption = `⚡ <b>Linkedin_Post_Generator — Content Ready for Approval!</b>\n\n` +
-    `🎯 <b>Topic:</b> ${chosenTopic.title}\n` +
-    `🔬 <b>Research:</b> ${chosenTopic.researchArea} (${chosenTopic.score}/100)\n` +
-    `📐 <b>Framework:</b> ${pov.framework} Analysis\n` +
-    `📝 <b>Post (${draft.wordCount} words):</b>\n${draft.hook.split('\n')[0]}\n\n` +
-    `🎨 <b>Canva Editable Link:</b> <a href="${visual.canvaEditUrl}">${visual.canvaEditUrl}</a>\n` +
-    `🖼 <b>High-Res Asset:</b> <a href="${photoUrl}">1200x627 JPEG</a>\n` +
-    `📊 <b>Publishing:</b> ${pubRes.mode === 'api' ? 'Published to LinkedIn' : 'Ready for 1-Click Publishing (Waiting Approval)'}`;
-
+  // ---- Stage 2: draft
   try {
-    const photoSent = await telegram.sendTelegramPhoto(env, photoUrl, tgCaption, null, fetchImpl);
-    if (!photoSent) {
-      await telegram.sendTelegramMessage(env, tgCaption, null, fetchImpl);
+    if (run.stages.draft !== 'DONE') {
+      const st = await load(kv);
+      if (!st.signals.some((x) => x.caseNumber === run.case_number)) {
+        st.signals = [caseToSignal(caseData, today)];
+        await save(kv, st);
+      }
+      await draftLinkedInPost(kv, `case_${run.case_number}`, { force: true, draftId: postId });
+      run.stages.draft = 'DONE';
+      await patch({ stages: run.stages });
     }
   } catch (e) {
-    console.error('[signal] Telegram notification error:', e?.message);
+    run.stages.draft = 'FAILED';
+    await patch({ stages: run.stages, generation_status: 'FAILED_AT_DRAFT', error_details: `draft: ${e.message}` });
+    return finalizeRun(kv, run.run_id);
   }
 
-  const freshState = await load(kv);
-  logActivity(freshState, 'Linkedin_Post_Generator', `Completed pipeline execution for "${draft.id}". Quality: ${quality.overallScore}/100.`);
-  await save(kv, freshState);
+  // ---- Stage 3: visual (Adobe Express — reports its real status, never silently falls back to Canva)
+  if (run.stages.visual !== 'DONE') {
+    const vis = await createLinkedInVisual(kv, postId, 'company_case_matrix');
+    run.stages.visual = vis.image_generation_status === 'ADOBE_EXPRESS_NOT_CONFIGURED' ? 'BLOCKED' : 'DONE';
+    await patch({
+      stages: run.stages,
+      image_reference: vis.image_reference,
+      image_generation_status: vis.image_generation_status,
+      adobe_express_project_id: vis.adobe_express_project_id,
+      adobe_express_url: vis.adobe_express_url,
+    });
+  }
 
-  const cd = draft.caseNumber ? getCaseByNumber(draft.caseNumber) : (chosenTopic.caseNumber ? getCaseByNumber(chosenTopic.caseNumber) : null);
-  const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  // ---- Stage 4: quality check + approval queue (NO auto-publish: approval comes from Telegram/dashboard)
+  if (run.stages.approval_queue !== 'DONE') {
+    await checkPostQuality(kv, postId);
+    await submitForApproval(kv, env, postId, fetchImpl, { skipTelegram: true });
+    run.stages.approval_queue = 'DONE';
+    await patch({ stages: run.stages });
+  }
 
-  return {
-    run_id: runId,
-    post_id: draft.id,
-    case_number: draft.case_number || (cd ? cd.caseNumber : 1),
-    company: draft.company || (cd ? cd.company : 'Eastman Kodak'),
-    theme: draft.theme || (cd ? cd.theme : 'Digital strategy'),
-    documented_business_problem: draft.documented_business_problem || (cd ? cd.documentedProblem : ''),
-    source_url: draft.source_url || (cd ? cd.sourceUrl : ''),
-    draft: {
-      hook: draft.hook,
-      body: draft.body,
-      word_count: draft.wordCount,
-      character_count: draft.characterCount,
-    },
-    image_reference: visual.endpoint || '/api/signal/visual.jpg',
-    canva_design_id: visual.canvaDesignId,
-    canva_url: visual.canvaEditUrl,
-    created_at: draft.createdAt,
-    generation_status: 'SUCCESS',
-    persistence_status: 'PERSISTED_IN_KV',
-    telegram_status: 'SENT_TO_TELEGRAM',
-    dashboard_status: 'VISIBLE_ON_DASHBOARD',
-    error_details: null,
+  // ---- Stage 5: persistence verified by read-back
+  {
+    const st = await load(kv);
+    const d = st.drafts[postId];
+    const ok = Boolean(d && d.body && d.case_number === run.case_number);
+    await patch({
+      draft: ok ? { hook: d.hook, body: d.body, word_count: d.wordCount, character_count: d.characterCount } : null,
+      persistence_status: ok ? 'PERSISTED_IN_KV' : 'FAILED_READBACK',
+      error_details: ok ? run.error_details : `persistence: draft "${postId}" not found after save`,
+    });
+    if (!ok) return finalizeRun(kv, run.run_id);
+  }
 
-    pipeline: PIPELINE_NAME,
-    item1_topicSelected: {
-      title: chosenTopic.title,
-      domain: chosenTopic.domain,
-      researchArea: chosenTopic.researchArea,
-      pillarId: chosenTopic.pillarId,
-    },
-    item2_selectionReason: {
-      totalScore: chosenTopic.score,
-      breakdown: chosenTopic.scores,
-      whyChosen: chosenTopic.whyChosen,
-    },
-    item3_verifiedResearch: {
-      verifiedFacts: chosenTopic.research?.verifiedFacts || [],
-      analysis: chosenTopic.research?.analysis || '',
-      assumptions: chosenTopic.research?.assumptions || '',
-      sourceUrls: chosenTopic.research?.sourceUrls || [],
-    },
-    item4_frameworkAnalysis: {
-      type: pov.framework,
-      data: pov.frameworkData,
-    },
-    item5_personalTake: {
-      operatorPOV: pov.operatorPerspective,
-      operatorTake: pov.operatorTake,
-      credentials: 'IndiaMART · Justdial · Magicbricks · magicpin Commercial Operations Experience',
-    },
-    item6_finalLinkedInPost: {
-      id: draft.id,
-      hook: draft.hook,
-      body: draft.body,
-      wordCount: draft.wordCount,
-      characterCount: draft.characterCount,
-      structureValidation: '10-Step Post Builder (Hook, Context, Problem, Analysis, Change, Fixes, Lesson, Question, Hashtags)',
-    },
-    item7_canvaDesignPreview: {
-      archetype: visual.archetype,
-      headline: visual.headline,
-      subline: visual.subline,
-      dimensions: '1200 × 627 (1.91:1 Landscape)',
-      svgPreviewAvailable: Boolean(visual.svg),
-    },
-    item8_exportedAsset: {
-      format: 'JPEG (1200x627 high-res)',
-      endpoint: '/api/signal/visual.jpg',
-      localAssetPath: 'data/canva-case-1-kodak.jpg',
-      publicDownloadUrl: 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg',
-    },
-    item9_canvaEditableLink: {
-      canvaDesignId: visual.canvaDesignId,
-      canvaEditUrl: visual.canvaEditUrl,
-    },
-    item10_publishingResult: {
-      status: pubRes.mode === 'api' ? 'published' : 'waiting_owner_approval',
-      mode: pubRes.mode,
-      queueState: 'Synced with AgentVerse Work Board & @VaniPro_Bot',
-    },
-    item11_linkedInPostUrl: {
-      url: pubRes.url || null,
-      limitationNotice: pubRes.mode === 'api'
-        ? null
-        : 'LinkedIn OAuth redirect URI is pending registration (https://agentverse.aistudio09.workers.dev/api/signal/auth/callback). The post and Canva visual are delivered to your Telegram approval queue and 1-click clipboard publish.',
-    },
-    item12_telegramNotificationResult: {
-      sentTo: '@VaniPro_Bot / Telegram Owner Chat',
-      delivered: true,
-      approvalButtons: '1-Click Inline Approve / Reject',
-    },
-  };
+  // ---- Stage 6: Telegram — exact persisted post, sent once per run
+  if (run.telegram_status !== 'SENT') {
+    const st = await load(kv);
+    const d = st.drafts[postId];
+    const header = `⚡ <b>Linkedin_Post_Generator — Approval Request</b>\n` +
+      `🏢 <b>${escHtml(run.company)}</b> · Case #${run.case_number} (${escHtml(run.theme)})\n` +
+      `❓ <b>Business problem:</b> ${escHtml(run.business_problem)}\n` +
+      `🔗 <b>Source:</b> ${escHtml(run.source_url)}\n` +
+      `🎨 <b>Adobe Express:</b> ${run.adobe_express_url ? escHtml(run.adobe_express_url) : escHtml(run.image_generation_status)}\n` +
+      `🆔 post_id <code>${escHtml(run.post_id)}</code> · run_id <code>${escHtml(run.run_id)}</code>\n\n` +
+      `<b>Draft:</b>\n`;
+    const footer = `\n\nApprove or reject below.`;
+    const kb = { inline_keyboard: [[{ text: '✅ Approve', callback_data: `app:work:sig_${postId}` }, { text: '❌ Reject', callback_data: `rej:work:sig_${postId}` }]] };
+    const post = escHtml(d.body);
+    let sent = false;
+    try {
+      if ((header + post + footer).length <= 4000) {
+        sent = await telegram.sendTelegramMessage(env, header + post + footer, kb, fetchImpl);
+      } else {
+        sent = await telegram.sendTelegramMessage(env, header, null, fetchImpl);
+        sent = sent && await telegram.sendTelegramMessage(env, post + footer, kb, fetchImpl);
+      }
+    } catch (e) {
+      console.error('[signal] Telegram error:', e?.message);
+    }
+    run.stages.telegram = sent ? 'DONE' : 'FAILED';
+    await patch({
+      stages: run.stages,
+      telegram_status: sent ? 'SENT' : 'FAILED',
+      error_details: sent ? run.error_details : 'telegram: message not delivered (bot token/chat id missing or Telegram API rejected it). The saved post is unaffected; re-run to retry only this stage.',
+    });
+  }
+  return finalizeRun(kv, run.run_id);
+}
+
+// Derives the final statuses from stage results and returns the persisted record (single source of truth).
+async function finalizeRun(kv, runId) {
+  const s = await load(kv);
+  const run = s.runs[runId];
+  const draft = s.drafts[run.post_id] || null;
+  const problems = [];
+  if (!draft) problems.push('draft');
+  if (run.stages.visual === 'BLOCKED') problems.push('visual (Adobe Express not configured)');
+  if (run.telegram_status !== 'SENT') problems.push('telegram');
+  if (run.persistence_status !== 'PERSISTED_IN_KV') problems.push('persistence');
+
+  if (run.generation_status !== 'FAILED_AT_DRAFT') {
+    run.generation_status = problems.length === 0 ? 'SUCCESS' : (draft ? 'PARTIAL' : 'FAILED');
+  }
+  run.dashboard_status = draft && run.persistence_status === 'PERSISTED_IN_KV' ? 'SERVED_FROM_PERSISTED_RECORD' : 'NOT_AVAILABLE';
+  if (problems.length && !run.error_details) run.error_details = `incomplete stages: ${problems.join(', ')}`;
+  s.runs[runId] = run;
+  logActivity(s, 'Linkedin_Post_Generator', `Run ${runId} (${run.post_id}, Case #${run.case_number} ${run.company}) → ${run.generation_status}. Telegram: ${run.telegram_status}. Visual: ${run.image_generation_status}.`);
+  await save(kv, s);
+  return { ...run, draft_full: draft };
 }
 
 // -------------------------------------------------------------
 // 9. Submit for Approval (AgentVerse Work Board & Telegram Bot)
 // -------------------------------------------------------------
-export async function submitForApproval(kv, env, draftId = null, fetchImpl = fetch) {
+export async function submitForApproval(kv, env, draftId = null, fetchImpl = fetch, opts = {}) {
   const s = await load(kv);
   const id = draftId || `post_${todayDate()}`;
   const draft = s.drafts[id];
@@ -1795,14 +1770,15 @@ export async function submitForApproval(kv, env, draftId = null, fetchImpl = fet
         body: draft.body,
         status: 'waiting',
         needs_approval: true,
+        no_notify: Boolean(opts.skipTelegram), // the pipeline sends the full persisted post itself
         url: draft.visual?.dataUri || undefined,
         ts: Date.now(),
       },
     ],
   }, fetchImpl);
 
-  // Send real-time Telegram alert to @VaniPro_Bot with 1-click Approve / Reject buttons
-  try {
+  // Telegram alert (skipped when the pipeline sends the full persisted post itself)
+  if (!opts.skipTelegram) try {
     await telegram.notifyApproval(env, {
       id: `sig_${id}`,
       type: 'work',
@@ -2010,7 +1986,8 @@ export async function readResource(kv, uri) {
 // -------------------------------------------------------------
 export function ownerView(s) {
   const today = todayDate();
-  const currentDraft = (s.latestDraftId && s.drafts[s.latestDraftId]) || s.drafts[`post_${today}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+  const latestRun = (s.latestRunId && s.runs && s.runs[s.latestRunId]) || null;
+  const currentDraft = latestRun ? (s.drafts[latestRun.post_id] || null) : null;
 
   return {
     module: 'PRANAV SIGNAL — LinkedIn Growth Studio',
@@ -2028,6 +2005,7 @@ export function ownerView(s) {
     benchmarks: s.benchmarks || [],
     sourcesCount: (s.sources || []).length,
     sources: (s.sources || []).slice(0, 15),
+    run: latestRun,
     signals: s.signals || [],
     history: (s.history || []).slice(0, 20),
     metrics: s.metrics || {},

@@ -221,7 +221,10 @@ test('PRANAV SIGNAL: REST endpoints /api/signal and decision flow', async () => 
   assert.equal(runRes.status, 200);
   const runData = await runRes.json();
   assert.equal(runData.ok, true);
-  assert.equal(runData.status, 'waiting_approval');
+  // Adobe Express is not configured in this Worker, so the honest status is PARTIAL (never SUCCESS).
+  assert.equal(runData.status, 'PARTIAL');
+  assert.equal(runData.run.case_number, 1);
+  assert.equal(runData.run.image_generation_status, 'ADOBE_EXPRESS_NOT_CONFIGURED');
 
   // POST /api/signal/decide approve
   const decRes = await worker.fetch(new Request(BASE + '/api/signal/decide', {
@@ -243,15 +246,12 @@ test('PRANAV SIGNAL: Public endpoints for UI visual, draft state, and OAuth call
   const draftJson = await draftRes.json();
   assert.equal(draftJson.ok, true);
   assert.ok(draftJson.state);
-  assert.ok(draftJson.state.benchmarks.length > 0);
+  assert.equal(draftJson.state.status, 'NO_POST_GENERATED_YET');
+  assert.equal(draftJson.state.draft.body, '');
 
-  // Public GET /api/signal/visual returns SVG directly
+  // With no run there is no visual: no generic mock image is served
   const visRes = await worker.fetch(new Request(BASE + '/api/signal/visual', { method: 'GET' }), env);
-  assert.equal(visRes.status, 200);
-  assert.match(visRes.headers.get('content-type'), /image\/svg\+xml/);
-  const svgText = await visRes.text();
-  assert.ok(svgText.includes('<svg'));
-  assert.ok(svgText.includes('PRANAV KUMAR'));
+  assert.equal(visRes.status, 404);
 
   // Public GET /api/signal/visual.jpg returns binary JPEG
   const jpgRes = await worker.fetch(new Request(BASE + '/api/signal/visual.jpg', { method: 'GET' }), env);
@@ -281,74 +281,130 @@ test('PRANAV SIGNAL: Public endpoints for UI visual, draft state, and OAuth call
   assert.ok(cbHtml.includes('LinkedIn Authorization Code Received'));
 });
 
-test('Linkedin_Post_Generator: Full automated pipeline delivers all 12 acceptance criteria', async () => {
+
+// ---- Linkedin_Post_Generator: case-bank engine, persistence, Telegram, Adobe Express (mocked fetch) ----
+function tgStub() {
+  const sent = [];
+  const f = async (url, init) => {
+    if (String(url).includes('api.telegram.org')) {
+      sent.push(JSON.parse(init.body));
+      return { ok: true, json: async () => ({ ok: true }) };
+    }
+    return { ok: false, text: async () => 'unexpected network call', json: async () => ({}) };
+  };
+  return { sent, f };
+}
+const envFor = () => ({ TELEGRAM_BOT_TOKEN: '1:x', TELEGRAM_CHAT_ID: '42', MCP_TOKEN: 't' });
+
+test('case selection: consecutive new runs pick Case #1, #2, #3 and persist usedCaseNumbers', async () => {
+  const kv = memKv();
+  const { f } = tgStub();
+  const got = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await signal.runLinkedinPostGenerator(kv, envFor(), { new_case: true }, f);
+    got.push(r.case_number);
+  }
+  assert.deepEqual(got, [1, 2, 3]);
+  const s = await signal.load(kv);
+  assert.deepEqual(s.usedCaseNumbers, [1, 2, 3]);
+});
+
+test('retry on the same day resumes the SAME run/case and does not re-send Telegram', async () => {
+  const kv = memKv();
+  const { sent, f } = tgStub();
+  const a = await signal.runLinkedinPostGenerator(kv, envFor(), {}, f);
+  const afterFirst = sent.length;
+  const b = await signal.runLinkedinPostGenerator(kv, envFor(), {}, f);
+  assert.equal(b.run_id, a.run_id);
+  assert.equal(b.post_id, a.post_id);
+  assert.equal(b.case_number, a.case_number);
+  assert.equal(sent.length, afterFirst, 'a resumed run must not send Telegram again');
+  assert.equal(sent.filter((m) => m.reply_markup).length, 1, 'exactly one approval message (with buttons) per run');
+  assert.equal((await signal.load(kv)).usedCaseNumbers.length, 1);
+});
+
+test('Telegram receives the exact persisted post; no Canva anywhere; Adobe Express status is honest', async () => {
+  const kv = memKv();
+  const { sent, f } = tgStub();
+  const r = await signal.runLinkedinPostGenerator(kv, envFor(), {}, f);
+  const s = await signal.load(kv);
+  const d = s.drafts[r.post_id];
+
+  assert.equal(r.persistence_status, 'PERSISTED_IN_KV');
+  assert.equal(r.telegram_status, 'SENT');
+  assert.equal(r.case_number, d.case_number);
+  assert.equal(r.company, 'Eastman Kodak');
+  assert.ok(d.body.includes('Eastman Kodak'));
+
+  const decode = (h) => h.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const tg = decode(sent.map((m) => m.text).join('\n'));
+  assert.ok(tg.includes(d.body), 'Telegram text must contain the exact saved draft body');
+  assert.ok(tg.includes(r.post_id) && tg.includes(r.run_id) && tg.includes(r.source_url));
+  assert.ok(sent[sent.length - 1].reply_markup.inline_keyboard[0][0].callback_data.startsWith('app:work:sig_'));
+
+  // Adobe Express: nothing invented
+  assert.equal(r.adobe_express_project_id, null);
+  assert.equal(r.adobe_express_url, null);
+  assert.equal(r.image_generation_status, 'ADOBE_EXPRESS_NOT_CONFIGURED');
+  assert.equal(r.generation_status, 'PARTIAL');
+  assert.ok(!/canva/i.test(JSON.stringify(s.drafts[r.post_id].visual)));
+  assert.ok(!/canva/i.test(d.visual.svg));
+});
+
+test('Telegram failure keeps the saved post and is reported; retry sends only the Telegram stage', async () => {
+  const kv = memKv();
+  const bad = async () => ({ ok: false, json: async () => ({}), text: async () => 'down' });
+  const r1 = await signal.runLinkedinPostGenerator(kv, envFor(), {}, bad);
+  assert.equal(r1.telegram_status, 'FAILED');
+  assert.equal(r1.persistence_status, 'PERSISTED_IN_KV');
+  assert.ok((await signal.load(kv)).drafts[r1.post_id].body.length > 100);
+
+  const { sent, f } = tgStub();
+  const r2 = await signal.runLinkedinPostGenerator(kv, envFor(), {}, f);
+  assert.equal(r2.run_id, r1.run_id);
+  assert.equal(r2.telegram_status, 'SENT');
+  assert.ok(sent.length >= 1);
+});
+
+test('dashboard endpoint serves the exact persisted record (and the case visual, not a generic one)', async () => {
   const env = mockEnv();
-  const res = await worker.fetch(new Request(BASE + '/mcp', {
-    method: 'POST',
-    headers: H_AUTH,
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 101,
-      method: 'tools/call',
-      params: {
-        name: 'linkedin_post_generator_run',
-        arguments: {
-          topic_id: 'prob_11',
-          archetype: 'revenue_leakage_matrix',
-          force: true,
-        },
-      },
-    }),
-  }), env);
+  const realFetch = globalThis.fetch;
+  const { f } = tgStub();
+  globalThis.fetch = f;
+  try {
+    const run = await worker.fetch(new Request(BASE + '/api/signal/run', { method: 'POST', headers: H_AUTH, body: '{}' }), env);
+    const runJson = await run.json();
+    const dash = await (await worker.fetch(new Request(BASE + '/api/signal/draft'), env)).json();
+    const s = await signal.load(env.MEDIA);
+    const saved = s.drafts[runJson.run.post_id];
+    assert.equal(dash.state.draft.body, saved.body);
+    assert.equal(dash.state.case_number, 1);
+    assert.equal(dash.state.run.run_id, runJson.run.run_id);
+    assert.equal(dash.state.visual.adobe_express_url, null);
+    assert.ok(dash.state.visual.svg.includes('EASTMAN KODAK') || dash.state.visual.svg.includes('Eastman Kodak'));
+    // load() must not overwrite the case visual with the generic matrix on later reads
+    const again = await signal.load(env.MEDIA);
+    assert.equal(again.drafts[runJson.run.post_id].visual.svg, saved.visual.svg);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
 
-  assert.equal(res.status, 200);
-  const jsonRes = await res.json();
-  assert.ok(jsonRes.result);
-  const out = jsonRes.result.structuredContent || jsonRes.result;
+test('clean reset backs up state, clears used cases and shows NO_POST_GENERATED_YET', async () => {
+  const kv = memKv();
+  const { f } = tgStub();
+  await signal.runLinkedinPostGenerator(kv, envFor(), {}, f);
+  const clean = await signal.resetSignalState(kv);
+  assert.equal(clean.status, 'NO_POST_GENERATED_YET');
+  assert.deepEqual(clean.usedCaseNumbers, []);
+  assert.deepEqual(clean.drafts, {});
+  assert.equal(clean.latestRunId, null);
+  assert.equal(clean.settings.publishMode, 'draft_only');
+});
 
-  assert.equal(out.pipeline, 'Linkedin_Post_Generator');
-
-  // Item 1: Topic Selected from 100 Business Problems Library
-  assert.ok(out.item1_topicSelected.title.includes('low-quality leads') || out.item1_topicSelected.title.length > 5);
-  assert.ok(out.item1_topicSelected.researchArea.includes('Sales') || out.item1_topicSelected.researchArea.length > 0);
-
-  // Item 2: Selection Reason
-  assert.ok(out.item2_selectionReason.totalScore >= 80);
-  assert.ok(out.item2_selectionReason.breakdown.commercial >= 90);
-
-  // Item 3: Verified Research
-  assert.ok(out.item3_verifiedResearch.verifiedFacts.length >= 2);
-  assert.ok(out.item3_verifiedResearch.sourceUrls.length >= 1);
-
-  // Item 4: Framework Analysis (STAR or SBI)
-  assert.ok(['STAR', 'SBI'].includes(out.item4_frameworkAnalysis.type));
-  assert.ok(out.item4_frameworkAnalysis.data);
-
-  // Item 5: Personal Take (Operator Lens)
-  assert.ok(out.item5_personalTake.operatorTake.length > 50);
-  assert.ok(out.item5_personalTake.credentials.includes('IndiaMART'));
-
-  // Item 6: Final LinkedIn Post (150-250 words, 7-part structure)
-  assert.ok(out.item6_finalLinkedInPost.wordCount >= 140 && out.item6_finalLinkedInPost.wordCount <= 265, `Word count: ${out.item6_finalLinkedInPost.wordCount}`);
-  assert.ok(out.item6_finalLinkedInPost.body.includes('#'));
-  assert.ok(out.item6_finalLinkedInPost.hook.length > 20);
-
-  // Item 7: Canva Design Preview (Archetype)
-  assert.equal(out.item7_canvaDesignPreview.archetype, 'revenue_leakage_matrix');
-  assert.equal(out.item7_canvaDesignPreview.svgPreviewAvailable, true);
-
-  // Item 8: Exported Asset
-  assert.equal(out.item8_exportedAsset.endpoint, '/api/signal/visual.jpg');
-
-  // Item 9: Canva Editable Link
-  assert.ok(out.item9_canvaEditableLink.canvaEditUrl.includes('canva.link'));
-
-  // Item 10: Publishing Result
-  assert.ok(out.item10_publishingResult.status);
-
-  // Item 11: LinkedIn Post URL / Limitation Notice
-  assert.ok(out.item11_linkedInPostUrl.limitationNotice || out.item11_linkedInPostUrl.url);
-
-  // Item 12: Telegram Notification Result
-  assert.equal(out.item12_telegramNotificationResult.delivered, true);
+test('case bank: 100 cases, numbered 1..100, each with a source URL', async () => {
+  const { CASE_BANK } = await import('../src/case_bank.mjs');
+  assert.equal(CASE_BANK.length, 100);
+  assert.deepEqual(CASE_BANK.map((c) => c.caseNumber), Array.from({ length: 100 }, (_, i) => i + 1));
+  assert.ok(CASE_BANK.every((c) => /^https?:\/\//.test(c.sourceUrl) && c.company && c.documentedProblem));
 });

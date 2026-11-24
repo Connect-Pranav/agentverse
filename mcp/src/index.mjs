@@ -841,8 +841,7 @@ async function route(request, env) {
         if (action === 'send_latest_signal') {
           try {
             const s = await signal.load(kv(env));
-            const keys = Object.keys(s.drafts || {});
-            const latestId = keys.sort().pop();
+            const latestId = (s.latestRunId && s.runs[s.latestRunId]?.post_id) || null;
             if (latestId && s.drafts[latestId]) {
               const d = s.drafts[latestId];
               await telegram.notifyApproval(env, {
@@ -940,9 +939,10 @@ async function route(request, env) {
     if (seg[2] === 'visual' && (method === 'GET' || method === 'HEAD')) {
       const s = await signal.load(k);
       const dateParam = url.searchParams.get('date');
-      const draftId = dateParam ? `post_${dateParam}` : null;
+      const draftId = url.searchParams.get('post_id') || (dateParam ? `post_${dateParam}` : null);
       const d = (draftId && s.drafts[draftId]) || s.drafts[`post_${signal.todayDate()}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
-      const svg = d?.visual?.svg || signal.getDefaultSvg(d?.visual?.headline, d?.visual?.subline);
+      if (!d?.visual?.svg) return json({ ok: false, error: 'NO_POST_GENERATED_YET' }, 404, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+      const svg = d.visual.svg;
       return new Response(method === 'HEAD' ? null : svg, {
         status: 200,
         headers: {
@@ -953,114 +953,86 @@ async function route(request, env) {
       });
     }
 
-    // Direct Telegram notification trigger for /vani
-    if (seg[2] === 'notify-telegram' && (method === 'POST' || method === 'GET')) {
-      const photoUrl = 'https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg';
-      const canvaLink = 'https://canva.link/tjdg95eyudrlyid';
-      const msg = `⚡ <b>Linkedin_Post_Generator — Pipeline Active!</b>\n\n` +
-        `🎯 <b>Topic:</b> Big IPOs to Watch in India (2026 Pipeline)\n` +
-        `🔬 <b>Research:</b> SEBI DRHP Filings & BSE Indices (Score: 98/100)\n` +
-        `📐 <b>Framework:</b> STAR Analysis (Situation → Task → Action → Result)\n` +
-        `💡 <b>Operator Take:</b> IndiaMART · Justdial · Magicbricks · magicpin lens\n` +
-        `📝 <b>Post Length:</b> 210 words (Optimal 150–250 range)\n\n` +
-        `🎨 <b>Canva Editable Link:</b> <a href="${canvaLink}">${canvaLink}</a>\n` +
-        `🖼 <b>High-Res Asset:</b> <a href="${photoUrl}">Download 1200x627 JPEG</a>\n` +
-        `📊 <b>Publishing:</b> Queued for Owner Approval (1-Click Approve / Reject)\n\n` +
-        `<i>Vani notification delivered for /vani review</i>`;
-      const okPhoto = await telegram.sendTelegramPhoto(env, photoUrl, msg).catch(() => false);
-      let okMsg = false;
-      if (!okPhoto) {
-        okMsg = await telegram.sendTelegramMessage(env, msg);
-      }
-      return json({ ok: true, photoSent: okPhoto, msgSent: okMsg }, 200, { 'access-control-allow-origin': '*' });
+    // Retired: this endpoint used to push a hardcoded IPO message with a Canva link. Telegram now only ever
+    // receives the persisted post of a run (POST /api/signal/run resumes the stored run and sends it once).
+    if (seg[2] === 'notify-telegram') {
+      return json({ ok: false, error: 'RETIRED', message: 'Use POST /api/signal/run; Telegram sends the persisted post once per run.' }, 410, { 'access-control-allow-origin': '*' });
     }
 
-    // Public / Viewer Read Endpoint (for AgentVerse Signal dashboard UI)
+    // Dashboard read endpoint: serves exactly the persisted record of the latest run (no fallbacks, no mock data).
     if (seg[2] === 'draft' && method === 'GET') {
       const freshState = await signal.load(k);
-      const today = signal.todayDate();
-      const activeDraft = (freshState.latestDraftId && freshState.drafts[freshState.latestDraftId]) ||
-        freshState.drafts[`post_${today}`] ||
-        Object.values(freshState.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] ||
-        null;
+      const run = (freshState.latestRunId && freshState.runs[freshState.latestRunId]) || null;
+      const activeDraft = run ? (freshState.drafts[run.post_id] || null) : null;
 
-      // Check Work Board status for human approvals (e.g. from Telegram)
       const w = await work.load(k);
-      const workItem = (w.items || []).find((x) => x.id === `sig_${activeDraft?.id}` || x.id === activeDraft?.id);
-      const isApproved = workItem?.status === 'ready' || activeDraft?.status === 'ready_for_manual_publish' || activeDraft?.status === 'ready' || activeDraft?.status === 'approved' || activeDraft?.status === 'published';
+      const workItem = activeDraft ? (w.items || []).find((x) => x.id === `sig_${activeDraft.id}`) : null;
       const isPublished = activeDraft?.status === 'published';
+      const isApproved = workItem?.status === 'ready' || ['ready_for_manual_publish', 'ready', 'approved', 'published'].includes(activeDraft?.status);
       const effStatus = isPublished ? 'published' : (isApproved ? 'approved' : 'waiting_approval');
       const hasLinkedInToken = Boolean(env.LINKEDIN_ACCESS_TOKEN || (await k.get('signal/linkedin_token')));
 
-      const svgVisual = activeDraft?.visual?.svg || (activeDraft ? signal.getDefaultSvg(activeDraft?.visual?.headline, activeDraft?.visual?.subline) : null);
+      const visual = activeDraft?.visual ? {
+        svg: activeDraft.visual.svg || null,
+        archetype: activeDraft.visual.archetype,
+        image_reference: activeDraft.visual.image_reference || run?.image_reference || null,
+        image_generation_status: activeDraft.visual.image_generation_status || run?.image_generation_status || null,
+        image_generation_error: activeDraft.visual.image_generation_error || null,
+        adobe_express_project_id: activeDraft.visual.adobe_express_project_id || null,
+        adobe_express_url: activeDraft.visual.adobe_express_url || null,
+      } : null;
 
       const draftObj = activeDraft ? {
         id: activeDraft.id,
-        case_number: activeDraft.case_number || activeDraft.caseNumber || null,
-        company: activeDraft.company || null,
-        theme: activeDraft.theme || null,
-        documented_business_problem: activeDraft.documented_business_problem || activeDraft.documentedProblem || null,
-        source_url: activeDraft.source_url || activeDraft.sourceUrl || null,
+        case_number: activeDraft.case_number,
+        company: activeDraft.company,
+        theme: activeDraft.theme,
+        documented_business_problem: activeDraft.documented_business_problem,
+        source_url: activeDraft.source_url,
         hook: activeDraft.hook,
         body: activeDraft.body,
-        pov: activeDraft.pov,
-        framework: activeDraft.framework,
+        word_count: activeDraft.wordCount,
         question: activeDraft.question,
-        tags: activeDraft.tags,
-        visual: {
-          svg: svgVisual,
-          canvaEditUrl: activeDraft.visual?.canvaEditUrl,
-          canvaDesignId: activeDraft.visual?.canvaDesignId,
-          archetype: activeDraft.visual?.archetype,
-        },
-      } : {
-        id: null,
-        case_number: null,
-        company: null,
-        theme: null,
-        documented_business_problem: null,
-        source_url: null,
-        hook: '',
-        body: '',
-        pov: '',
-        framework: '',
-        question: '',
-        tags: [],
-        visual: null,
-      };
+        tags: activeDraft.tags || [],
+        visual,
+      } : { id: null, case_number: null, company: null, theme: null, documented_business_problem: null, source_url: null, hook: '', body: '', tags: [], visual: null };
 
       return json({
         ok: true,
         state: {
-          date: activeDraft?.date || today,
+          date: activeDraft ? String(activeDraft.createdAt || '').slice(0, 10) : signal.todayDate(),
           status: activeDraft ? effStatus : 'NO_POST_GENERATED_YET',
-          score: activeDraft ? (freshState.signals[0]?.score || 94) : null,
-          topic: activeDraft ? (activeDraft.topic || freshState.signals[0]?.title) : 'NO_POST_GENERATED_YET',
-          case_number: activeDraft ? (activeDraft.case_number || activeDraft.caseNumber || null) : null,
-          company: activeDraft ? activeDraft.company : null,
-          theme: activeDraft ? activeDraft.theme : null,
-          documented_business_problem: activeDraft ? (activeDraft.documented_business_problem || activeDraft.documentedProblem) : null,
-          source_url: activeDraft ? (activeDraft.source_url || activeDraft.sourceUrl) : null,
-          category: activeDraft ? (activeDraft.category || freshState.signals[0]?.category) : 'Ready for Fresh Run',
-          draft: draftObj,
-          visual: activeDraft ? {
-            svg: svgVisual,
-            canvaEditUrl: activeDraft.visual?.canvaEditUrl,
-            canvaDesignId: activeDraft.visual?.canvaDesignId,
-            archetype: activeDraft.visual?.archetype,
+          topic: activeDraft ? `Case #${activeDraft.case_number}: ${activeDraft.company}` : 'NO_POST_GENERATED_YET',
+          category: activeDraft ? activeDraft.theme : 'Ready for Fresh Run',
+          run: run ? {
+            run_id: run.run_id,
+            post_id: run.post_id,
+            created_at: run.created_at,
+            generation_status: run.generation_status,
+            persistence_status: run.persistence_status,
+            telegram_status: run.telegram_status,
+            dashboard_status: run.dashboard_status,
+            image_generation_status: run.image_generation_status,
+            error_details: run.error_details,
           } : null,
+          case_number: activeDraft?.case_number ?? null,
+          company: activeDraft?.company ?? null,
+          theme: activeDraft?.theme ?? null,
+          documented_business_problem: activeDraft?.documented_business_problem ?? null,
+          source_url: activeDraft?.source_url ?? null,
+          draft: draftObj,
+          visual,
           linkedin_connected: hasLinkedInToken,
           approval_source: workItem?.status === 'ready' ? 'telegram' : (isApproved ? 'system' : null),
           quality_check: activeDraft?.qualityCheck ? {
-            fact_check_passed: activeDraft.qualityCheck.checks?.factChecked !== false,
-            brand_voice_score: activeDraft.qualityCheck.checks?.brandVoiceScore || 98,
-            originality_passed: activeDraft.qualityCheck.checks?.originalityPassed !== false,
-            overall_score: activeDraft.qualityCheck.overallScore || 96,
+            overall_score: activeDraft.qualityCheck.overallScore,
+            passed: activeDraft.qualityCheck.passed,
+            word_count: activeDraft.qualityCheck.wordCount,
           } : null,
-          sources: (freshState.sources || []).slice(0, 15),
-          benchmarks: freshState.benchmarks || [],
+          sources: [],
+          benchmarks: [],
           calendar: [],
-          audit_log: (freshState.logs || []).slice(0, 10).map((l) => (typeof l === 'string' ? l : `${l.action || l.event || 'Activity'}: ${l.details || ''}`)),
+          audit_log: (freshState.logs || []).slice(-10).reverse().map((l) => (typeof l === 'string' ? l : `${l.at || ''} ${l.agent || 'Activity'}: ${l.message || ''}`)),
         },
         overview: signal.ownerView(freshState),
       }, 200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
@@ -1250,14 +1222,14 @@ async function route(request, env) {
       const payload = await readJson(request).catch(() => ({}));
       const pipelineRes = await signal.runLinkedinPostGenerator(k, env, payload);
       const s = await signal.load(k);
+      const { draft_full, ...runRecord } = pipelineRes;
       return json({
-        ok: true,
+        ok: pipelineRes.generation_status === 'SUCCESS' || pipelineRes.generation_status === 'PARTIAL',
         pipeline: 'Linkedin_Post_Generator',
-        draftId: pipelineRes.item6_finalLinkedInPost.id,
-        topic: pipelineRes.item1_topicSelected.title,
-        result: pipelineRes,
+        run: runRecord,
+        draftId: pipelineRes.post_id,
         state: signal.ownerView(s),
-        status: 'waiting_approval',
+        status: pipelineRes.generation_status,
       }, 200, { 'access-control-allow-origin': '*' });
     }
 

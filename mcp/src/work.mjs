@@ -45,7 +45,7 @@ export async function upsert(kv, env, payload, fetchImpl = fetch) {
     formatted.push(item);
 
     // If item needs human review, dispatch instant Telegram notification
-    if (item.status === 'waiting') {
+    if (item.status === 'waiting' && !it.no_notify) {
       try {
         await telegram.notifyApproval(env, {
           id: item.id,

@@ -1,74 +1,42 @@
 #!/usr/bin/env node
-// Linkedin_Post_Generator — Daily 09:30 IST Content Generation & Publishing Runner
-// Integrated into PRANAV SIGNAL / Agentverse Architecture
+// Linkedin_Post_Generator — daily 09:30 IST runner (GitHub Actions cron).
+// Calls the DEPLOYED Worker so the run is written to the same KV the dashboard reads.
+// It never falls back to an in-memory store: a run that is not persisted must fail loudly.
 
-import * as signal from '../mcp/src/signal.mjs';
+const mcpUrl = (process.env.SV_MCP_URL || process.env.WORKER_URL || '').replace(/\/+$/, '');
+const mcpToken = process.env.SV_MCP_TOKEN || process.env.MCP_TOKEN || '';
 
-async function main() {
-  console.log('====================================================');
-  console.log('⚡ Linkedin_Post_Generator — Execution Runner');
-  console.log(`📅 Execution Date: ${new Date().toISOString()}`);
-  console.log('====================================================');
-
-  const mcpUrl = process.env.SV_MCP_URL || process.env.WORKER_URL;
-  const mcpToken = process.env.SV_MCP_TOKEN || process.env.MCP_TOKEN;
-
-  if (mcpUrl && mcpToken) {
-    console.log(`🌐 Connecting to remote AgentVerse Worker: ${mcpUrl}`);
-    try {
-      const res = await fetch(`${mcpUrl.replace(/\/+$/, '')}/api/signal/run`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${mcpToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ trigger: 'scheduled_runner', time: new Date().toISOString() }),
-      });
-      const data = await res.json();
-      console.log('✅ Remote Linkedin_Post_Generator Pipeline Completed:', JSON.stringify(data, null, 2));
-      return;
-    } catch (e) {
-      console.warn('⚠️ Remote call failed, running in standalone memory mode:', e.message);
-    }
-  }
-
-  // Standalone in-memory execution fallback
-  console.log('🚀 Running Linkedin_Post_Generator pipeline locally...');
-  const memKvStore = new Map();
-  const kv = {
-    get: async (k, type) => {
-      const v = memKvStore.get(k);
-      if (!v) return null;
-      return type === 'json' ? JSON.parse(v) : v;
-    },
-    put: async (k, v) => memKvStore.set(k, typeof v === 'string' ? v : JSON.stringify(v)),
-  };
-
-  const env = {
-    MCP_TOKEN: mcpToken || 'local_token',
-    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
-    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
-    LINKEDIN_ACCESS_TOKEN: process.env.LINKEDIN_ACCESS_TOKEN,
-    LINKEDIN_PERSON_URN: process.env.LINKEDIN_PERSON_URN,
-  };
-
-  const pipelineResult = await signal.runLinkedinPostGenerator(kv, env, { force: true });
-  console.log('✅ Pipeline Execution Finished:');
-  console.log(`   Topic: ${pipelineResult.item1_topicSelected.title}`);
-  console.log(`   Framework: ${pipelineResult.item4_frameworkAnalysis.type}`);
-  console.log(`   Word Count: ${pipelineResult.item6_finalLinkedInPost.wordCount} words`);
-  console.log(`   Canva Link: ${pipelineResult.item9_canvaEditableLink.canvaEditUrl}`);
-  console.log(`   Visual Asset: ${pipelineResult.item8_exportedAsset.endpoint}`);
-  console.log(`   Approval Status: ${pipelineResult.item10_publishingResult.status}`);
-  console.log('====================================================');
+function fail(msg) {
+  console.error(`❌ ${msg}`);
+  process.exit(1);
 }
 
-main().catch((err) => {
-  console.error('❌ Pipeline run failed:', err);
-  process.exit(1);
-});
+async function main() {
+  console.log(`⚡ Linkedin_Post_Generator — ${new Date().toISOString()}`);
+  if (!mcpUrl) fail('SV_MCP_URL is not set (repo variable). Refusing to run without the deployed Worker: a local run would not persist anything the dashboard can show.');
+  if (!mcpToken) fail('SV_MCP_TOKEN / MCP_TOKEN secret is not set.');
 
-main().catch((err) => {
-  console.error('❌ Pipeline run failed:', err);
-  process.exit(1);
-});
+  const res = await fetch(`${mcpUrl}/api/signal/run`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${mcpToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trigger: 'scheduled_runner', time: new Date().toISOString() }),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { fail(`Worker returned non-JSON (HTTP ${res.status}): ${text.slice(0, 300)}`); }
+  if (!res.ok) fail(`Worker returned HTTP ${res.status}: ${text.slice(0, 300)}`);
+
+  const r = data.run || {};
+  console.log(JSON.stringify({
+    run_id: r.run_id, post_id: r.post_id, case_number: r.case_number, company: r.company,
+    generation_status: r.generation_status, persistence_status: r.persistence_status,
+    telegram_status: r.telegram_status, image_generation_status: r.image_generation_status,
+    error_details: r.error_details,
+  }, null, 2));
+
+  // Persisted + draft present is the minimum; visual/Telegram problems are reported but keep the saved post.
+  if (r.persistence_status !== 'PERSISTED_IN_KV') fail('Run was not persisted.');
+  if (r.generation_status !== 'SUCCESS') console.warn(`⚠️ Run finished as ${r.generation_status}: ${r.error_details}`);
+}
+
+main().catch((e) => fail(`Pipeline run failed: ${e.message}`));

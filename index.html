@@ -1228,9 +1228,10 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
             <small style="color:var(--mut);font-size:11.5px" id="sigPaletteText">Palette: Corporate Editorial · Obsidian · Jade Emerald · Amber Gold</small>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <a class="sig-btn gold" id="sigCanvaEditBtn" target="_blank" href="https://canva.link/tjdg95eyudrlyid" title="Open and edit design directly in Canva"><span data-i="palette"></span> Edit in Canva</a>
+              <a class="sig-btn gold" id="sigCanvaEditBtn" target="_blank" rel="noopener" href="#" style="display:none" title="Adobe Express design (shown only when a real project URL exists)"><span data-i="palette"></span> Open in Adobe Express</a>
+              <small id="sigAdobeStatus" style="color:var(--mut);font-size:11px"></small>
               <button class="sig-btn" id="sigRegenVisualBtn" type="button" title="Regenerate visual"><span data-i="rotate-ccw"></span> Regenerate</button>
-              <a class="sig-btn primary" id="sigDownloadJpgBtn" download="pranav-signal-1200x627.jpg" href="/api/signal/visual.jpg" title="Download crisp JPEG image"><span data-i="image"></span> Download Image (JPEG)</a>
+              <a class="sig-btn primary" id="sigDownloadJpgBtn" download="pranav-signal-1200x627.jpg" href="#" title="Download crisp JPEG image"><span data-i="image"></span> Download Image (JPEG)</a>
               <button class="sig-btn" id="sigDownloadPdfBtn" type="button" title="Download landscape PDF document"><span data-i="file-text"></span> Download PDF</button>
               <a class="sig-btn" id="sigDownloadVisualBtn" download="pranav-signal.svg" href="/api/signal/visual" title="Download vector SVG"><span data-i="download"></span> SVG</a>
             </div>
@@ -3917,9 +3918,11 @@ function sigRender(){
   }
 
   if($("sigCanvaEditBtn")){
-    var canvaUrl = v.canvaEditUrl || (arch === "indian_startups_tier_list" ? "https://canva.link/2j879erylbq4ctg" : "https://canva.link/tjdg95eyudrlyid");
-    $("sigCanvaEditBtn").href = canvaUrl;
+    var axUrl = v.adobe_express_url || "";
+    $("sigCanvaEditBtn").style.display = axUrl ? "" : "none";
+    if(axUrl){ $("sigCanvaEditBtn").href = axUrl; }
   }
+  if($("sigAdobeStatus")){ $("sigAdobeStatus").textContent = "Adobe Express: " + (v.image_generation_status || "n/a"); }
 
   if($("sigVisualContainer")){
     var svg = v.svg;
