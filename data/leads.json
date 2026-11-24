@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-24T09:51:16.647Z",
- "count": 3,
+ "updated": "2026-11-24T22:24:06.553Z",
+ "count": 5,
  "health": {
   "reddit": {
    "ok": 0,
@@ -30,6 +30,42 @@
  },
  "reddit": "public",
  "leads": [
+  {
+   "id": "md_117672385310522550",
+   "source": "mastodon #getfedihired",
+   "title": "🤖 Data Scientist at Stitch Fix 📍United States | Remote Job 💵 $170,000 – $196,000 / year Stitch Fix is looki",
+   "text": "🤖 Data Scientist at Stitch Fix 📍United States | Remote Job 💵 $170,000 – $196,000 / year Stitch Fix is looking for a data scientist to improve inventory matching and order fulfillment. ✅ You'll develop and validate data science solutions for inventory matching, order sourcing, and fulfillment. 🔗 APPLICATION LINK IN BIO # GetFediHired # RemoteJobs # AIjobs",
+   "url": "https://mastodon.social/@rolechemy/117672385310522550",
+   "author": "rolechemy",
+   "created": "2026-11-24T16:35:05.947Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 7,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-24T22:24:06.552Z"
+  },
+  {
+   "id": "md_117672129911297142",
+   "source": "mastodon #hiring",
+   "title": "📌 Hiring Now! | ML Engineer, LLM and Agentic Evaluations Contract with Turing, remote across LATAM. Pay discu",
+   "text": "📌 Hiring Now! | ML Engineer, LLM and Agentic Evaluations Contract with Turing, remote across LATAM. Pay discussed during screening. ✅ Python evaluation suites for LLM reasoning and coding ✅ Agent benchmarks covering planning and tool use ✅ Model comparisons, graders, and failure analysis How do you make model evaluations reproducible? 👉 Apply here: https:// nearskill.in/jobs/ml-engineer- llm-agentic-evaluations-118678?utm_source=mastodon&utm_medium=social # RemoteJobs # Python # AIJobs # Hiring",
+   "url": "https://mastodon.social/@nearskill/117672129911297142",
+   "author": "nearskill",
+   "created": "2026-11-24T15:30:08.882Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 6,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-24T22:24:06.552Z"
+  },
   {
    "id": "md_117649142566619467",
    "source": "mastodon #hiring",
