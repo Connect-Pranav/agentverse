@@ -8,6 +8,15 @@ import * as telegram from './telegram.mjs';
 import * as adobe from './adobe_express.mjs';
 import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
 import { CASE_BANK, getCaseByNumber, getNextUnusedCase, buildLinkedInPostFromCase } from './case_bank.mjs';
+import {
+  TEMPLATE_REGISTRY,
+  THEME_TEMPLATE_MAP,
+  CANVA_TEMPLATE_IDS,
+  pickTemplate,
+  generateVisualSvg,
+  buildTakeaways,
+  generateCompanyCaseMatrix,
+} from './templates.mjs';
 
 export const PIPELINE_NAME = 'Linkedin_Post_Generator';
 
@@ -159,6 +168,23 @@ export async function load(kv) {
   s.logs = s.logs || [];
   s.runs = s.runs || {};
   s.latestRunId = s.latestRunId || null;
+
+  // templates.mjs now owns all SVG generation.
+  // Only fill in missing SVG; never overwrite an existing persisted visual.
+  for (const d of Object.values(s.drafts || {})) {
+    if (d?.visual && !d.visual.svg) {
+      const caseNum = d.caseNumber || d.case_number;
+      const cd = caseNum ? getCaseByNumber(caseNum) : null;
+      if (cd) {
+        d.visual.svg = generateVisualSvg(d.visual.archetype || pickTemplate(cd), { caseData: cd, hook: d.hook || '', body: d.body || '', takeaways: buildTakeaways(cd), theme: cd.theme });
+        d.visual.dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(d.visual.svg)}`;
+        if (s.visuals && s.visuals[d.id]) {
+          s.visuals[d.id].svg = d.visual.svg;
+          s.visuals[d.id].dataUri = d.visual.dataUri;
+        }
+      }
+    }
+  }
 
   return s;
 }
@@ -1460,42 +1486,40 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
   const draft = s.drafts[id];
   if (!draft) throw new SignalError(404, `Draft "${id}" not found.`);
 
-  // Determine archetype: preferred parameter > draft archetype > infer from topic
-  let archetype = preferredArchetype || draft.archetype;
+  // Resolve case data from draft
+  const caseNum = draft.caseNumber || draft.case_number;
+  const caseData = caseNum ? getCaseByNumber(caseNum) : null;
+
+  // Pick template: preferred > explicit > theme-based rotation
+  let archetype = preferredArchetype;
   if (!archetype) {
-    if (draft.caseNumber || draft.case_number) archetype = 'company_case_matrix';
-    else if (/IPO/i.test(draft.topic)) archetype = 'big_ipos_watchlist';
-    else if (/Tier List|Startups/i.test(draft.topic)) archetype = 'indian_startups_tier_list';
-    else archetype = 'company_case_matrix';
+    if (caseData) {
+      archetype = pickTemplate(caseData);
+    } else if (/IPO/i.test(draft.topic)) {
+      archetype = 'big_ipos_watchlist';
+    } else if (/Tier List|Startups/i.test(draft.topic)) {
+      archetype = 'indian_startups_tier_list';
+    } else {
+      archetype = 'company_case_matrix';
+    }
   }
 
-  let headline = '';
-  let subline = '';
-  let svgVisual = '';
+  // Build SVG using the template repository
+  const params = {
+    caseData: caseData || {},
+    hook: draft.hook || draft.body?.split('\n')[0] || '',
+    body: draft.body || '',
+    takeaways: caseData ? buildTakeaways(caseData) : [],
+    theme: caseData?.theme || draft.topic || '',
+  };
+  const svgVisual = generateVisualSvg(archetype, params);
 
-  const caseData = (draft.caseNumber || draft.case_number) ? getCaseByNumber(draft.caseNumber || draft.case_number) : null;
+  // Canva template metadata (Null = SVG-only; will be populated as Canva designs are created)
+  const canvaMeta = CANVA_TEMPLATE_IDS[archetype] || CANVA_TEMPLATE_IDS.company_case_matrix;
 
-  if (caseData) {
-    archetype = 'company_case_matrix';
-    headline = caseData.company.toUpperCase();
-    subline = `${caseData.theme} · ${caseData.period} · ${caseData.industry}`;
-    svgVisual = getCompanyCaseSvg(caseData);
-  } else if (archetype === 'big_ipos_watchlist') {
-    headline = 'Big IPOs';
-    subline = 'Major unlisted companies in the IPO pipeline · Valuation, Sector & SEBI Status';
-    svgVisual = getWatchlistSvg(headline, subline);
-  } else if (archetype === 'indian_startups_tier_list') {
-    headline = 'Indian Startups Tier List';
-    subline = 'Ranked by team growth in the last 12 months · Data by Crustdata';
-    svgVisual = getTierListSvg(headline, subline);
-  } else {
-    headline = 'THE CRM DATA INTEGRITY MATRIX';
-    subline = 'Why 60% of Pipeline Forecasts Fail and How Operators Fix It';
-    svgVisual = getDefaultSvg(headline, subline);
-  }
+  const headline = caseData ? `${caseData.company} — ${caseData.theme}` : (draft.topic || 'Business Insight');
+  const subline = caseData ? `${caseData.period} · ${caseData.industry}` : '';
 
-  // Adobe Express is the intended design tool. No Adobe Express API/MCP/connector exists in this
-  // Worker, so nothing is claimed here: the IDs stay null and the status says exactly why.
   const visual = {
     id: `vis_${id}`,
     draftId: id,
@@ -1503,13 +1527,16 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
     height: 627,
     aspectRatio: '1.91:1',
     archetype,
+    templateName: archetype,
     headline,
     subline,
-    image_generation_status: 'ADOBE_EXPRESS_NOT_CONFIGURED',
-    image_generation_error: 'No Adobe Express integration (API, MCP or connected account) is configured for this Worker. Local SVG preview rendered from the selected case only; no Adobe Express design was created.',
+    canvaDesignId: canvaMeta?.designId || null,
+    canvaEditUrl: canvaMeta?.editUrl || null,
+    canvaExportUrl: canvaMeta?.editUrl ? `https://agentverse.aistudio09.workers.dev/api/signal/visual.jpg` : null,
+    image_reference: canvaMeta?.editUrl || `/api/signal/visual?post_id=${encodeURIComponent(id)}`,
     adobe_express_project_id: null,
     adobe_express_url: null,
-    image_reference: `/api/signal/visual?post_id=${encodeURIComponent(id)}`,
+    image_generation_status: 'WORKER_RENDERED',
     svg: svgVisual,
     dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(svgVisual)}`,
     createdAt: nowIso(),
@@ -1517,7 +1544,7 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
 
   draft.visual = visual;
   s.visuals[id] = visual;
-  logActivity(s, 'Visual Creative Agent', `Rendered local 1200x627 preview (${archetype}) for draft "${id}". Adobe Express: ${visual.image_generation_status}.`);
+  logActivity(s, 'Visual Creative Agent', `Generated 1200x627 visual asset using template "${archetype}"${canvaMeta?.designId ? ` (Canva ID: ${canvaMeta.designId})` : ' (SVG only — Canva ID pending)'} for draft "${id}".`);
   await save(kv, s);
   return visual;
 }
@@ -1673,8 +1700,8 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       stages: run.stages,
       image_reference: ax.status === 'CREATED' ? (ax.thumbnail || ax.url) : vis.image_reference,
       image_generation_status: v.image_generation_status,
-      adobe_express_project_id: v.adobe_express_project_id,
-      adobe_express_url: v.adobe_express_url,
+      adobe_express_project_id: v.adobe_express_project_id ?? null,
+      adobe_express_url: v.adobe_express_url ?? null,
       error_details: ax.status === 'FAILED' ? `visual: ${ax.error}` : run.error_details,
     });
   }

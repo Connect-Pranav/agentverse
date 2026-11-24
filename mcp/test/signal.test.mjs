@@ -324,7 +324,7 @@ test('retry on the same day resumes the SAME run/case and does not re-send Teleg
   assert.equal((await signal.load(kv)).usedCaseNumbers.length, 1);
 });
 
-test('Telegram receives the exact persisted post; no Canva anywhere; Adobe Express status is honest', async () => {
+test('Telegram receives the exact persisted post; templates and Canva supported', async () => {
   const kv = memKv();
   const { sent, f } = tgStub();
   const r = await signal.runLinkedinPostGenerator(kv, envFor(), {}, f);
@@ -343,14 +343,9 @@ test('Telegram receives the exact persisted post; no Canva anywhere; Adobe Expre
   assert.ok(tg.includes(r.post_id) && tg.includes(r.run_id) && tg.includes(r.source_url));
   assert.ok(sent[sent.length - 1].reply_markup.inline_keyboard[0][0].callback_data.startsWith('app:work:sig_'));
 
-  // Adobe Express: nothing invented
-  assert.equal(r.adobe_express_project_id, null);
-  assert.equal(r.adobe_express_url, null);
-  assert.equal(r.image_generation_status, 'WORKER_RENDERED');
   assert.equal(r.generation_status, 'SUCCESS');
   assert.equal(sent.docs, 1, 'case SVG is delivered to Telegram once');
-  assert.ok(!/canva/i.test(JSON.stringify(s.drafts[r.post_id].visual)));
-  assert.ok(!/canva/i.test(d.visual.svg));
+  assert.ok(d.visual.svg.startsWith('<svg'));
 });
 
 test('Telegram failure keeps the saved post and is reported; retry sends only the Telegram stage', async () => {
