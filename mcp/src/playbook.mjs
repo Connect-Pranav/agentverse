@@ -129,7 +129,7 @@ export const BUSINESS_PROBLEMS = [
 
 export const PLAYBOOK_INSTRUCTIONS = `
 MY POSITIONING:
-I am a business leader with experience in sales leadership, branch operations, revenue growth, team management, funnel optimisation, customer acquisition and business execution (commercial operations at IndiaMART, Justdial, Magicbricks, and magicpin). Write for my personal LinkedIn profile.
+I am a business leader with experience in sales leadership, branch operations, revenue growth, team management, funnel optimisation, customer acquisition and business execution (commercial operations at high-velocity commercial businesses, scaleups, and digital marketplaces). Write for my personal LinkedIn profile.
 
 DAILY SERIES:
 "100 Business Problems Worth Solving" (Suggested subtitle: "One Business Problem. One Leadership Take.")

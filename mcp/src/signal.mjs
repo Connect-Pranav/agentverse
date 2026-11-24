@@ -1,7 +1,7 @@
 // PRANAV SIGNAL — LinkedIn Growth Studio MCP
 // Autonomous thought leadership, market intelligence & GTM operations engine.
 // Positioned for Pranav Kumar: RevOps | GTM Strategy & Execution | P&L Ownership | Funnel Optimization | AI & Automation.
-// IndiaMART · Justdial · Magicbricks · magicpin.
+// Commercial Scaleups · B2B Platforms · Digital Marketplaces.
 
 import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
@@ -54,7 +54,7 @@ export class SignalError extends Error {
 export const PRANAV_POSITIONING = {
   name: 'Pranav Kumar',
   headline: 'Revenue Operations | GTM Strategy & Execution | P&L Ownership | Funnel Optimization | Team Leadership | AI & Automation',
-  companies: ['IndiaMART', 'Justdial', 'Magicbricks', 'magicpin'],
+  companies: ['B2B Marketplaces', 'Commercial Scaleups', 'Digital Platforms'],
   domains: [
     'Revenue Operations (RevOps)',
     'Go-to-Market (GTM) Strategy & Commercial Execution',
@@ -63,13 +63,13 @@ export const PRANAV_POSITIONING = {
     'Cross-functional Team Scaling & KPI Systems',
     'Enterprise AI & Practical Workflow Automation',
   ],
-  bio: 'Commercial operator with cross-industry leadership across India\'s largest B2B, local search, proptech, and hyperlocal commerce marketplaces (IndiaMART, Justdial, Magicbricks, magicpin). Focused on turning complex operational levers into repeatable revenue acceleration, grounded unit economics, and high-velocity team execution.',
+  bio: 'Commercial operator with cross-industry leadership across India\'s largest B2B, local search, proptech, and hyperlocal commerce marketplaces (high-velocity commercial businesses, scaleups, and digital marketplaces). Focused on turning complex operational levers into repeatable revenue acceleration, grounded unit economics, and high-velocity team execution.',
   toneGuidelines: {
     voice: 'Grounded, sharp, authoritative, pragmatic, numbers-aware, strategic operator.',
     structure: [
       '1. Provocative Hook (challenge conventional wisdom or state a surprising market fact)',
       '2. Analytical Context (what is changing in enterprise tech / market / buyer behavior)',
-      '3. Operator POV (how this really works inside scaling companies: IndiaMART / Justdial / Magicbricks / magicpin lens)',
+      '3. Operator POV (how this really works inside scaling companies: commercial scaleup & marketplace lens)',
       '4. Practical Framework or Tactical Lesson (actionable takeaway for leaders)',
       '5. High-signal Discussion Question (inviting thoughtful peer perspectives)',
     ],
@@ -293,7 +293,7 @@ export async function auditProfile(kv) {
     }),
     recommendations: [
       'Anchor discussions around real P&L and sales capacity trade-offs to highlight operational depth.',
-      'Highlight cross-industry parallels between IndiaMART (B2B SME) and Magicbricks/magicpin (hyperlocal/real-estate consumertech).',
+      'Highlight cross-industry parallels between enterprise B2B marketplaces and hyperlocal consumer platforms.',
       'Emphasize practical AI enablement over theoretical models to appeal to enterprise founders and COOs.',
     ],
   };
@@ -335,7 +335,7 @@ export async function analyseBenchmarkPatterns(kv) {
     ],
     structuralFormulas: [
       { name: 'Hook → Tension → Operator Math → Solution → Discussion', effectiveness: '94%' },
-      { name: 'Belief Challenge → Real Market Data → IndiaMART/Tech Lessons → Takeaway', effectiveness: '91%' },
+      { name: 'Belief Challenge → Real Market Data → Commercial Scaleup Lessons → Takeaway', effectiveness: '91%' },
     ],
     keyObservations: [
       'High-performing executive posts average between 1,200 and 1,800 characters.',
@@ -545,7 +545,7 @@ export async function generatePranavPov(kv, topicId = null) {
       behaviour: `Forcing sales reps to fill 30+ mandatory fields, prompting them to enter garbage data to satisfy activity quotas instead of capturing true buyer intent.`,
       impact: `Distorted revenue forecasts, wasted marketing spend on unqualified leads, and blindsided leadership at quarter-end when "commit" deals vanish.`,
     };
-    operatorPerspective = `Leading commercial operations across IndiaMART, Justdial, Magicbricks, and magicpin taught me one fundamental rule: threatening reps with CRM compliance never fixes dirty data. Process design does.`;
+    operatorPerspective = `Leading commercial operations across high-velocity commercial businesses, scaleups, and digital marketplaces taught me one fundamental rule: threatening reps with CRM compliance never fixes dirty data. Process design does.`;
     operatorTake = `If your sales forecast relies on rep memory rather than buyer evidence, you don't have a pipeline—you have a wishlist.`;
     pranavTakeaways = [
       `1. Cut 70% of mandatory fields: Keep only the 3 fields that directly correlate with deal velocity.`,
@@ -561,7 +561,7 @@ export async function generatePranavPov(kv, topicId = null) {
       action: `Implement process automation, establish clear ownership, and create measurable accountability checkpoints to eliminate the problem systematically.`,
       result: `Businesses that solve "${problemTitle}" structurally see measurable improvements in operational efficiency, revenue retention, and team morale.`,
     };
-    operatorPerspective = `Managing commercial operations at IndiaMART, Justdial, Magicbricks, and magicpin, I encountered "${problemTitle}" in various forms across all growth stages. The root cause is almost always process, not people.`;
+    operatorPerspective = `Managing commercial operations at high-velocity commercial businesses, scaleups, and digital marketplaces, I encountered "${problemTitle}" in various forms across all growth stages. The root cause is almost always process, not people.`;
     operatorTake = `The businesses that win are not the ones with more resources — they are the ones that treat operational problems like "${problemTitle}" as systems design challenges, not personnel challenges.`;
     pranavTakeaways = [
       `1. Diagnose the system: Map exactly where "${problemTitle}" enters the workflow and what it costs per week.`,
@@ -576,7 +576,7 @@ export async function generatePranavPov(kv, topicId = null) {
       behaviour: `Businesses either ignore "${problemTitle}" or address it reactively — without a systematic, preventive process to catch and fix it before it compounds.`,
       impact: `When "${problemTitle}" goes unaddressed, it compounds into revenue leakage, operational inefficiency, customer dissatisfaction, and competitive disadvantage over time.`,
     };
-    operatorPerspective = `Having led high-velocity commercial teams at IndiaMART, Justdial, Magicbricks, and magicpin, I saw "${problemTitle}" surface repeatedly — especially at inflection points like team expansion or market entry.`;
+    operatorPerspective = `Having led high-velocity commercial teams at high-velocity commercial businesses, scaleups, and digital marketplaces, I saw "${problemTitle}" surface repeatedly — especially at inflection points like team expansion or market entry.`;
     operatorTake = `Fixing "${problemTitle}" is not about tools. It is about process clarity, ownership, and measurable accountability at every operational layer.`;
     pranavTakeaways = [
       `1. Surface the problem: Track "${problemTitle}" with a simple daily metric before spending a rupee on solutions.`,
@@ -645,7 +645,7 @@ The SBI breakdown:
 • Behaviour: Forcing reps to fill 30+ mandatory fields, prompting them to enter garbage data to satisfy activity quotas.
 • Impact: Distorted revenue forecasts, wasted marketing spend on unqualified leads, and blindsided leadership at quarter-end.
 
-Leading commercial operations across IndiaMART, Justdial, Magicbricks, and magicpin taught me one fundamental rule: threatening reps with CRM compliance never fixes dirty data. Process design does.
+Leading commercial operations across high-velocity commercial businesses, scaleups, and digital marketplaces taught me one fundamental rule: threatening reps with CRM compliance never fixes dirty data. Process design does.
 
 3 practical rules for operators:
 1. Cut 70% of mandatory fields: Keep only the 3 fields that directly correlate with deal velocity.
@@ -668,7 +668,7 @@ The operational breakdown:
 • Action: Map the handoff workflow, automate repetitive triage, and assign single-owner metric accountability.
 • Result: Recovered team bandwidth, predictable operating cadences, and measurable margin resilience.
 
-Scaling commercial operations across IndiaMART, Justdial, Magicbricks, and magicpin taught me one fundamental truth: exceptional talent cannot compensate for a structurally broken operating process.
+Scaling commercial operations across high-velocity commercial businesses, scaleups, and digital marketplaces taught me one fundamental truth: exceptional talent cannot compensate for a structurally broken operating process.
 
 3 tactical rules to fix this:
 1. Audit the hidden leak: Measure the weekly hours lost to this friction before purchasing new software.
@@ -690,7 +690,7 @@ The SBI breakdown:
 • Behaviour: Treating "${problemTitle.toLowerCase()}" with ad-hoc manual workarounds instead of systematic redesign.
 • Impact: High operational drag, frontline team fatigue, and hidden customer satisfaction drop-offs.
 
-Over a decade leading commercial execution at IndiaMART, Justdial, Magicbricks, and magicpin, I saw this pattern repeatedly: sustainable scale is built on clean operational mechanics, not heroic daily firefighting.
+Over a decade leading commercial execution at high-velocity commercial businesses, scaleups, and digital marketplaces, I saw this pattern repeatedly: sustainable scale is built on clean operational mechanics, not heroic daily firefighting.
 
 3 actionable rules for operators:
 1. Track the operational baseline: Put a simple daily metric on this bottleneck before spending capital.
@@ -718,7 +718,7 @@ Here is the operational breakdown:
 • Action: Rationalize territory distribution, cut dilutive subsidies, and tie leader bonuses to gross margin.
 • Result: Companies with positive contribution margins secure anchor books at 30% stronger valuations.
 
-Leading commercial operations across IndiaMART, Justdial, Magicbricks, and magicpin taught me one truth: public markets forgive slower revenue growth, but they never forgive broken unit economics.
+Leading commercial operations across high-velocity commercial businesses, scaleups, and digital marketplaces taught me one truth: public markets forgive slower revenue growth, but they never forgive broken unit economics.
 
 3 tactical rules for operators today:
 1. Stress-test gross margin at the single-store or unit level before multi-city expansion.
@@ -744,7 +744,7 @@ The operational reality:
 • Action: Implement deterministic workflow automation and cross-train existing teams.
 • Result: High-performing scaleups are generating 2.4x more revenue per employee than in 2022.
 
-Across high-velocity marketplaces like IndiaMART, Justdial, Magicbricks, and magicpin, I saw this clearly: expanding headcount without clear funnel predictability just compounds operational friction.
+Across high-velocity marketplaces like high-velocity commercial businesses, scaleups, and digital marketplaces, I saw this clearly: expanding headcount without clear funnel predictability just compounds operational friction.
 
 Before adding another 50 roles to your sales or ops team:
 1. Audit CRM handoffs to recover wasted frontline rep hours.
@@ -771,7 +771,7 @@ The SBI breakdown:
 • Behaviour: Pushing reps for higher call volumes while feeding unverified leads.
 • Impact: High customer acquisition costs, rep burnout, and sub-35% quota attainment.
 
-Over a decade across IndiaMART, Justdial, Magicbricks, and magicpin, I learned that revenue acceleration doesn't come from more software. It comes from clean funnel physics.
+Over a decade across high-velocity commercial businesses, scaleups, and digital marketplaces, I learned that revenue acceleration doesn't come from more software. It comes from clean funnel physics.
 
 What top operators do differently in 2026:
 1. Automate firmographic pre-scoring before a single calendar invite is sent.
@@ -879,7 +879,7 @@ export function getDefaultSvg(headline = 'THE B2B REVENUE LEAKAGE MATRIX', subli
 
     <!-- Track Record Badge -->
     <rect x="715" y="0" width="365" height="30" rx="15" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-    <text x="897" y="19" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">IndiaMART · Justdial · Magicbricks · magicpin</text>
+    <text x="897" y="19" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">Commercial Scaleups · B2B Platforms · Digital Marketplaces</text>
   </g>
 
   <!-- Eye-Catching Header -->
@@ -1069,7 +1069,7 @@ export function getWatchlistSvg(headline = 'Big IPOs', subline = 'Major unlisted
     <circle cx="16" cy="15" r="5" fill="#00F0FF"/>
     <text x="30" y="19" fill="#00F0FF" font-size="11.5" font-weight="700" letter-spacing="1.2">PRANAV KUMAR · MARKET INTELLIGENCE</text>
     <rect x="735" y="0" width="345" height="30" rx="15" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-    <text x="907" y="19" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">IndiaMART · Justdial · Magicbricks · magicpin</text>
+    <text x="907" y="19" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">Commercial Scaleups · B2B Platforms · Digital Marketplaces</text>
   </g>
 
   <!-- Headline & Yellow Highlight Banner -->
@@ -1181,7 +1181,7 @@ export function getTierListSvg(headline = 'Indian Startups Tier List', subline =
     <circle cx="14" cy="14" r="4.5" fill="#00F0FF"/>
     <text x="26" y="18" fill="#00F0FF" font-size="11" font-weight="700" letter-spacing="1.2">PRANAV KUMAR · STARTUP BENCHMARKING</text>
     <rect x="740" y="0" width="340" height="28" rx="14" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-    <text x="910" y="18" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">IndiaMART · Justdial · Magicbricks · magicpin</text>
+    <text x="910" y="18" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">Commercial Scaleups · B2B Platforms · Digital Marketplaces</text>
   </g>
 
   <!-- Header -->
@@ -1986,7 +1986,7 @@ export async function updateContentMemory(kv, memoryUpdate = {}) {
 export async function getResourcesList() {
   return [
     { uri: 'pranav://voice-card', name: 'Pranav Voice Card', description: 'Writing voice, tone guidelines, structure formulas & anti-patterns', mimeType: 'application/json' },
-    { uri: 'pranav://positioning', name: 'Pranav Professional Positioning', description: 'Headline, credentials, IndiaMART, Justdial, Magicbricks, magicpin experience', mimeType: 'application/json' },
+    { uri: 'pranav://positioning', name: 'Pranav Professional Positioning', description: 'Headline, credentials, high-velocity commercial businesses, scaleups, and digital marketplaces experience', mimeType: 'application/json' },
     { uri: 'pranav://benchmark-profiles', name: 'GTM & RevOps Benchmark Profiles', description: 'Monitored industry thought leaders in RevOps, GTM and AI for Business', mimeType: 'application/json' },
     { uri: 'pranav://content-pillars', name: 'Content Pillars', description: '5 core strategic content pillars for Pranav Kumar', mimeType: 'application/json' },
     { uri: 'pranav://approved-posts', name: 'Approved Posts Ledger', description: 'History of approved and published LinkedIn posts', mimeType: 'application/json' },

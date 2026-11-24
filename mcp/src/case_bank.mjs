@@ -1670,7 +1670,7 @@ It was a structural operating failure: ${c.postAngle || c.documentedProblem}`;
 ${c.companyProfile || ''}`;
 
   const operatorLesson = `The Management Lesson:
-Across high-velocity commercial businesses like IndiaMART, Justdial, Magicbricks, and magicpin, I saw this pattern repeat: scale is never proof of durability. If you don't cannibalise your own cash cow, the market will do it for you.`;
+Across high-velocity commercial businesses, scaleups, and digital marketplaces, I saw this pattern repeat: scale is never proof of durability. If you don't cannibalise your own cash cow, the market will do it for you.`;
 
   const fixPoints = formatFixPoints(c.recommendedFix);
   const fixSection = `Operator Fix:

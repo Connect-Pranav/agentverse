@@ -195,7 +195,7 @@ function generateDarkStatHeadline({ caseData, hook }) {
   <circle cx="58" cy="608" r="10" fill="#F59E0B"/>
   <text x="58" y="613" fill="#0A0A0A" font-size="10" font-weight="900" text-anchor="middle">PK</text>
   <text x="80" y="613" fill="#F8FAFC" font-size="13" font-weight="700">PRANAV KUMAR</text>
-  <text x="225" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · IndiaMART · Justdial · Magicbricks · magicpin</text>
+  <text x="225" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · Commercial Scaleups &amp; Marketplaces</text>
 </svg>`;
 }
 
@@ -262,7 +262,7 @@ function generateQuoteBulletSystem({ caseData, hook }) {
   <circle cx="58" cy="608" r="10" fill="#38BDF8"/>
   <text x="58" y="613" fill="#0F172A" font-size="10" font-weight="900" text-anchor="middle">PK</text>
   <text x="80" y="613" fill="#F8FAFC" font-size="13" font-weight="700">PRANAV KUMAR</text>
-  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · IndiaMART · Justdial · Magicbricks · magicpin</text>
+  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · Commercial Scaleups &amp; Marketplaces</text>
 </svg>`;
 }
 
@@ -324,7 +324,7 @@ function generateProblemRealitySplit({ caseData, hook }) {
   ).join('\n  ')}
 
   <!-- Author -->
-  <text x="600" y="616" fill="#94A3B8" font-size="12" text-anchor="middle">PRANAV KUMAR · RevOps &amp; GTM Strategy · IndiaMART · Justdial · Magicbricks · magicpin</text>
+  <text x="600" y="616" fill="#94A3B8" font-size="12" text-anchor="middle">PRANAV KUMAR · RevOps &amp; GTM Strategy · Commercial Scaleups &amp; Marketplaces</text>
 </svg>`;
 }
 
@@ -379,7 +379,7 @@ function generateLeadershipFrameworkCards({ caseData, hook }) {
   <circle cx="58" cy="608" r="10" fill="#F59E0B"/>
   <text x="58" y="613" fill="#0A0E1A" font-size="10" font-weight="900" text-anchor="middle">PK</text>
   <text x="80" y="613" fill="#F8FAFC" font-size="13" font-weight="700">PRANAV KUMAR</text>
-  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · IndiaMART · Justdial · Magicbricks · magicpin</text>
+  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · Commercial Scaleups &amp; Marketplaces</text>
 </svg>`;
 }
 
@@ -454,7 +454,7 @@ function generatePerformersPrinciple({ caseData, hook }) {
   <circle cx="58" cy="608" r="10" fill="#6366F1"/>
   <text x="58" y="613" fill="#F8FAFC" font-size="10" font-weight="900" text-anchor="middle">PK</text>
   <text x="80" y="613" fill="#F8FAFC" font-size="13" font-weight="700">PRANAV KUMAR</text>
-  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · IndiaMART · Justdial · Magicbricks · magicpin</text>
+  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · Commercial Scaleups &amp; Marketplaces</text>
 </svg>`;
 }
 
@@ -513,7 +513,7 @@ function generateInsightGrid({ caseData, hook }) {
   <circle cx="58" cy="608" r="10" fill="#38BDF8"/>
   <text x="58" y="613" fill="#07090F" font-size="10" font-weight="900" text-anchor="middle">PK</text>
   <text x="80" y="613" fill="#F8FAFC" font-size="13" font-weight="700">PRANAV KUMAR</text>
-  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · IndiaMART · Justdial · Magicbricks · magicpin</text>
+  <text x="230" y="613" fill="#94A3B8" font-size="12">RevOps &amp; GTM Strategy · Commercial Scaleups &amp; Marketplaces</text>
 </svg>`;
 }
 
@@ -647,7 +647,7 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
   <circle cx="76" cy="606" r="9" fill="#00F0FF"/>
   <text x="76" y="610" fill="#070B19" font-size="9" font-weight="900" text-anchor="middle">PK</text>
   <text x="96" y="610" fill="#F8FAFC" font-size="12.5" font-weight="700">PRANAV KUMAR</text>
-  <text x="240" y="610" fill="#94A3B8" font-size="11.5">IndiaMART · Justdial · Magicbricks · magicpin · Commercial Operations Insight</text>
+  <text x="240" y="610" fill="#94A3B8" font-size="11.5">Commercial Scaleups &amp; Marketplaces · Operations &amp; Strategy Insight</text>
   <text x="1140" y="610" fill="#64748B" font-size="11" text-anchor="end">Source: SEC Restructuring Filings &amp; Chapter 11 Record</text>
 </svg>`;
 }

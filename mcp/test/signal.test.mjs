@@ -95,7 +95,7 @@ test('PRANAV SIGNAL: MCP resources/list and resources/read', async () => {
   assert.equal(readRes.status, 200);
   const readData = await readRes.json();
   assert.ok(readData.result.contents[0].text.includes('Pranav Kumar'));
-  assert.ok(readData.result.contents[0].text.includes('IndiaMART'));
+  assert.ok(readData.result.contents[0].text.includes('B2B Marketplaces'));
 });
 
 test('PRANAV SIGNAL: Full autonomous flow via MCP tools and idempotency', async () => {
@@ -134,7 +134,7 @@ test('PRANAV SIGNAL: Full autonomous flow via MCP tools and idempotency', async 
   assert.equal(draftRes.status, 200);
   const draftData = (await draftRes.json()).result.structuredContent;
   assert.ok(draftData.id.startsWith('post_'));
-  assert.ok(draftData.body.includes('IndiaMART'));
+  assert.ok(draftData.body.includes('Management Lesson'));
 
   // 5. Generate 1200x627 visual
   const visRes = await worker.fetch(new Request(BASE + '/mcp', {
