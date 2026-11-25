@@ -1162,7 +1162,13 @@ def yt_token():
     if not (cid and sec and rt):
         raise RuntimeError("YouTube is not connected: add repo secrets YT_CLIENT_ID, YT_CLIENT_SECRET and YT_REFRESH_TOKEN")
     body = urllib.parse.urlencode({"client_id": cid, "client_secret": sec, "refresh_token": rt, "grant_type": "refresh_token"}).encode()
-    r = http("POST", "https://oauth2.googleapis.com/token", body, {"content-type": "application/x-www-form-urlencoded"}, 60)
+    try:
+        r = http("POST", "https://oauth2.googleapis.com/token", body, {"content-type": "application/x-www-form-urlencoded"}, 60)
+    except Exception as e:
+        if "invalid_grant" in str(e):
+            raise RuntimeError("YouTube login expired (invalid_grant). Make a new token with scripts/yt-refresh-token.py and update the YT_REFRESH_TOKEN secret. "
+                               "If the Google OAuth app is in 'Testing' mode, tokens expire every 7 days: set it to 'In production' once.") from None
+        raise
     if not r.get("access_token"):
         raise RuntimeError("Google did not return an access token (refresh token expired or revoked?)")
     return r["access_token"]
