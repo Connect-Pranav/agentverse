@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-25T08:28:05.741Z",
- "count": 5,
+ "updated": "2026-11-25T21:39:55.501Z",
+ "count": 6,
  "health": {
   "reddit": {
    "ok": 0,
@@ -83,6 +83,24 @@
     "llm"
    ],
    "firstSeen": "2026-11-20T20:12:31.028Z"
+  },
+  {
+   "id": "md_117676494447583306",
+   "source": "mastodon #hiring",
+   "title": "The 4:55 p.m. test is a good hiring filter. The landing page is broken, the developer is on a plane and the ca",
+   "text": "The 4:55 p.m. test is a good hiring filter. The landing page is broken, the developer is on a plane and the campaign goes live Monday. You get one person to help. The person you’d grab usually acts before the situation pins them down. 🔁 # marketing # hiring https:// rosssimmonds.com/blog/be-unblo ckable-the-trait-every-team-wants-to-grab/",
+   "url": "https://mastodon.social/@jakubdistri2/117676494447583306",
+   "author": "jakubdistri2",
+   "created": "2026-11-25T10:00:06.401Z",
+   "product": "Foliocraft",
+   "products": [
+    "Foliocraft"
+   ],
+   "score": 5,
+   "matched": [
+    "landing page"
+   ],
+   "firstSeen": "2026-11-25T21:39:55.501Z"
   },
   {
    "id": "md_117654608558394982",
