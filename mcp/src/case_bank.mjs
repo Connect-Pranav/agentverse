@@ -1652,6 +1652,21 @@ Eastman Kodak didn't fail because they lacked technology. They failed because le
 • Filed Chapter 11 bankruptcy in January 2012.
 • Peak $5.1B market cap decimated; 145,000+ jobs eliminated.
 • Forced to fire-sale 1,100 digital imaging patents for just $527M to survive.`;
+  } else if (c.caseNumber === 2 || /Blockbuster/i.test(c.company)) {
+    hook = `In 2000, Netflix offered to sell itself to Blockbuster for $50 million. Blockbuster's CEO laughed them out of the room.
+
+By September 2010, Blockbuster filed for Chapter 11 bankruptcy with $1 billion in debt. Today, Netflix is worth over $250 billion.
+
+Blockbuster didn't die because streaming appeared overnight. They died because leadership protected $800M in punitive late fees instead of following where customer behavior had already moved.`;
+
+    strategy = `The Strategy Trap:
+• Flawed Strategy: Protect a 9,000-store physical retail footprint and high-margin late fees rather than cannibalising the channel with mail or digital delivery.
+• Operator Reality: When your revenue model profits from customer friction, an unencumbered competitor will redesign the customer workflow and take the market.`;
+
+    outcome = `The Business Outcome:
+• Filed Chapter 11 bankruptcy in September 2010.
+• Decimated a peak $6 Billion commercial valuation.
+• Eradicated over 9,000 physical retail stores and 84,000 jobs globally.`;
   } else {
     hook = `When ${c.company} hit a wall in ${c.period}, the problem wasn't market demand.
 

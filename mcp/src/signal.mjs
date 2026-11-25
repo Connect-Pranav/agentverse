@@ -144,7 +144,10 @@ export const DEFAULT_BENCHMARKS = [
 
 // Initial state schema
 export async function load(kv) {
-  const s = (await kv.get(KEY, 'json')) ?? {};
+  let s = (await kv.get(KEY, 'json')) ?? {};
+  if (typeof s === 'string') {
+    try { s = JSON.parse(s); } catch { s = {}; }
+  }
   s.positioning = s.positioning || PRANAV_POSITIONING;
   s.settings = {
     dailySchedule: '09:30 Asia/Kolkata',

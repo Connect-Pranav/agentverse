@@ -3310,9 +3310,9 @@ function mtRender(){
     h+='<div class="mt-now"><span class="mt-dot"></span>'+esc(p&&p.step?p.step:(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")?((STU.health&&STU.health.instantStart)?"Starting the renderer…":"Waiting for the GitHub renderer (scheduled every 15 min — GitHub sometimes starts it late)"):"Working…"))+'</div>';
     h+='<div class="stu-bar"><i style="width:'+(pct||4)+'%"></i></div>';
     var waitingRunner=(j.status==="queued"||j.status==="approved"||(pub&&pub.state==="requested")||(j.short&&j.short.state==="requested"))&&!p;
-    if(waitingRunner)h+='<div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
+    if(waitingRunner)h+='<div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button><a class="mt-all" href="https://github.com/Connect-Pranav/agentverse/actions/workflows/songvideo.yml" target="_blank" rel="noopener" style="margin-left:8px"><span data-i="external-link"></span>Run on GitHub</a></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
   } else { STU.deadline=0;
-    if(e.label==="overdue")h+='<div class="mt-now"><span class="mt-dot" style="background:#f5a623;box-shadow:0 0 8px #f5a623"></span>GitHub has not started the renderer yet (its schedule is running late). Tap <b>Start now</b> to begin immediately.</div><div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
+    if(e.label==="overdue")h+='<div class="mt-now"><span class="mt-dot" style="background:#f5a623;box-shadow:0 0 8px #f5a623"></span>GitHub has not started the renderer yet (its schedule is running late). Tap <b>Start now</b> to begin immediately, or run directly on GitHub.</div><div class="acts"><button class="ap" data-mt="start" type="button"><span data-i="zap"></span>Start now</button><a class="mt-all" href="https://github.com/Connect-Pranav/agentverse/actions/workflows/songvideo.yml" target="_blank" rel="noopener" style="margin-left:8px"><span data-i="external-link"></span>Run on GitHub</a></div>'+(STU.startMsg?'<p class="mt-sh">'+esc(STU.startMsg)+'</p>':'');
   }
   if(j.plan){
     if(j.image_engine==="owner")h+='<p class="mt-free">Your '+(j.image_total||j.own_images||"")+' images — no AI image generation, no cost.</p>';
@@ -3394,7 +3394,7 @@ $("mtJob").onclick=function(e){
   if(a==="gallery"){ mtGallery(STU.cur,true); return; }
   if(a==="start"){
     b.disabled=true;
-    stuApi("POST","/api/songvideo/start",{}).then(function(){ STU.startMsg="Renderer started — first update in about 1–2 minutes."; STU.health=STU.health||{}; STU.health.instantStart=true; toast("Renderer started",true); mtRender(); },function(e2){ STU.startMsg=e2.message; toast(/GH_DISPATCH_TOKEN/.test(e2.message)?"One-time setup needed for Start now":e2.message,false); mtRender(); });
+    stuApi("POST","/api/songvideo/start",{}).then(function(){ STU.startMsg="Renderer started — first update in about 1–2 minutes."; STU.health=STU.health||{}; STU.health.instantStart=true; toast("Renderer started",true); mtRender(); },function(e2){ STU.startMsg=e2.message; toast(/GH_DISPATCH_TOKEN/.test(e2.message)?"Setup needed for instant start. Use 'Run on GitHub' button to start now.":e2.message,false); mtRender(); });
     return;
   }
   if(a==="redo"){

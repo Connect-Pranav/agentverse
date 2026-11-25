@@ -133,12 +133,15 @@ async function autopilot(env, j) {
   const s = j.schedule;
   if (!s?.auto) return false;
   if (j.status === 'needs_approval') { await decide(env, j, 'approve'); j.autoApproved = true; await saveJob(env, j); return true; }
-  if (j.status === 'ready' && (!j.publish || (j.publish.state === 'failed' && (j.publish.autoTries ?? 0) < 2)) && Date.parse(s.at) <= Date.now()) {
+  const isPublishFailed = j.publish?.state === 'failed';
+  const timeSinceFail = isPublishFailed ? (Date.now() - Date.parse(j.publish?.requestedAt || j.updatedAt || 0)) : 0;
+  const canAutoRetry = isPublishFailed && ((j.publish.autoTries ?? 0) < 5 || timeSinceFail > 15 * 60e3);
+  if (j.status === 'ready' && (!j.publish || canAutoRetry) && Date.parse(s.at) <= Date.now()) {
     const tries = (j.publish?.autoTries ?? 0) + (j.publish ? 1 : 0);
     j.publish = null;
     if (!clean(j.youtube?.title, 100)) j.youtube = { ...(j.youtube ?? {}), title: `${j.title || 'New song'} | Sunverse` };
     await requestPublish(env, j, { privacy: s.privacy });
-    j.publish.auto = true; j.publish.autoTries = tries;
+    j.publish.auto = true; j.publish.autoTries = tries > 10 ? 1 : tries;
     await saveJob(env, j);
     return true;
   }
@@ -724,8 +727,11 @@ async function pending(env) {
     if (!j) continue;
     try { await autopilot(env, j); } catch (e) { console.error('planner', j.id, e?.message); }
     const stale = (x) => !(x?.leaseUntil && Date.parse(x.leaseUntil) > now);
+    const pubWaiting = j.publish && (j.publish.state === 'requested' || (j.publish.state === 'publishing' && stale(j.publish)));
+    const pubAutoDue = j.status === 'ready' && j.schedule?.auto && Date.parse(j.schedule.at) <= now && (!j.publish || j.publish.state === 'failed');
+    const shortWaiting = j.short && (j.short.state === 'requested' || (j.short.state === 'making' && stale(j.short)));
     if (['queued', 'approved'].includes(j.status) || quotaRetry(j) || (['analyzing', 'rendering'].includes(j.status) && stale(j))
-      || (j.status === 'ready' && ((j.publish && (j.publish.state === 'requested' || (j.publish.state === 'publishing' && stale(j.publish)))) || (j.short && (j.short.state === 'requested' || (j.short.state === 'making' && stale(j.short))))))) n++;
+      || (j.status === 'ready' && (pubWaiting || pubAutoDue || shortWaiting))) n++;
   }
   return n;
 }
@@ -1318,7 +1324,27 @@ async function route(request, env) {
     owner(request, env);
     const v = (j) => view(env, request, j);
     if (seg[2] === 'start' && method === 'POST') {
-      // owner pressed "Start now": run the GitHub renderer immediately instead of waiting for its schedule
+      // owner pressed "Start now": refresh queued/stuck jobs first so runner claims them immediately
+      for (const id of await index(env)) {
+        const j = await kv(env).get(jobKey(id), 'json');
+        if (!j) continue;
+        let changed = false;
+        if (j.status === 'ready' && j.publish && ['failed', 'requested'].includes(j.publish.state)) {
+          j.publish.state = 'requested';
+          j.publish.attempts = 0;
+          j.publish.requestedAt = nowIso();
+          j.publish.leaseUntil = null;
+          if (j.publish.autoTries !== undefined) j.publish.autoTries = 0;
+          changed = true;
+        } else if (j.status === 'failed') {
+          j.status = j.analysis ? 'approved' : 'queued';
+          j.attempts = 0;
+          j.leaseUntil = null;
+          j.error = null;
+          changed = true;
+        }
+        if (changed) await saveJob(env, j);
+      }
       if (!env.GH_DISPATCH_TOKEN) throw new HttpError(409, 'Start now needs the Cloudflare secret GH_DISPATCH_TOKEN (GitHub token with Actions: read and write on Connect-Pranav/agentverse)');
       const repo = env.GH_REPO || 'Connect-Pranav/agentverse';
       const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/songvideo.yml/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main' }),

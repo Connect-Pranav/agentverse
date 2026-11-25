@@ -1168,9 +1168,10 @@ def yt_token():
         if "invalid_grant" in str(e):
             raise RuntimeError("YouTube login expired (invalid_grant). Make a new token with scripts/yt-refresh-token.py and update the YT_REFRESH_TOKEN secret. "
                                "If the Google OAuth app is in 'Testing' mode, tokens expire every 7 days: set it to 'In production' once.") from None
-        raise
+        raise RuntimeError(f"Google OAuth token refresh failed ({redact(e)}). Please verify or refresh YT_REFRESH_TOKEN in repo secrets.") from None
     if not r.get("access_token"):
-        raise RuntimeError("Google did not return an access token (refresh token expired or revoked?)")
+        err = r.get("error_description") or r.get("error") or "token expired or revoked"
+        raise RuntimeError(f"Google did not return an access token ({err}). Please regenerate YT_REFRESH_TOKEN in repo secrets.")
     return r["access_token"]
 
 
