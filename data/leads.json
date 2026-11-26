@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-26T08:12:47.154Z",
+ "updated": "2026-11-26T21:28:39.467Z",
  "count": 7,
  "health": {
   "reddit": {
@@ -60,24 +60,6 @@
    "products": [
     "NIKHILs TECH STUDIO"
    ],
-   "score": 7,
-   "matched": [
-    "llm"
-   ],
-   "firstSeen": "2026-11-24T22:24:06.552Z"
-  },
-  {
-   "id": "md_117672129911297142",
-   "source": "mastodon #hiring",
-   "title": "📌 Hiring Now! | ML Engineer, LLM and Agentic Evaluations Contract with Turing, remote across LATAM. Pay discu",
-   "text": "📌 Hiring Now! | ML Engineer, LLM and Agentic Evaluations Contract with Turing, remote across LATAM. Pay discussed during screening. ✅ Python evaluation suites for LLM reasoning and coding ✅ Agent benchmarks covering planning and tool use ✅ Model comparisons, graders, and failure analysis How do you make model evaluations reproducible? 👉 Apply here: https:// nearskill.in/jobs/ml-engineer- llm-agentic-evaluations-118678?utm_source=mastodon&utm_medium=social # RemoteJobs # Python # AIJobs # Hiring",
-   "url": "https://mastodon.social/@nearskill/117672129911297142",
-   "author": "nearskill",
-   "created": "2026-11-24T15:30:08.882Z",
-   "product": "NIKHILs TECH STUDIO",
-   "products": [
-    "NIKHILs TECH STUDIO"
-   ],
    "score": 6,
    "matched": [
     "llm"
@@ -119,6 +101,24 @@
     "landing page"
    ],
    "firstSeen": "2026-11-25T21:39:55.501Z"
+  },
+  {
+   "id": "md_117672129911297142",
+   "source": "mastodon #hiring",
+   "title": "📌 Hiring Now! | ML Engineer, LLM and Agentic Evaluations Contract with Turing, remote across LATAM. Pay discu",
+   "text": "📌 Hiring Now! | ML Engineer, LLM and Agentic Evaluations Contract with Turing, remote across LATAM. Pay discussed during screening. ✅ Python evaluation suites for LLM reasoning and coding ✅ Agent benchmarks covering planning and tool use ✅ Model comparisons, graders, and failure analysis How do you make model evaluations reproducible? 👉 Apply here: https:// nearskill.in/jobs/ml-engineer- llm-agentic-evaluations-118678?utm_source=mastodon&utm_medium=social # RemoteJobs # Python # AIJobs # Hiring",
+   "url": "https://mastodon.social/@nearskill/117672129911297142",
+   "author": "nearskill",
+   "created": "2026-11-24T15:30:08.882Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 5,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-24T22:24:06.552Z"
   },
   {
    "id": "md_117654608558394982",
