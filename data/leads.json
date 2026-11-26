@@ -1,6 +1,6 @@
 {
- "updated": "2026-11-25T21:39:55.501Z",
- "count": 6,
+ "updated": "2026-11-26T08:12:47.154Z",
+ "count": 7,
  "health": {
   "reddit": {
    "ok": 0,
@@ -30,6 +30,24 @@
  },
  "reddit": "public",
  "leads": [
+  {
+   "id": "md_117681115296450073",
+   "source": "mastodon #getfedihired",
+   "title": "🤖 Senior Machine Learning Engineer, Assistance Foundations at Airbnb 📍United States | Remote Job 💵 $196,000",
+   "text": "🤖 Senior Machine Learning Engineer, Assistance Foundations at Airbnb 📍United States | Remote Job 💵 $196,000 – $227,000 / year Airbnb is looking for a senior machine learning engineer to build production AI systems for support teams. ✅ You'll design, evaluate, and ship LLM and agentic systems from experiments through production. 🔗 APPLICATION LINK IN BIO # GetFediHired # RemoteJobs # AIjobs",
+   "url": "https://mastodon.social/@rolechemy/117681115296450073",
+   "author": "rolechemy",
+   "created": "2026-11-26T05:35:14.952Z",
+   "product": "NIKHILs TECH STUDIO",
+   "products": [
+    "NIKHILs TECH STUDIO"
+   ],
+   "score": 7,
+   "matched": [
+    "llm"
+   ],
+   "firstSeen": "2026-11-26T08:12:47.154Z"
+  },
   {
    "id": "md_117672385310522550",
    "source": "mastodon #getfedihired",
