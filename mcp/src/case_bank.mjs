@@ -1667,6 +1667,21 @@ Blockbuster didn't die because streaming appeared overnight. They died because l
 • Filed Chapter 11 bankruptcy in September 2010.
 • Decimated a peak $6 Billion commercial valuation.
 • Eradicated over 9,000 physical retail stores and 84,000 jobs globally.`;
+  } else if (c.caseNumber === 3 || /Nokia/i.test(c.company)) {
+    hook = `In 2007, Nokia commanded over 50% of global mobile phone profits. Forbes put them on the cover asking: "Nokia: 1 Billion Customers — Can Anyone Catch the Cell Phone King?"
+
+By 2013, Nokia's smartphone market share plummeted to under 3%. In September 2013, Nokia sold its core mobile business to Microsoft in distress.
+
+Nokia didn't die because they built fragile hardware. They died because leadership treated mobile as a device manufacturing business while iOS and Android turned it into a software developer ecosystem.`;
+
+    strategy = `The Strategy Trap:
+• Flawed Strategy: Rely on fragmented Symbian codebases and hardware cycle refreshes instead of building a unified, developer-first operating platform.
+• Operator Reality: In a platform economy, superior hardware engineering cannot compensate for an inferior software ecosystem and high developer friction.`;
+
+    outcome = `The Business Outcome:
+• Smartphone market share collapsed from ~50% peak to under 3% by 2013.
+• Decimated over $200 Billion in peak enterprise valuation.
+• Forced into an emergency exit, selling Devices & Services to Microsoft for $7.2 Billion.`;
   } else {
     hook = `When ${c.company} hit a wall in ${c.period}, the problem wasn't market demand.
 
