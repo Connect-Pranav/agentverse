@@ -496,3 +496,41 @@ test('editorial visuals: every case renders in every template without cutting so
   assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-v1') && /Yahoo/i.test(s.drafts.a.visual.svg));
   assert.equal(s.drafts.b.visual.svg, '<svg>kept</svg>');
 });
+
+test('animation: frames sample SMIL correctly; finished frame equals the static design; GIF route stores + serves', async () => {
+  const E = await import('../src/editorial_templates.mjs');
+  const { CASE_BANK } = await import('../src/case_bank.mjs');
+  const yahoo = CASE_BANK.find((c) => c.caseNumber === 5);
+  const svg = E.EDITORIAL_TEMPLATES[E.pickEditorialTemplate(yahoo)]({ caseData: yahoo });
+  const len = E.animationLength(svg);
+  assert.ok(len > 1 && len < 6, `animation length ${len}`);
+  const start = E.sampleSvgAt(svg, 0), end = E.sampleSvgAt(svg, Infinity);
+  assert.ok(!/<animate/.test(start) && !/<animate/.test(end));
+  assert.match(start, /width="0" height="\d+" rx="8"/, 'bars start empty');
+  // finished frame keeps every bar at its full width (base values are the final state)
+  for (const m of svg.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="\d+" rx="8" fill="#(?:DC6656|2870C8|8CA9CB)">/g)) assert.ok(end.includes(`width="${m[1]}"`));
+  assert.equal(E.stripAnimations(svg), end);
+
+  const kv = memKv();
+  const sent = [];
+  const f = async (url, init) => { sent.push(String(url)); return { ok: true, status: 200, json: async () => ({ ok: true }), text: async () => '{}' }; };
+  await signal.runLinkedinPostGenerator(kv, envFor(), { skipEngagement: true }, f);
+  const st = await signal.load(kv);
+  const gif = new TextEncoder().encode('GIF89a-test').buffer;
+  const r1 = await signal.attachVisualGif(kv, envFor(), st.latestDraftId, gif, f);
+  const afterFirst = sent.length;
+  const r2 = await signal.attachVisualGif(kv, envFor(), st.latestDraftId, gif, f);
+  assert.equal(r1.bytes, gif.byteLength);
+  assert.equal(r1.telegram_sent, true);
+  assert.ok(sent.slice(0, afterFirst).some((u) => u.includes('sendDocument')));
+  assert.equal(r2.telegram_sent, true);
+  assert.equal(sent.length, afterFirst, 'GIF is sent to Telegram only once per post');
+
+  // Worker routes: no GIF yet -> 404; upload needs runner auth
+  const env = mockEnv();
+  const head = await worker.fetch(new Request(BASE + '/api/signal/visual.gif?post_id=post_none', { method: 'HEAD' }), env);
+  assert.equal(head.status, 404);
+  const anon = await worker.fetch(new Request(BASE + '/api/signal/visual-gif?post_id=x', { method: 'PUT', body: 'GIF89a', headers: { 'content-type': 'image/gif' } }), env);
+  assert.ok(anon.status === 401 || anon.status === 503, `anonymous upload must be refused, got ${anon.status}`);
+  assert.ok((await signal.load(kv)).drafts[st.latestDraftId].visual.gif.url.includes('visual.gif'));
+});

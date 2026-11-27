@@ -1670,6 +1670,25 @@ export async function signalFontCss(env) {
   } catch (_) { return ''; }
 }
 
+// Stores the animated GIF for a post and sends it to Telegram once (the approval chat sees the motion version).
+export async function attachVisualGif(kv, env, postId, buf, fetchImpl = fetch) {
+  const s = await load(kv);
+  const d = s.drafts[postId];
+  if (!d) throw new SignalError(404, `Draft "${postId}" not found.`);
+  await kv.put(`signal/gif/${postId}`, buf, { expirationTtl: 120 * 86400 });
+  const already = Boolean(d.visual?.gif?.telegram_sent);
+  let sent = already;
+  if (!already && d.status !== 'published') {
+    sent = await telegram.sendTelegramDocument(env, `case-${d.case_number || d.caseNumber || 'x'}-animated.gif`, buf, 'image/gif',
+      `Animated visual for ${d.company || postId}. Same post, same facts; download from the dashboard to upload to LinkedIn.`, fetchImpl);
+  }
+  d.visual = { ...(d.visual || {}), gif: { url: `/api/signal/visual.gif?post_id=${encodeURIComponent(postId)}`, bytes: buf.byteLength, updatedAt: nowIso(), telegram_sent: Boolean(sent) } };
+  if (s.visuals?.[postId]) s.visuals[postId] = d.visual;
+  logActivity(s, 'Visual Creative Agent', `Animated GIF stored for "${postId}" (${(buf.byteLength / 1024).toFixed(0)} KB)${sent && !already ? ', sent to Telegram' : ''}.`);
+  await save(kv, s);
+  return { post_id: postId, bytes: buf.byteLength, telegram_sent: Boolean(sent) };
+}
+
 // Linkedin_Post_Generator: one Excel/CSV case per day -> draft -> visual -> persist -> Telegram.
 // Idempotent per post_id: re-running the same day RESUMES the stored run (same run_id / post_id /
 // case_number) and only repeats stages that have not completed. Pass { new_case: true } or { topic_id }

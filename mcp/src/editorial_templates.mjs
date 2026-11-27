@@ -84,6 +84,61 @@ function eyebrow(text, x, y, fill, anchor = 'start') {
   return `<text x="${x}" y="${y}" font-family="${FONT_FAMILY.mono}" font-weight="400" font-size="13" letter-spacing="1.4" fill="${fill}" text-anchor="${anchor}">${esc(String(text).toUpperCase())}</text>`;
 }
 
+
+// ─── Motion (SMIL) ───────────────────────────────────────────
+// Every animation starts at t=0 and holds its start value through its delay (values + keyTimes),
+// so nothing flashes before it begins. Base attributes are always the FINAL frame, so any viewer
+// that ignores SMIL (and the JPEG / PDF / GIF last frame) shows the finished design.
+const r2 = (n) => Math.round(n * 1000) / 1000;
+export function anim(attr, from, to, delay = 0, dur = 0.7) {
+  const total = delay + dur;
+  const k = r2(delay / total);
+  return `<animate attributeName="${attr}" values="${from};${from};${to}" keyTimes="0;${k};1" dur="${r2(total)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;0.16 1 0.3 1"/>`;
+}
+function rise(delay = 0, dy = 28, dur = 0.7) {
+  return anim('opacity', 0, 1, delay, dur) +
+    `<animateTransform attributeName="transform" type="translate" values="0 ${dy};0 ${dy};0 0" keyTimes="0;${r2(delay / (delay + dur))};1" dur="${r2(delay + dur)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;0.16 1 0.3 1"/>`;
+}
+// Wraps content in a group that fades and rises into place.
+const R = (delay, ...items) => reveal(items.join('\n  '), delay);
+const reveal = (content, delay, dy = 28, dur = 0.7) => `<g opacity="1" transform="translate(0 0)">${rise(delay, dy, dur)}${content}</g>`;
+
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+function valueAt(a, t) {
+  const get = (n) => (new RegExp(`\\b${n}="([^"]*)"`).exec(a) || [])[1];
+  const dur = parseFloat(get('dur')) || 0;
+  const vals = (get('values') || `${get('from')};${get('to')}`).split(';').map((v) => v.trim());
+  const keys = (get('keyTimes') || vals.map((_, i) => i / (vals.length - 1)).join(';')).split(';').map(Number);
+  const splines = get('calcMode') === 'spline' ? (get('keySplines') || '').split(';') : [];
+  const x = dur ? Math.min(1, Math.max(0, t / dur)) : 1;
+  let i = 0;
+  while (i < keys.length - 2 && x > keys[i + 1]) i++;
+  const span = keys[i + 1] - keys[i] || 1;
+  let f = Math.min(1, Math.max(0, (x - keys[i]) / span));
+  if (splines[i] && splines[i].trim() !== '0 0 1 1') f = easeOut(f);
+  const A = vals[i].split(/[\s,]+/).map(Number), B = vals[i + 1].split(/[\s,]+/).map(Number);
+  return A.map((v, j) => r2(v + (B[j] - v) * f)).join(' ');
+}
+const setAttr = (tag, name, val) => (new RegExp(`\\s${name}="[^"]*"`).test(tag) ? tag.replace(new RegExp(`(\\s${name}=")[^"]*"`), `$1${val}"`) : tag.replace(/(\/?)>$/, ` ${name}="${val}"$1>`));
+
+// Freezes every animation at time t (seconds) and removes the SMIL tags: used for GIF frames
+// and, with t = Infinity, for the static JPEG / PDF.
+export function sampleSvgAt(svg, t) {
+  return String(svg).replace(/(<\w+\b[^>]*>)((?:<animate(?:Transform)?\b[^>]*\/>)+)/g, (_, open, anims) => {
+    let tag = open;
+    for (const a of anims.match(/<animate(?:Transform)?\b[^>]*\/>/g)) {
+      const attr = (/attributeName="([^"]+)"/.exec(a) || [])[1];
+      const v = valueAt(a, t);
+      tag = a.startsWith('<animateTransform') ? setAttr(tag, 'transform', `translate(${v})`) : setAttr(tag, attr, v);
+    }
+    return tag;
+  });
+}
+// Seconds until the last animation finishes.
+export function animationLength(svg) {
+  return Math.max(0, ...[...String(svg).matchAll(/<animate(?:Transform)?\b[^>]*\bdur="([\d.]+)s"/g)].map((m) => +m[1]));
+}
+
 // ─── Content extraction (from sourced case fields only) ─────
 export function sentences(t = '') {
   return String(t).split(/(?<=[.!?])\s+(?=[A-Z0-9"“])|;\s+/).map((x) => x.trim()).filter(Boolean);
@@ -188,18 +243,18 @@ export function generateFailureAutopsy({ caseData }) {
     y += 32 + 40;
     // Headline: the case's own post angle, sentence case
     const h = fit(asSentence(cd.postAngle || cd.documentedProblem || cd.company), CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
-    parts.push(block(h, M, y, T.navy));
+    parts.push(R(0.1, block(h, M, y, T.navy)));
     y += h.height + 24;
     // Company line
     const co = `${cd.company || ''}`;
-    parts.push(`<text x="${M}" y="${y + 18}" font-family="${FONT_FAMILY.body}" font-weight="600" font-size="22" fill="${T.navy}">${esc(co)}<tspan fill="${T.slate}" font-weight="400">  ·  ${esc(cd.industry || '')}</tspan></text>`);
+    parts.push(R(0.45, `<text x="${M}" y="${y + 18}" font-family="${FONT_FAMILY.body}" font-weight="600" font-size="22" fill="${T.navy}">${esc(co)}<tspan fill="${T.slate}" font-weight="400">  ·  ${esc(cd.industry || '')}</tspan></text>`));
     y += 22 + 12;
     const prof = fit(cd.companyProfile || '', span(10), { fam: 'body', weight: 400, sizes: [18, 17], lh: 1.4, maxLines: 2 });
-    parts.push(block(prof, M, y, T.slate));
+    parts.push(R(0.55, block(prof, M, y, T.slate)));
     const sp = lv.spread || 0;
     y += prof.height + lv.gap - 8 + sp;
     // Period timeline replaces the plain divider when the case has dated years.
-    const tl = timeline(cd, M, y - 8, CW, { label: T.slate, track: T.border, accent: T.coral });
+    const tl = timeline(cd, M, y - 8, CW, { label: T.slate, track: T.border, accent: T.coral, delay: 0.8 });
     if (tl.h) { parts.push(tl.svg); y += tl.h; } else parts.push(`<line x1="${M}" y1="${y}" x2="${CANVAS.w - M}" y2="${y}" stroke="${T.border}" stroke-width="1"/>`);
     y += lv.gap - 8 + sp;
 
@@ -213,20 +268,20 @@ export function generateFailureAutopsy({ caseData }) {
       { x: M, title: 'What went wrong', b: wrong, bg: T.lightCoral, stroke: 'none', titleFill: T.coral },
       { x: M + half + 24, title: 'Why it happened', b: why, bg: T.white, stroke: T.border, titleFill: T.navy },
     ];
-    for (const c of cards) {
-      parts.push(`<rect x="${c.x}" y="${y}" width="${half}" height="${cardH.toFixed(0)}" rx="14" fill="${c.bg}"${c.stroke !== 'none' ? ` stroke="${c.stroke}" stroke-width="1"` : ''}/>`,
+    cards.forEach((c, ci) => {
+      parts.push(R(1.0 + ci * 0.25, `<rect x="${c.x}" y="${y}" width="${half}" height="${cardH.toFixed(0)}" rx="14" fill="${c.bg}"${c.stroke !== 'none' ? ` stroke="${c.stroke}" stroke-width="1"` : ''}/>`,
         `<text x="${c.x + pad}" y="${y + pad + 22}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${c.titleFill}">${esc(c.title)}</text>`,
-        block(c.b, c.x + pad, y + pad + 28 + 20, T.navy));
-    }
+        block(c.b, c.x + pad, y + pad + 28 + 20, T.navy)));
+    });
     y += cardH + 24 + sp;
 
     // What it cost (full width, coral rule)
     const cost = fit(cd.businessImpact || cd.documentedResponse || '', CW - 2 * pad - 8, { fam: 'body', weight: 400, sizes: lv.body, lh: 1.45, maxLines: 4 });
     const costH = pad + 28 + 20 + cost.height + pad;
-    parts.push(`<rect x="${M}" y="${y}" width="${CW}" height="${costH.toFixed(0)}" rx="14" fill="${T.white}" stroke="${T.border}" stroke-width="1"/>`,
+    parts.push(R(1.6, `<rect x="${M}" y="${y}" width="${CW}" height="${costH.toFixed(0)}" rx="14" fill="${T.white}" stroke="${T.border}" stroke-width="1"/>`,
       `<rect x="${M}" y="${y + 20}" width="4" height="${(costH - 40).toFixed(0)}" rx="2" fill="${T.coral}"/>`,
       `<text x="${M + pad + 8}" y="${y + pad + 22}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${T.navy}">What it cost</text>`,
-      block(cost, M + pad + 8, y + pad + 28 + 20, T.navy));
+      block(cost, M + pad + 8, y + pad + 28 + 20, T.navy)));
     y += costH + 24 + sp;
 
     // Operator lessons (light teal, numbered)
@@ -235,12 +290,12 @@ export function generateFailureAutopsy({ caseData }) {
     const fitted = items.map((t) => fit(t + '.', lessonW, { fam: 'body', weight: 400, sizes: [lv.lesson], lh: 1.4, maxLines: 2 }));
     const listH = fitted.reduce((a, b) => a + b.height, 0) + Math.max(0, fitted.length - 1) * 14;
     const lessonsH = pad + 28 + 24 + listH + pad;
-    parts.push(`<rect x="${M}" y="${y}" width="${CW}" height="${lessonsH.toFixed(0)}" rx="14" fill="${T.lightTeal}"/>`,
-      `<text x="${M + pad}" y="${y + pad + 22}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${T.navy}">Operator lessons</text>`);
+    parts.push(R(1.9, `<rect x="${M}" y="${y}" width="${CW}" height="${lessonsH.toFixed(0)}" rx="14" fill="${T.lightTeal}"/>`,
+      `<text x="${M + pad}" y="${y + pad + 22}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${T.navy}">Operator lessons</text>`));
     let ly = y + pad + 28 + 24;
     fitted.forEach((b, i) => {
-      parts.push(`<text x="${M + pad}" y="${(ly + b.size * 0.8).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${b.size}" fill="${T.teal}">${String(i + 1).padStart(2, '0')}</text>`,
-        block(b, M + pad + 56, ly, T.navy));
+      parts.push(R(2.1 + i * 0.15, `<text x="${M + pad}" y="${(ly + b.size * 0.8).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${b.size}" fill="${T.teal}">${String(i + 1).padStart(2, '0')}</text>`,
+        block(b, M + pad + 56, ly, T.navy)));
       ly += b.height + 14;
     });
     y += lessonsH;
@@ -276,18 +331,18 @@ export function generateEditorialCover({ caseData }) {
     let y = top + Math.round(free * 0.45);
     const parts = [svgOpen(T.midnight)];
     parts.push(eyebrow(`Case ${caseNo(cd)} · ${cd.theme || ''}`, M, M + 13, T.amber), eyebrow(cd.period || '', CANVAS.w - M, M + 13, soft, 'end'));
-    parts.push(block(h, M, y, T.white));
+    parts.push(R(0.1, block(h, M, y, T.white)));
     y += h.height + 48;
-    parts.push(`<rect x="${M}" y="${y}" width="96" height="4" rx="2" fill="${T.amber}"/>`);
+    parts.push(`<rect x="${M}" y="${y}" width="96" height="4" rx="2" fill="${T.amber}">${anim('width', 0, 96, 0.7, 0.6)}</rect>`);
     y += 4 + 40;
-    parts.push(`<text x="${M}" y="${y + 20}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${T.white}">${esc(cd.company || '')}<tspan font-family="${FONT_FAMILY.body}" font-weight="400" font-size="20" fill="${soft}">  ·  ${esc(cd.industry || '')}</tspan></text>`);
+    parts.push(R(1.0, `<text x="${M}" y="${y + 20}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${T.white}">${esc(cd.company || '')}<tspan font-family="${FONT_FAMILY.body}" font-weight="400" font-size="20" fill="${soft}">  ·  ${esc(cd.industry || '')}</tspan></text>`));
     y += 28 + 24;
-    parts.push(block(prob, M, y, soft));
-    const tl = timeline(cd, M, y + prob.height + Math.max(48, Math.floor((panelY - (y + prob.height) - 56) / 2)), CW, { label: soft, track: '#24344B', accent: T.coral });
+    parts.push(R(1.1, block(prob, M, y, soft)));
+    const tl = timeline(cd, M, y + prob.height + Math.max(48, Math.floor((panelY - (y + prob.height) - 56) / 2)), CW, { label: soft, track: '#24344B', accent: T.coral, delay: 1.3 });
     if (y + prob.height + 48 + tl.h <= panelY - 24) parts.push(tl.svg);
-    parts.push(`<rect x="${M}" y="${panelY}" width="${CW}" height="${panelH.toFixed(0)}" rx="14" fill="#132238" stroke="${rule}" stroke-width="1"/>`,
+    parts.push(R(1.9, `<rect x="${M}" y="${panelY}" width="${CW}" height="${panelH.toFixed(0)}" rx="14" fill="#132238" stroke="${rule}" stroke-width="1"/>`,
       eyebrow('What it cost', M + pad, panelY + pad + 13, T.amber),
-      block(cost, M + pad, panelY + pad + 13 + 20, T.white));
+      block(cost, M + pad, panelY + pad + 13 + 20, T.white)));
     parts.push(footer(`Editorial · ${cd.theme || ''}`, `Source: ${sourceLabel(cd)}`, { rule, text: '#8A97A8' }), '</svg>');
     return { svg: parts.join('\n  '), bottom: panelY + panelH };
   });
@@ -310,9 +365,9 @@ export function generateExecCheatSheet({ caseData }) {
     parts.push(eyebrow(`Executive cheat sheet · Case ${caseNo(cd)}`, M, y + 13, T.blue), eyebrow(cd.period || '', CANVAS.w - M, y + 13, T.slate, 'end'));
     y += 13 + 48;
     const h = fit(`What ${cd.company || 'this case'} teaches operators`, CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
-    parts.push(block(h, M, y, T.navy));
+    parts.push(R(0.1, block(h, M, y, T.navy)));
     y += h.height + 16;
-    parts.push(`<text x="${M}" y="${y + 16}" font-family="${FONT_FAMILY.body}" font-weight="400" font-size="18" fill="${T.slate}">${esc([cd.theme, cd.industry].filter(Boolean).join('  ·  '))}</text>`);
+    parts.push(R(0.35, `<text x="${M}" y="${y + 16}" font-family="${FONT_FAMILY.body}" font-weight="400" font-size="18" fill="${T.slate}">${esc([cd.theme, cd.industry].filter(Boolean).join('  ·  '))}</text>`));
     const sp = lv.spread || 0;
     y += 18 + lv.gap + sp;
 
@@ -326,10 +381,10 @@ export function generateExecCheatSheet({ caseData }) {
     const modH = pad + 13 + 20 + Math.max(...mods.map((m) => m.b.height)) + pad;
     mods.forEach((m, i) => {
       const x = M + i * (w + 24);
-      parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${modH.toFixed(0)}" rx="14" fill="${T.white}" stroke="${T.border}" stroke-width="1"/>`,
+      parts.push(R(0.6 + i * 0.2, `<rect x="${x}" y="${y}" width="${w}" height="${modH.toFixed(0)}" rx="14" fill="${T.white}" stroke="${T.border}" stroke-width="1"/>`,
         `<rect x="${x + pad}" y="${y + pad - 2}" width="24" height="3" rx="1.5" fill="${m.acc}"/>`,
         eyebrow(m.t, x + pad, y + pad + 20, T.navy),
-        block(m.b, x + pad, y + pad + 13 + 28, T.navy));
+        block(m.b, x + pad, y + pad + 13 + 28, T.navy)));
     });
     y += modH + lv.gap + sp;
 
@@ -337,24 +392,24 @@ export function generateExecCheatSheet({ caseData }) {
     const rp = 32;
     const rl = fit(asSentence(cd.postAngle), CW - 2 * rp - 8, { fam: 'head', weight: 700, sizes: lv.rule, lh: 1.2, maxLines: 3 });
     const ruleH = rp + 13 + 20 + rl.height + rp;
-    parts.push(`<rect x="${M}" y="${y}" width="${CW}" height="${ruleH.toFixed(0)}" rx="14" fill="${T.lightBlue}"/>`,
+    parts.push(R(1.3, `<rect x="${M}" y="${y}" width="${CW}" height="${ruleH.toFixed(0)}" rx="14" fill="${T.lightBlue}"/>`,
       `<rect x="${M}" y="${y + 20}" width="4" height="${(ruleH - 40).toFixed(0)}" rx="2" fill="${T.blue}"/>`,
       eyebrow('Decision rule', M + rp + 8, y + rp + 13, T.blue),
-      block(rl, M + rp + 8, y + rp + 13 + 20, T.navy));
+      block(rl, M + rp + 8, y + rp + 13 + 20, T.navy)));
     y += ruleH + lv.gap + sp;
 
     // Checklist
-    parts.push(`<text x="${M}" y="${y + 22}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="30" fill="${T.navy}">Operator checklist</text>`);
+    parts.push(R(1.6, `<text x="${M}" y="${y + 22}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="30" fill="${T.navy}">Operator checklist</text>`));
     y += 30 + 32;
-    for (const it of actionItems(cd.recommendedFix)) {
+    actionItems(cd.recommendedFix).forEach((it, ix) => {
       const b = fit(it + '.', CW - 64, { fam: 'body', weight: 400, sizes: [lv.item], lh: 1.4, maxLines: 2 });
       const cy = y + b.size * 0.4 - 11;
-      parts.push(`<rect x="${M}" y="${cy.toFixed(1)}" width="22" height="22" rx="6" fill="none" stroke="${T.teal}" stroke-width="2"/>`,
+      parts.push(R(1.75 + ix * 0.15, `<rect x="${M}" y="${cy.toFixed(1)}" width="22" height="22" rx="6" fill="none" stroke="${T.teal}" stroke-width="2"/>`,
         `<path d="M${M + 5} ${(cy + 11).toFixed(1)} l4.5 4.5 l8 -9" fill="none" stroke="${T.teal}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
-        block(b, M + 40, y, T.navy));
+        block(b, M + 40, y, T.navy)));
       y += b.height + lv.itemGap;
       parts.push(`<line x1="${M + 40}" y1="${(y - lv.itemGap / 2).toFixed(1)}" x2="${CANVAS.w - M}" y2="${(y - lv.itemGap / 2).toFixed(1)}" stroke="${T.border}" stroke-width="1"/>`);
-    }
+    });
     parts.push(footer(`Executive cheat sheet · ${cd.theme || ''}`, `Source: ${sourceLabel(cd)}`, { rule: T.border, text: T.slate }), '</svg>');
     return { svg: parts.join('\n  '), bottom: y };
   });
@@ -430,11 +485,11 @@ function timeline(cd, x, y, w, colors) {
   if (!p || p.to <= p.from) return { svg: '', h: 0 };
   const yrs = p.to - p.from;
   const label = yrs > 0 ? `${yrs} year${yrs > 1 ? 's' : ''}` : 'single year';
-  return { h: 56, svg: `<g>
+  return { h: 56, svg: `<g opacity="1">${anim('opacity', 0, 1, Math.max(0, (colors.delay || 0.6) - 0.3), 0.5)}
     <text x="${x}" y="${y + 13}" font-family="${FONT_FAMILY.mono}" font-size="13" letter-spacing="1.4" fill="${colors.label}">${esc(String(p.from))}</text>
     <text x="${x + w}" y="${y + 13}" font-family="${FONT_FAMILY.mono}" font-size="13" letter-spacing="1.4" fill="${colors.label}" text-anchor="end">${esc(String(p.to))}</text>
     <line x1="${x}" y1="${y + 36}" x2="${x + w}" y2="${y + 36}" stroke="${colors.track}" stroke-width="2"/>
-    <line x1="${x}" y1="${y + 36}" x2="${x + w}" y2="${y + 36}" stroke="${colors.accent}" stroke-width="3" stroke-dasharray="${w}" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" from="${w}" to="0" dur="1.4s" fill="freeze"/></line>
+    <line x1="${x}" y1="${y + 36}" x2="${x + w}" y2="${y + 36}" stroke="${colors.accent}" stroke-width="3" stroke-dasharray="${w}" stroke-dashoffset="0">${anim('stroke-dashoffset', w, 0, colors.delay || 0.6, 1.2)}</line>
     <circle cx="${x}" cy="${y + 36}" r="6" fill="${colors.accent}"/>
     <circle cx="${x + w}" cy="${y + 36}" r="6" fill="${colors.accent}"/>
     <text x="${x + w / 2}" y="${y + 28}" font-family="${FONT_FAMILY.mono}" font-size="13" fill="${colors.label}" text-anchor="middle">${esc(label)}</text>
@@ -462,7 +517,7 @@ export function generateDataStory({ caseData }) {
     parts.push(eyebrow(`Data story · Case ${caseNo(cd)} · ${cd.company || ''}`, M, y + 13, T.amber), eyebrow(cd.period || '', CANVAS.w - M, y + 13, soft, 'end'));
     y += 13 + 48 + sp;
     const h = fit(asSentence(cd.postAngle || cd.documentedProblem), CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
-    parts.push(block(h, M, y, T.white));
+    parts.push(R(0.1, block(h, M, y, T.white)));
     y += h.height + lv.gap + sp;
 
     const pad = 32;
@@ -485,8 +540,8 @@ export function generateDataStory({ caseData }) {
         const color = f.trend === 'down' || neg.test(f.label) ? T.coral : (isLast ? T.blue : '#8CA9CB');
         inner += `<text x="${M + pad}" y="${(iy + bh / 2 + 7).toFixed(1)}" font-family="${FONT_FAMILY.body}" font-weight="600" font-size="20" fill="${T.white}">${esc(f.label)}</text>
     <rect x="${barX}" y="${iy}" width="${barMax}" height="${bh}" rx="8" fill="${track}"/>
-    <rect x="${barX}" y="${iy}" width="${w.toFixed(1)}" height="${bh}" rx="8" fill="${color}"><animate attributeName="width" from="0" to="${w.toFixed(1)}" dur="1.1s" begin="${(0.2 + i * 0.25).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1" keyTimes="0;1"/></rect>
-    <text x="${(barX + w + 16).toFixed(1)}" y="${(iy + bh / 2 + vs * 0.36).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${vs}" fill="${T.white}">${esc(f.raw)}</text>`;
+    <rect x="${barX}" y="${iy}" width="${w.toFixed(1)}" height="${bh}" rx="8" fill="${color}">${anim('width', 0, w.toFixed(1), 0.9 + i * 0.3, 1.1)}</rect>
+    <text x="${(barX + w + 16).toFixed(1)}" y="${(iy + bh / 2 + vs * 0.36).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${vs}" fill="${T.white}" opacity="1">${anim('x', (barX + 16).toFixed(1), (barX + w + 16).toFixed(1), 0.9 + i * 0.3, 1.1)}${anim('opacity', 0, 1, 0.9 + i * 0.3, 0.5)}${esc(f.raw)}</text>`;
         iy += bh + 24;
       });
       iy += 8;
@@ -495,23 +550,23 @@ export function generateDataStory({ caseData }) {
       inner += eyebrow('The number', M + pad, iy + 13, T.amber);
       iy += 13 + 24;
       const ks = Math.min(200, Math.floor((CW - 2 * pad) / Math.max(1, measure(f.raw, 'mono', 700, 1))));
-      inner += `<text x="${M + pad}" y="${(iy + ks * 0.78).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${ks}" fill="${T.coral}" letter-spacing="-4" opacity="1"><animate attributeName="opacity" from="0" to="1" dur="0.9s" fill="freeze"/>${esc(f.raw)}</text>`;
+      inner += `<text x="${M + pad}" y="${(iy + ks * 0.78).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${ks}" fill="${T.coral}" letter-spacing="-4" opacity="1">${anim('opacity', 0, 1, 0.9, 0.8)}${esc(f.raw)}</text>`;
       iy += ks * 0.8 + 24;
     }
     const cap2 = fit((chart || single).sentence, CW - 2 * pad, { fam: 'body', weight: 400, sizes: lv.body, lh: 1.45, maxLines: lv.bodyLines });
     inner += block(cap2, M + pad, iy, soft);
     iy += cap2.height + pad;
-    parts.push(`<rect x="${M}" y="${panelTop}" width="${CW}" height="${(iy - panelTop).toFixed(0)}" rx="14" fill="#132238" stroke="${rule}" stroke-width="1"/>`, inner);
+    parts.push(R(0.5, `<rect x="${M}" y="${panelTop}" width="${CW}" height="${(iy - panelTop).toFixed(0)}" rx="14" fill="#132238" stroke="${rule}" stroke-width="1"/>`, inner));
     y = iy + lv.gap + sp;
 
     // Root cause + the lesson
     const why = fit(cd.rootCauseAnalysis || '', CW, { fam: 'body', weight: 400, sizes: lv.body, lh: 1.45, maxLines: lv.bodyLines + 1 });
-    parts.push(eyebrow('Why it happened', M, y + 13, T.amber), block(why, M, y + 13 + 20, T.white));
+    parts.push(R(2.3, eyebrow('Why it happened', M, y + 13, T.amber), block(why, M, y + 13 + 20, T.white)));
     y += 13 + 20 + why.height + 40 + sp;
     const lesson = actionItems(cd.recommendedFix)[0] || '';
     const ls = fit(lesson + '.', CW - 40, { fam: 'head', weight: 700, sizes: [32, 30, 28, 26, 24], lh: 1.25, maxLines: 3 });
-    parts.push(`<rect x="${M}" y="${y}" width="4" height="${(13 + 16 + ls.height).toFixed(0)}" rx="2" fill="${T.teal}"/>`,
-      eyebrow('Operator lesson', M + 24, y + 13, '#42BFA9'), block(ls, M + 24, y + 13 + 16, T.white));
+    parts.push(R(2.6, `<rect x="${M}" y="${y}" width="4" height="${(13 + 16 + ls.height).toFixed(0)}" rx="2" fill="${T.teal}"/>`,
+      eyebrow('Operator lesson', M + 24, y + 13, '#42BFA9'), block(ls, M + 24, y + 13 + 16, T.white)));
     y += 13 + 16 + ls.height;
     parts.push(footer(`Data story · ${cd.theme || ''}`, `Source: ${sourceLabel(cd)}`, { rule, text: '#8A97A8' }), '</svg>');
     return { svg: parts.join('\n  '), bottom: y };
@@ -538,7 +593,7 @@ export function pickEditorialTemplate(caseData) {
 
 // Animations are for the live preview / SVG file; JPEG, PDF and LinkedIn need the finished frame.
 export function stripAnimations(svg) {
-  return String(svg).replace(/<animate\b[^>]*\/>/g, '');
+  return sampleSvgAt(svg, Infinity);
 }
 
 // Injects the embedded @font-face CSS so the SVG renders with the right fonts as a file / <img> / JPEG export.

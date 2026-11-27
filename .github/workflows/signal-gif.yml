@@ -1,0 +1,36 @@
+name: PRANAV SIGNAL — Animated GIF
+
+# Makes the animated GIF for the latest LinkedIn post when it does not have one yet
+# (e.g. a post made from the dashboard's "Run Pipeline Now"). Skips in seconds when the GIF exists.
+on:
+  schedule:
+    - cron: '25 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Re-render even if a GIF exists'
+        type: boolean
+        default: false
+
+concurrency:
+  group: signal-gif
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  gif:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Render and upload GIF
+        run: |
+          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          npm install --no-save --no-package-lock --silent @resvg/resvg-js@2
+          node scripts/signal-gif.mjs ${{ inputs.force && '--force' || '' }}

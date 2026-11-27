@@ -1232,6 +1232,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
               <small id="sigAdobeStatus" style="color:var(--mut);font-size:11px"></small>
               <button class="sig-btn" id="sigRegenVisualBtn" type="button" title="Regenerate visual"><span data-i="rotate-ccw"></span> Regenerate</button>
               <a class="sig-btn primary" id="sigDownloadJpgBtn" download="pranav-signal-visual.jpg" href="#" title="Download crisp JPEG image"><span data-i="image"></span> Download Image (JPEG)</a>
+              <a class="sig-btn" id="sigDownloadGifBtn" style="display:none" download href="#" title="Animated GIF for LinkedIn"><span data-i="image"></span> Download GIF</a>
               <button class="sig-btn" id="sigDownloadPdfBtn" type="button" title="Download PDF document"><span data-i="file-text"></span> Download PDF</button>
               <a class="sig-btn" id="sigDownloadVisualBtn" download="pranav-signal.svg" href="/api/signal/visual" title="Download vector SVG"><span data-i="download"></span> SVG</a>
             </div>
@@ -3937,6 +3938,11 @@ function sigRender(){
       }).catch(function(e){ console.warn("Visual fetch:", e); });
     }
     if($("sigDownloadVisualBtn")) $("sigDownloadVisualBtn").href = "/api/signal/visual";
+    if($("sigDownloadGifBtn")){
+      var g = v.gif;
+      $("sigDownloadGifBtn").style.display = g && g.url ? "" : "none";
+      if(g && g.url){ $("sigDownloadGifBtn").href = g.url; $("sigDownloadGifBtn").setAttribute("download", "pranav-signal-animated.gif"); }
+    }
   }
 
   // Render Research Ledger

@@ -917,6 +917,29 @@ async function route(request, env) {
   if (seg[0] === 'api' && seg[1] === 'signal') {
     const k = kv(env);
 
+    // Animated GIF of a post's visual (rendered by scripts/signal-gif.mjs on GitHub Actions).
+    if (seg[2] === 'visual.gif' && (method === 'GET' || method === 'HEAD')) {
+      const postId = url.searchParams.get('post_id') || (await signal.load(k)).latestDraftId || `post_${signal.todayDate()}`;
+      if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(400, 'Bad post_id');
+      const gif = await k.get(`signal/gif/${postId}`, 'arrayBuffer');
+      if (!gif) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
+      return new Response(method === 'HEAD' ? null : gif, { headers: {
+        'content-type': 'image/gif', 'content-length': String(gif.byteLength), 'cache-control': 'public, max-age=300',
+        'content-disposition': `inline; filename="pranav-signal-${postId}.gif"`, 'access-control-allow-origin': '*' } });
+    }
+    if (seg[2] === 'visual-gif' && method === 'PUT') {
+      await runner(request, env);
+      const postId = url.searchParams.get('post_id') || '';
+      if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(400, 'Bad post_id');
+      const len = Number(request.headers.get('content-length') ?? 0);
+      if (!(len > 0 && len <= 10 * 1024 * 1024)) throw new HttpError(413, 'GIF must be under 10 MB');
+      const buf = await request.arrayBuffer();
+      const head = new TextDecoder().decode(new Uint8Array(buf, 0, 6));
+      if (head !== 'GIF89a' && head !== 'GIF87a') throw new HttpError(415, 'Not a GIF');
+      const out = await signal.attachVisualGif(k, env, postId, buf);
+      return json({ ok: true, ...out });
+    }
+
     // Public JPEG Visual endpoint (direct image/jpeg binary)
     if ((seg[2] === 'visual.jpg' || (seg[2] === 'visual' && (url.searchParams.get('format') === 'jpg' || url.searchParams.get('format') === 'jpeg'))) && (method === 'GET' || method === 'HEAD')) {
       if (method === 'HEAD') {
@@ -966,6 +989,8 @@ async function route(request, env) {
       return new Response(method === 'HEAD' ? null : svg, {
         status: 200,
         headers: {
+          'X-Post-Id': String(d.id || ''),
+          'Access-Control-Expose-Headers': 'X-Post-Id',
           'Content-Type': 'image/svg+xml; charset=utf-8',
           'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'public, max-age=60',

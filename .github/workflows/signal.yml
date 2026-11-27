@@ -37,3 +37,10 @@ jobs:
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
         run: |
           node scripts/signal-runner.mjs
+
+      - name: Animated GIF of today's visual
+        if: success()
+        run: |
+          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          npm install --no-save --no-package-lock --silent @resvg/resvg-js@2
+          node scripts/signal-gif.mjs
