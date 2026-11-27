@@ -62,7 +62,7 @@ export const CASE_BANK = [
     "rootCauseAnalysis": "The problem was ecosystem breadth and consumer experience, not only device design: developers, apps, browser experience and timing increasingly shaped purchase decisions.",
     "businessImpact": "The company launched BlackBerry 10 and restructured its business; SEC reporting described weak device shipments and competitive pressure.",
     "documentedResponse": "BlackBerry's filing describes declining shipments and a portfolio that struggled to meet consumer demand for high-end devices and LTE.",
-    "recommendedFix": "Prioritise a small number of customer segments where security is a differentiator; partner for ecosystem gaps rather than trying to rebuild everything.",
+    "recommendedFix": "Prioritise customer segments where security is a differentiator; Partner for ecosystem gaps rather than rebuilding commodity layers; Enforce single-point P&L ownership across hardware and services.",
     "postAngle": "When the product is technically good but the ecosystem is missing, what exactly is the customer buying?",
     "evidenceType": "Primary – SEC annual filing",
     "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1070235/000144530514000824/bbry-03012014x40fexhibit13.htm"
@@ -1682,6 +1682,21 @@ Nokia didn't die because they built fragile hardware. They died because leadersh
 • Smartphone market share collapsed from ~50% peak to under 3% by 2013.
 • Decimated over $200 Billion in peak enterprise valuation.
 • Forced into an emergency exit, selling Devices & Services to Microsoft for $7.2 Billion.`;
+  } else if (c.caseNumber === 4 || /BlackBerry/i.test(c.company)) {
+    hook = `In 2008, BlackBerry controlled over 50% of the US smartphone market, valued at $83 Billion. Every Fortune 500 CEO, Wall Street banker, and world leader was addicted to their physical keyboard.
+
+By 2014, their global market share cratered to 0.4%. Peak valuation collapsed by over 90%.
+
+BlackBerry didn't fail because enterprise users stopped wanting secure email. They failed because leadership insisted enterprise IT departments—not end-user employees—would dictate the future of mobile workflows.`;
+
+    strategy = `The Strategy Trap:
+• Flawed Strategy: Rely on enterprise IT procurement lock-in and physical keyboards while ignoring the consumerization of IT and touchscreen app ecosystems.
+• Operator Reality: When end-users prefer a competitor's workflow, bottom-up employee adoption will dismantle top-down enterprise lock-in every time.`;
+
+    outcome = `The Business Outcome:
+• US smartphone market share collapsed from >50% peak to less than 0.5% by 2014.
+• Decimated over $75 Billion in enterprise market capitalization.
+• Wrote off $1 Billion in unsold BlackBerry Z10 inventory in a single quarter before exiting hardware entirely.`;
   } else {
     hook = `When ${c.company} hit a wall in ${c.period}, the problem wasn't market demand.
 
@@ -1709,7 +1724,7 @@ ${fixPoints}`;
   const conversation = `What strategic milestone would you have enforced to pivot before the legacy profit pool collapsed?`;
 
   const tagTheme = (c.theme || 'Strategy').replace(/[^a-zA-Z0-9]/g, '');
-  const hashtags = `#BusinessStrategy #Operations #Leadership #${tagTheme} #100BusinessProblems`;
+  const hashtags = `#BusinessStrategy #Strategy #Leadership #Operations #Management #DigitalTransformation #Innovation #Technology #Scaleups #Startups #Entrepreneurship #RevOps #GTMStrategy #${tagTheme} #100BusinessProblems`;
 
   const body = `${hook}
 

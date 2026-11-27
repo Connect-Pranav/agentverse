@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-11-27T13:13:55.000Z",
+  "post_inspected": {
+    "case_number": 3,
+    "company": "Nokia",
+    "url": "https://www.linkedin.com/posts/connect-pranav_businessstrategy-operations-leadership-share-7531688294691209216-82Jv/",
+    "likes": 2,
+    "impressions": 200,
+    "comments_count": 1
+  },
+  "interactions": [
+    {
+      "commenter": "Razn",
+      "comment": "Would love to understand more about the stop/go gates. Were these based on customer churn, margin dilution, or something else?",
+      "reply_posted": "Razn In high-velocity scaleups, stop/go gates work best when anchored strictly to contribution margin dilution and net revenue retention (NRR) rather than top-line GMV. Once customer acquisition cost (CAC) payback exceeds 12 months or legacy maintenance eats >40% of engineering bandwidth, the migration trigger must be non-negotiable.",
+      "status": "replied_live"
+    }
+  ]
+}

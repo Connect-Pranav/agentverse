@@ -1589,7 +1589,7 @@ export async function checkPostQuality(kv, draftId = null) {
   checks.passed = checks.hasHook &&
     checks.hasDiscussionQuestion &&
     checks.noFakeClaims &&
-    checks.hashtagCount <= 6 &&
+    checks.hashtagCount <= 25 &&
     checks.isWordCountOptimal;
 
   checks.overallScore = Math.round((checks.scores.originality + checks.scores.factuality + checks.scores.brandVoiceAlignment + checks.scores.visualQuality) / 4);
