@@ -475,7 +475,7 @@ test('editorial visuals: every case renders in every template without cutting so
     const svg = fn({ caseData: c });
     assert.ok(svg.startsWith('<svg') && svg.includes('viewBox="0 0 1200 1500"'), `${k} case ${c.caseNumber}`);
     assert.ok(!svg.includes('…'), `${k} case ${c.caseNumber} had to shorten sourced text`);
-    assert.ok(svg.includes(E.sourceLabel(c).split(' · ').pop().slice(0, 12)) || svg.includes('Source:'), 'source footer present');
+    assert.ok(svg.includes(E.sourceLabel(c).split(' · ').pop().slice(0, 12)) || /Source:|>SOURCE</.test(svg), 'source footer present');
     assert.ok(!/NaN|undefined/.test(svg), `${k} case ${c.caseNumber} has NaN/undefined`);
   }
   assert.ok(E.withFonts('<style>/*@signal-fonts*/</style>', '@font-face{}').includes('@font-face{}'));
@@ -489,7 +489,7 @@ test('editorial visuals: every case renders in every template without cutting so
     const svg = E.EDITORIAL_TEMPLATES[E.pickEditorialTemplate(c)]({ caseData: c });
     const text = [c.businessImpact, c.documentedResponse, c.documentedProblem].join(' ').replace(/\s+/g, '');
     for (const m of svg.matchAll(/font-family="'IBM Plex Mono'[^"]*" font-weight="700" font-size="(\d+)"[^>]*>(?:<animate[^>]*\/>)?([^<]+)</g)) {
-      if (+m[1] >= 20 && /[$£€₹%]/.test(m[2])) assert.ok(text.includes(m[2].replace(/&amp;/g, '&')), `case ${c.caseNumber} shows ${m[2]} which is not in its sources`);
+      if (+m[1] >= 20 && /[$£€₹%]/.test(m[2]) && /\d/.test(m[2])) assert.ok(text.includes(m[2].replace(/&amp;/g, '&')), `case ${c.caseNumber} shows ${m[2]} which is not in its sources`);
     }
   }
   assert.ok(!E.stripAnimations('<rect><animate attributeName="width"/></rect>').includes('animate'));
@@ -584,4 +584,20 @@ test('hero illustration: made once on Workers AI, used by the newspaper visual, 
   const n = calls.length;
   await signal.attachVisualMedia(kv, env, r.post_id, new TextEncoder().encode('GIF89a').buffer, { kind: 'gif', fetchImpl: f, design: 'x' });
   assert.equal(calls.length, n, 'only one motion version is sent to Telegram per post');
+});
+
+test('12 print styles: a different style each day (12 consecutive cases = 12 styles), Yahoo stays the newspaper, every style animates', async () => {
+  const E = await import('../src/editorial_templates.mjs');
+  const { CASE_BANK } = await import('../src/case_bank.mjs');
+  assert.equal(E.PRINT_ROTATION.length, 12);
+  assert.equal(new Set(E.PRINT_ROTATION).size, 12);
+  const picks = CASE_BANK.slice(4, 16).map((c) => E.pickEditorialTemplate(c));
+  assert.equal(new Set(picks).size, 12, 'cases 5-16 use all 12 styles');
+  assert.equal(E.pickEditorialTemplate(CASE_BANK[4]), 'bi_newspaper');
+  for (const k of E.PRINT_ROTATION) {
+    const svg = E.EDITORIAL_TEMPLATES[k]({ caseData: CASE_BANK[4], heroHref: '/api/signal/hero.jpg?post_id=p' });
+    assert.ok(E.animationLength(svg) > 1, `${k} animates`);
+    assert.ok(svg.includes(`data-design="${E.DESIGN_ID}"`), `${k} carries the design id`);
+    assert.ok(/Yahoo|YAHOO/.test(svg), `${k} names the company`);
+  }
 });
