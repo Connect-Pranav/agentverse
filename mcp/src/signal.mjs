@@ -142,6 +142,9 @@ export const DEFAULT_BENCHMARKS = [
   },
 ];
 
+// Case numbers already published on LinkedIn by hand before the pipeline took over (owner confirmed 2026-11-28).
+const PUBLISHED_BASELINE = [1, 2, 3, 4];
+
 // Initial state schema
 export async function load(kv) {
   let s = (await kv.get(KEY, 'json')) ?? {};
@@ -166,6 +169,14 @@ export async function load(kv) {
   s.history = s.history || [];
   s.usedCaseNumbers = s.usedCaseNumbers || [];
   s.currentCycle = s.currentCycle || 1;
+  // One-time clean-up (v3): cases 1-4 are already live on LinkedIn, so the next post is Case #5. Any draft or run
+  // that was never published (made by the old pipeline, e.g. "Founders struggle...") is dropped so it cannot be resumed.
+  if ((s.schemaVersion ?? 0) < 3) {
+    for (const [id, d] of Object.entries(s.drafts)) if (d?.status !== 'published') delete s.drafts[id];
+    s.runs = {}; s.latestRunId = null; s.signals = [];
+    s.usedCaseNumbers = [...new Set([...s.usedCaseNumbers.map(Number), ...PUBLISHED_BASELINE])].sort((a, b) => a - b);
+    s.schemaVersion = 3;
+  }
   s.latestDraftId = s.latestDraftId || null;
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };
   s.logs = s.logs || [];

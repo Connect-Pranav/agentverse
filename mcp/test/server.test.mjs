@@ -687,3 +687,17 @@ test('Worker cron heartbeat runs by itself and reports honestly', async () => {
   const h = await (await worker.fetch(new Request(B + '/health'), e)).json();
   assert.equal(h.heartbeat.at, hb.at);
 });
+
+test('signal: stale unpublished drafts are dropped, next case after the 4 published is #5', async () => {
+  const e = env();
+  await e.MEDIA.put('signal/state', JSON.stringify({
+    latestRunId: 'run_old', runs: { run_old: { run_id: 'run_old', post_id: 'post_2026-11-27', case_number: 99, created_at: 'x' } },
+    drafts: { 'post_2026-11-27': { id: 'post_2026-11-27', status: 'waiting_approval', hook: 'Founders struggle to turn strategy into daily execution' } },
+    usedCaseNumbers: [],
+  }));
+  const sig = await import('../src/signal.mjs');
+  const s = await sig.load(e.MEDIA);
+  assert.deepEqual(Object.keys(s.drafts), [], 'old draft removed');
+  assert.equal(s.latestRunId, null);
+  assert.equal(sig.pickCase(s).caseData.caseNumber, 5);
+});

@@ -921,6 +921,10 @@ async function route(request, env) {
           },
         });
       }
+      // data/visual.jpg is the Case #1 (Kodak) picture only: never serve it as the image of another case.
+      const stJpg = await signal.load(k);
+      const runJpg = stJpg.latestRunId && stJpg.runs[stJpg.latestRunId];
+      if (runJpg && Number(runJpg.case_number) !== 1) return json({ ok: false, error: 'NO_JPEG_FOR_THIS_CASE', use: '/api/signal/visual' }, 404, { 'access-control-allow-origin': '*' });
       if (env.ASSETS) {
         try {
           const assetRes = await env.ASSETS.fetch(new Request(`${url.origin}/data/visual.jpg`));
