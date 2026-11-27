@@ -518,7 +518,10 @@ export function generateDataStory({ caseData }) {
     y += 13 + 48 + sp;
     const h = fit(asSentence(cd.postAngle || cd.documentedProblem), CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
     parts.push(R(0.1, block(h, M, y, T.white)));
-    y += h.height + lv.gap + sp;
+    y += h.height + 28;
+    // Company named up front so the visual reads as this case even before the headline is parsed.
+    parts.push(R(0.35, `<text x="${M}" y="${y + 24}" font-family="${FONT_FAMILY.head}" font-weight="800" font-size="30" fill="${T.amber}">${esc(cd.company || '')}<tspan font-family="${FONT_FAMILY.body}" font-weight="400" font-size="20" fill="${soft}">  ·  ${esc([cd.industry, cd.period].filter(Boolean).join('  ·  '))}</tspan></text>`));
+    y += 30 + lv.gap + sp;
 
     const pad = 32;
     const panelTop = y;
