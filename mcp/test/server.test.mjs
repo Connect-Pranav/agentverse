@@ -664,3 +664,26 @@ test('Telegram bot: /start message returns chat id', async () => {
     globalThis.fetch = real;
   }
 });
+
+test('signal write routes are never anonymous', async () => {
+  const e = env();
+  const post = (path, auth) => worker.fetch(new Request(B + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) }, body: '{}' }), e);
+  for (const path of ['/api/signal/run', '/api/signal/decide', '/api/signal/reset', '/api/signal/auth/token']) {
+    assert.equal((await post(path, null)).status, 401, `${path} without a token`);
+    assert.equal((await post(path, 'Bearer wrong')).status, 401, `${path} with a wrong token`);
+  }
+  assert.notEqual((await post('/api/signal/auth/token', 'Bearer tok')).status, 401, 'owner token is accepted');
+});
+
+test('Worker cron heartbeat runs by itself and reports honestly', async () => {
+  const e = env();
+  let job; await worker.scheduled({ scheduledTime: Date.parse('2026-11-28T04:03:00Z'), cron: '*/10 * * * *' }, e, { waitUntil: (p) => { job = p; } });
+  await job;
+  const hb = await e.MEDIA.get('system/heartbeat', 'json');
+  assert.ok(hb && hb.at === '2026-11-28T04:03:00.000Z', 'heartbeat stored');
+  assert.equal(hb.songsWaiting, 0);
+  assert.equal(hb.dispatched, undefined, 'no GitHub dispatch without GH_DISPATCH_TOKEN');
+  assert.ok(hb.signal || hb.signalError, 'daily LinkedIn draft attempted at 04:xx UTC, result recorded');
+  const h = await (await worker.fetch(new Request(B + '/health'), e)).json();
+  assert.equal(h.heartbeat.at, hb.at);
+});

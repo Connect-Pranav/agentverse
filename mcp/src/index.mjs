@@ -269,15 +269,15 @@ async function removeJob(env, j) {
 /* ---------------- instant start (optional) ---------------- */
 const CTX = new WeakMap();
 const ctxOf = (request) => CTX.get(request);
-function kick(env, ctx) {
+function kick(env, ctx, workflow = 'songvideo.yml') {
   if (!env.GH_DISPATCH_TOKEN) return false;
   const repo = env.GH_REPO || 'Connect-Pranav/agentverse';
-  const p = fetch(`https://api.github.com/repos/${repo}/actions/workflows/songvideo.yml/dispatches`, {
+  const p = fetch(`https://api.github.com/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
     method: 'POST', body: JSON.stringify({ ref: 'main' }),
     headers: { authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'agentverse-worker', 'content-type': 'application/json' },
-  }).then((r) => { if (!r.ok) console.error('dispatch failed', r.status); }).catch((e) => console.error('dispatch error', e));
-  if (ctx?.waitUntil) ctx.waitUntil(p);
-  return true;
+  }).then((r) => { if (!r.ok) console.error('dispatch failed', workflow, r.status); return r.ok; }).catch((e) => { console.error('dispatch error', workflow, e); return false; });
+  if (ctx?.waitUntil) { ctx.waitUntil(p); return true; }
+  return p;
 }
 
 /* ---------------- AGENTVERSE cloud brain (Cloudflare Workers AI, free tier) ---------------- */
@@ -784,7 +784,7 @@ async function route(request, env) {
     });
   }
 
-  if (path === '/health') return json({ ok: true, runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, pranavSignal: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled, telegramBot: Boolean(env.TELEGRAM_BOT_TOKEN) }, 200, { 'access-control-allow-origin': '*' });
+  if (path === '/health') return json({ ok: true, heartbeat: await kv(env).get('system/heartbeat', 'json').catch(() => null), runnerAuth: 'mcp-token or github-oidc', app: 'agentverse', songStudio: true, pranavSignal: true, version: VERSION, kv: Boolean(env.MEDIA), tokenSet: Boolean(env.MCP_TOKEN), instantStart: Boolean(env.GH_DISPATCH_TOKEN), brain: Boolean(env.AI), vaniVoice: vani.config(env).enabled, telegramBot: Boolean(env.TELEGRAM_BOT_TOKEN) }, 200, { 'access-control-allow-origin': '*' });
   if (seg[0] === 'mcp') { owner(request, env, seg[1]); return mcp(request, env); }
   if (seg[0] === 'sv' && seg[1] && seg[2] && method === 'GET') {
     const m = /^(\d{1,2})\.jpg$/.exec(seg[2]);
@@ -1193,6 +1193,7 @@ async function route(request, env) {
 
     // Direct token / secret configuration endpoint
     if (seg[2] === 'auth' && seg[3] === 'token' && method === 'POST') {
+      owner(request, env);
       const payload = await readJson(request);
       if (payload.token) await k.put('signal/linkedin_token', String(payload.token).trim());
       if (payload.client_secret) await k.put('signal/linkedin_client_secret', String(payload.client_secret).trim());
@@ -1207,6 +1208,7 @@ async function route(request, env) {
 
     // Clean Reset Endpoint — Purge all obsolete LinkedIn generation data
     if (seg[2] === 'reset' && method === 'POST') {
+      owner(request, env);
       const cleanState = await signal.resetSignalState(k);
       const w = await work.load(k);
       if (Array.isArray(w.items)) {
@@ -1223,8 +1225,7 @@ async function route(request, env) {
 
     // Run Pipeline (Runner or Owner) — Linkedin_Post_Generator
     if (seg[2] === 'run' && method === 'POST') {
-      if ((request.headers.get('authorization') ?? '').split('.').length === 3) await runner(request, env);
-      else if (env.MCP_TOKEN && request.headers.has('authorization')) owner(request, env);
+      await runner(request, env); // owner token, or the GitHub Actions OIDC token; never anonymous
       const payload = await readJson(request).catch(() => ({}));
       const pipelineRes = await signal.runLinkedinPostGenerator(k, env, payload);
       const s = await signal.load(k);
@@ -1241,7 +1242,7 @@ async function route(request, env) {
 
     // Decide (Approve / Reject)
     if (seg[2] === 'decide' && method === 'POST') {
-      if (env.MCP_TOKEN && request.headers.has('authorization')) owner(request, env);
+      owner(request, env);
       const payload = await readJson(request);
       const action = payload.decision || payload.action || 'approve';
       const s = await signal.load(k);
@@ -1441,7 +1442,42 @@ async function route(request, env) {
   throw new HttpError(404, 'Not found');
 }
 
+/* ---------------- Worker heartbeat (Cloudflare Cron Trigger) ----------------
+   GitHub's own schedule is best-effort and often skipped for hours. This runs inside Cloudflare every 10 minutes,
+   so AGENTVERSE starts its own work: planner, song renderer wake-up, daily LinkedIn draft, hourly agents. */
+async function heartbeat(env, when = new Date()) {
+  const out = {};
+  const hour = when.getUTCHours(), first = when.getUTCMinutes() < 10;
+  try {
+    const n = await pending(env);
+    out.songsWaiting = n;
+    if (n > 0) out.songRunner = env.GH_DISPATCH_TOKEN ? await kick(env, null, 'songvideo.yml') : 'GH_DISPATCH_TOKEN missing: renderer waits for the next GitHub schedule';
+  } catch (e) { out.songError = String(e?.message ?? e).slice(0, 200); }
+  if (first && env.GH_DISPATCH_TOKEN) {
+    const wf = ['growth.yml', 'leadgen.yml'];
+    if (hour % 2 === 0) wf.push('agents.yml');
+    if (hour % 6 === 0) wf.push('leads.yml');
+    out.dispatched = {};
+    for (const w of wf) out.dispatched[w] = await kick(env, null, w);
+  }
+  if (first && hour === 4) { // 09:30 IST: today's LinkedIn draft, made inside the Worker; publishing still needs the owner's OK
+    try {
+      const k = kv(env);
+      const st = await signal.load(k);
+      if (!st.drafts?.[`post_${signal.todayDate()}`]) {
+        const r = await signal.runLinkedinPostGenerator(k, env, { trigger: 'worker_cron', time: when.toISOString() });
+        out.signal = r.generation_status;
+      } else out.signal = 'already drafted today';
+    } catch (e) { out.signalError = String(e?.message ?? e).slice(0, 200); }
+  }
+  try { await kv(env).put('system/heartbeat', JSON.stringify({ at: when.toISOString(), ...out }), { expirationTtl: 7 * 86400 }); } catch (_) {}
+  return out;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(heartbeat(env, new Date(event.scheduledTime)).catch((e) => console.error('heartbeat', e)));
+  },
   async fetch(request, env, ctx) {
     if (ctx) CTX.set(request, ctx);
     try {

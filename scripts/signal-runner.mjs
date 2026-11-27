@@ -3,8 +3,23 @@
 // Calls the DEPLOYED Worker so the run is written to the same KV the dashboard reads.
 // It never falls back to an in-memory store: a run that is not persisted must fail loudly.
 
-const mcpUrl = (process.env.SV_MCP_URL || process.env.WORKER_URL || '').replace(/\/+$/, '');
-const mcpToken = process.env.SV_MCP_TOKEN || process.env.MCP_TOKEN || '';
+const CANDIDATES = ['https://agentverse.pravanigroup.workers.dev', 'https://agentverse.aistudio09.workers.dev'];
+let mcpUrl = (process.env.SV_MCP_URL || process.env.WORKER_URL || '').replace(/\/+$/, '');
+let mcpToken = process.env.SV_MCP_TOKEN || process.env.MCP_TOKEN || '';
+
+// No repo variable or secret needed: find the Worker by /health and use the GitHub Actions OIDC token.
+async function discover() {
+  if (!mcpUrl) {
+    for (const c of CANDIDATES) {
+      try { const h = await (await fetch(`${c}/health`)).json(); if (h.app === 'agentverse') { mcpUrl = c; break; } } catch { /* try next */ }
+    }
+  }
+  if (!mcpToken && process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+    const u = `${process.env.ACTIONS_ID_TOKEN_REQUEST_URL}&audience=agentverse`;
+    const r = await fetch(u, { headers: { Authorization: `bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` } });
+    if (r.ok) mcpToken = (await r.json()).value;
+  }
+}
 
 function fail(msg) {
   console.error(`❌ ${msg}`);
@@ -13,8 +28,9 @@ function fail(msg) {
 
 async function main() {
   console.log(`⚡ Linkedin_Post_Generator — ${new Date().toISOString()}`);
-  if (!mcpUrl) fail('SV_MCP_URL is not set (repo variable). Refusing to run without the deployed Worker: a local run would not persist anything the dashboard can show.');
-  if (!mcpToken) fail('SV_MCP_TOKEN / MCP_TOKEN secret is not set.');
+  await discover();
+  if (!mcpUrl) fail('No AGENTVERSE Worker answered /health. Refusing to run without the deployed Worker: a local run would not persist anything the dashboard can show.');
+  if (!mcpToken) fail('No credentials: run on GitHub Actions with id-token: write, or set SV_MCP_TOKEN.');
 
   const res = await fetch(`${mcpUrl}/api/signal/run`, {
     method: 'POST',

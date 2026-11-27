@@ -4,6 +4,7 @@
   // Then add the secret MCP_TOKEN (Settings → Variables and Secrets).
   "name": "agentverse",
   "workers_dev": true,
+  "triggers": { "crons": ["*/10 * * * *"] },
   "preview_urls": false,
   "main": "mcp/src/index.mjs",
   "compatibility_date": "2026-10-01",
