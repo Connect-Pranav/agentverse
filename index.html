@@ -4237,6 +4237,8 @@ function sigInitControls(){
 
     function doExport(el){
       var svgXml = new XMLSerializer().serializeToString(el);
+      // Bars/timelines animate in the preview; files must show the finished frame.
+      if(format !== 'svg') svgXml = svgXml.replace(/<animate\b[^>]*\/>/g, "");
       if(format === 'svg'){
         var blob = new Blob([svgXml], { type: "image/svg+xml;charset=utf-8" });
         var url = URL.createObjectURL(blob);

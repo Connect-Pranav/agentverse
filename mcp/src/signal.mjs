@@ -180,9 +180,9 @@ export async function load(kv) {
     s.usedCaseNumbers = [...new Set([...s.usedCaseNumbers.map(Number), ...PUBLISHED_BASELINE])].sort((a, b) => a - b);
     s.schemaVersion = 3;
   }
-  // v4: unpublished drafts are re-rendered in the Business Intelligence Editorial design (1200x1500).
-  // Published posts keep the visual they went out with.
-  if ((s.schemaVersion ?? 0) < 4) {
+  // v4/v5: unpublished drafts are re-rendered in the Business Intelligence Editorial design (1200x1500),
+  // using the one template that best fits the case (v5). Published posts keep the visual they went out with.
+  if ((s.schemaVersion ?? 0) < 5) {
     for (const d of Object.values(s.drafts)) {
       const cd = getCaseByNumber(d?.caseNumber || d?.case_number);
       if (!d?.visual || d.status === 'published' || !cd) continue;
@@ -192,7 +192,7 @@ export async function load(kv) {
         dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, canvaDesignId: null, canvaEditUrl: null, canvaExportUrl: null });
       if (s.visuals?.[d.id]) s.visuals[d.id] = d.visual;
     }
-    s.schemaVersion = 4;
+    s.schemaVersion = 5;
   }
   s.latestDraftId = s.latestDraftId || null;
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };

@@ -90,6 +90,7 @@ export function sentences(t = '') {
 }
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const stripEnd = (s) => s.replace(/[.;:\s]+$/, '');
+const asSentence = (s) => { const t = stripEnd(String(s || '').trim()); return /[?!]$/.test(t) ? t : `${t}.`; };
 
 export function actionItems(fix = '') {
   let items = String(fix).split(/;\s*|\n+|\s*\d+\.\s+/).map((s) => stripEnd(s.trim())).filter((s) => s.length > 3);
@@ -156,7 +157,8 @@ function firstThatFits(levels, build) {
       const gaps = lv.gaps || 0;
       const free = limit - r.bottom - 24;
       if (!gaps || free < 48) return r.svg;
-      return build({ ...lv, spread: Math.min(40, Math.floor(free / gaps)) }).svg;
+      const spread = build({ ...lv, spread: Math.min(lv.maxSpread || 40, Math.floor(free / gaps)) });
+      return spread.bottom <= limit ? spread.svg : r.svg;
     }
     if (fits && !fallback) fallback = r.svg;
   }
@@ -185,7 +187,7 @@ export function generateFailureAutopsy({ caseData }) {
       eyebrow(`Case ${caseNo(cd)} · ${cd.period || ''}`, CANVAS.w - M, y + 21, T.slate, 'end'));
     y += 32 + 40;
     // Headline: the case's own post angle, sentence case
-    const h = fit(stripEnd(cd.postAngle || cd.documentedProblem || cd.company || '') + '.', CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
+    const h = fit(asSentence(cd.postAngle || cd.documentedProblem || cd.company), CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
     parts.push(block(h, M, y, T.navy));
     y += h.height + 24;
     // Company line
@@ -196,7 +198,9 @@ export function generateFailureAutopsy({ caseData }) {
     parts.push(block(prof, M, y, T.slate));
     const sp = lv.spread || 0;
     y += prof.height + lv.gap - 8 + sp;
-    parts.push(`<line x1="${M}" y1="${y}" x2="${CANVAS.w - M}" y2="${y}" stroke="${T.border}" stroke-width="1"/>`);
+    // Period timeline replaces the plain divider when the case has dated years.
+    const tl = timeline(cd, M, y - 8, CW, { label: T.slate, track: T.border, accent: T.coral });
+    if (tl.h) { parts.push(tl.svg); y += tl.h; } else parts.push(`<line x1="${M}" y1="${y}" x2="${CANVAS.w - M}" y2="${y}" stroke="${T.border}" stroke-width="1"/>`);
     y += lv.gap - 8 + sp;
 
     // Two cards: what went wrong / why it happened
@@ -259,11 +263,11 @@ export function generateEditorialCover({ caseData }) {
   ];
   return firstThatFits(levels, (lv) => {
     const pad = 32, bottomLimit = CANVAS.h - M - 56;
-    const h = fit(stripEnd(cd.postAngle || cd.documentedProblem || '') + '.', CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
+    const h = fit(asSentence(cd.postAngle || cd.documentedProblem), CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
     const prob = fit(cd.documentedProblem || '', span(10), { fam: 'body', weight: 400, sizes: lv.body, lh: 1.45, maxLines: lv.bodyLines });
     const cost = fit(cd.businessImpact || '', CW - 2 * pad, { fam: 'body', weight: 600, sizes: lv.body, lh: 1.45, maxLines: 4 });
     const panelH = pad + 13 + 20 + cost.height + pad;
-    const storyH = h.height + 48 + 4 + 40 + 28 + 24 + prob.height;
+    const storyH = h.height + 48 + 4 + 40 + 28 + 24 + prob.height + 104;
     const top = M + 13 + 64;
     const panelY = bottomLimit - panelH;
     const free = panelY - 64 - top - storyH;
@@ -279,6 +283,8 @@ export function generateEditorialCover({ caseData }) {
     parts.push(`<text x="${M}" y="${y + 20}" font-family="${FONT_FAMILY.head}" font-weight="700" font-size="28" fill="${T.white}">${esc(cd.company || '')}<tspan font-family="${FONT_FAMILY.body}" font-weight="400" font-size="20" fill="${soft}">  ·  ${esc(cd.industry || '')}</tspan></text>`);
     y += 28 + 24;
     parts.push(block(prob, M, y, soft));
+    const tl = timeline(cd, M, y + prob.height + Math.max(48, Math.floor((panelY - (y + prob.height) - 56) / 2)), CW, { label: soft, track: '#24344B', accent: T.coral });
+    if (y + prob.height + 48 + tl.h <= panelY - 24) parts.push(tl.svg);
     parts.push(`<rect x="${M}" y="${panelY}" width="${CW}" height="${panelH.toFixed(0)}" rx="14" fill="#132238" stroke="${rule}" stroke-width="1"/>`,
       eyebrow('What it cost', M + pad, panelY + pad + 13, T.amber),
       block(cost, M + pad, panelY + pad + 13 + 20, T.white));
@@ -329,7 +335,7 @@ export function generateExecCheatSheet({ caseData }) {
 
     // Decision rule (light blue, blue rule)
     const rp = 32;
-    const rl = fit(stripEnd(cd.postAngle || '') + '.', CW - 2 * rp - 8, { fam: 'head', weight: 700, sizes: lv.rule, lh: 1.2, maxLines: 3 });
+    const rl = fit(asSentence(cd.postAngle), CW - 2 * rp - 8, { fam: 'head', weight: 700, sizes: lv.rule, lh: 1.2, maxLines: 3 });
     const ruleH = rp + 13 + 20 + rl.height + rp;
     parts.push(`<rect x="${M}" y="${y}" width="${CW}" height="${ruleH.toFixed(0)}" rx="14" fill="${T.lightBlue}"/>`,
       `<rect x="${M}" y="${y + 20}" width="4" height="${(ruleH - 40).toFixed(0)}" rx="2" fill="${T.blue}"/>`,
@@ -354,17 +360,185 @@ export function generateExecCheatSheet({ caseData }) {
   });
 }
 
+// ─── Sourced figures (the only numbers a visual may show) ───
+const FIG_RE = /([$£€₹])\s?(\d[\d,]*(?:\.\d+)?)\s?(trillion|tn|billion|bn|million|mn|m|k)?\b|(\d[\d,]*(?:\.\d+)?)\s?(%|per cent|percent)/gi;
+const MULT = { trillion: 1e12, tn: 1e12, billion: 1e9, bn: 1e9, million: 1e6, mn: 1e6, m: 1e6, k: 1e3 };
+const STOP = new Set(['of', 'about', 'roughly', 'approximately', 'around', 'up', 'to', 'a', 'an', 'the', 'nearly', 'over', 'some', 'and', 'with', 'reported', 'recorded', 'showed', 'its', 'by', 'from', 'was', 'were', 'is']);
+
+function labelBefore(text) {
+  const words = text.replace(/[,;:()]/g, ' ').trim().split(/\s+/);
+  while (words.length && STOP.has(words[words.length - 1].toLowerCase())) words.pop();
+  const out = words.slice(-3);
+  while (out.length && STOP.has(out[0].toLowerCase())) out.shift();
+  return out.join(' ');
+}
+
+// Finds money / percentage figures in the case's sourced text, with the sentence they came from.
+export function extractFigures(cd = {}) {
+  for (const field of ['businessImpact', 'documentedResponse', 'documentedProblem']) {
+    for (const sentence of sentences(cd[field] || '')) {
+      const figs = [];
+      for (const m of sentence.matchAll(FIG_RE)) {
+        const isPct = Boolean(m[5]);
+        const num = parseFloat((isPct ? m[4] : m[2]).replace(/,/g, ''));
+        if (!Number.isFinite(num) || (!isPct && !m[1])) continue;
+        const before = sentence.slice(0, m.index);
+        const after = sentence.slice(m.index + m[0].length);
+        const yr = /^\s+in\s+((?:FY|Q[1-4]\s)?\d{4})/i.exec(after);
+        figs.push({
+          raw: m[0].replace(/\s+/g, ''), unit: isPct ? '%' : m[1],
+          value: isPct ? num : num * (MULT[(m[3] || '').toLowerCase()] || 1),
+          label: yr ? yr[1] : labelBefore(before), year: yr ? parseInt(yr[1].replace(/\D/g, ''), 10) : null,
+          before, after,
+        });
+      }
+      if (figs.length) return { field, sentence, figs };
+    }
+  }
+  return null;
+}
+
+// A chart is only drawn for 2+ sourced figures of the same unit with usable labels.
+export function chartData(cd) {
+  const f = extractFigures(cd);
+  if (!f || f.figs.length < 2) return null;
+  const figs = f.figs.filter((x) => x.unit === f.figs[0].unit);
+  if (figs.length < 2) return null;
+  // "from $A to $B [after X]" -> Before / After
+  if (figs.length === 2 && /\bfrom\b[^$£€₹\d]*$/i.test(figs[0].before) && /^\s*to\b/i.test(figs[0].after.slice(0, 12))) {
+    const tail = /^\s+(after [^;,.]+)/i.exec(figs[1].after);
+    figs[0].label = 'Before';
+    figs[1].label = tail ? cap(tail[1]) : 'After';
+    figs[1].trend = figs[1].value < figs[0].value ? 'down' : 'up';
+  }
+  if (figs.every((x) => x.year)) figs.sort((x, y) => x.year - y.year);
+  if (figs.some((x) => !x.label)) return null;
+  figs.forEach((x) => { x.label = cap(x.label); });
+  return { ...f, figs };
+}
+
+const DRAMA = /\b(bankrupt\w*|collapse\w*|closed?|closures?|exit\w*|administration|insolven\w*|liquidat\w*|wiped|fell|lost|losses|failed|failure|crisis|penalt\w*|fines?|recall\w*|scandal|breach\w*|fraud\w*|impairment|write-?down)\b/i;
+
+function periodYears(period = '') {
+  const ys = (String(period).match(/\d{4}/g) || []).map(Number);
+  return ys.length ? { from: ys[0], to: ys[ys.length - 1] } : null;
+}
+
+// Period timeline (sourced period only): a drawn line from start to end year.
+function timeline(cd, x, y, w, colors) {
+  const p = periodYears(cd.period);
+  if (!p || p.to <= p.from) return { svg: '', h: 0 };
+  const yrs = p.to - p.from;
+  const label = yrs > 0 ? `${yrs} year${yrs > 1 ? 's' : ''}` : 'single year';
+  return { h: 56, svg: `<g>
+    <text x="${x}" y="${y + 13}" font-family="${FONT_FAMILY.mono}" font-size="13" letter-spacing="1.4" fill="${colors.label}">${esc(String(p.from))}</text>
+    <text x="${x + w}" y="${y + 13}" font-family="${FONT_FAMILY.mono}" font-size="13" letter-spacing="1.4" fill="${colors.label}" text-anchor="end">${esc(String(p.to))}</text>
+    <line x1="${x}" y1="${y + 36}" x2="${x + w}" y2="${y + 36}" stroke="${colors.track}" stroke-width="2"/>
+    <line x1="${x}" y1="${y + 36}" x2="${x + w}" y2="${y + 36}" stroke="${colors.accent}" stroke-width="3" stroke-dasharray="${w}" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" from="${w}" to="0" dur="1.4s" fill="freeze"/></line>
+    <circle cx="${x}" cy="${y + 36}" r="6" fill="${colors.accent}"/>
+    <circle cx="${x + w}" cy="${y + 36}" r="6" fill="${colors.accent}"/>
+    <text x="${x + w / 2}" y="${y + 28}" font-family="${FONT_FAMILY.mono}" font-size="13" fill="${colors.label}" text-anchor="middle">${esc(label)}</text>
+  </g>` };
+}
+
+// ─── 05 Data Story (Midnight; sourced bars or one hero figure) ─
+export function generateDataStory({ caseData }) {
+  const cd = caseData || {};
+  const T = TOKENS, M = CANVAS.m;
+  const soft = '#AEB9C8', rule = '#24344B', track = '#1C2C44';
+  const chart = chartData(cd);
+  const single = chart ? null : extractFigures(cd);
+  if (!chart && !single) return generateEditorialCover({ caseData: cd }); // no sourced number: no data story
+  const levels = [
+    { head: [80, 76, 72], headLines: 4, body: [24, 22], bodyLines: 5, gaps: 4, gap: 56, bar: 64, maxSpread: 110 },
+    { head: [72, 68], headLines: 4, body: [22, 21], bodyLines: 4, gaps: 4, gap: 48, bar: 56, maxSpread: 110 },
+    { head: [64, 60], headLines: 5, body: [21, 20], bodyLines: 4, gaps: 4, gap: 40, bar: 48, maxSpread: 110 },
+    { head: [56], headLines: 5, body: [20, 18], bodyLines: 4, gaps: 4, gap: 32, bar: 44, maxSpread: 110 },
+  ];
+  return firstThatFits(levels, (lv) => {
+    const sp = lv.spread || 0;
+    const parts = [svgOpen(T.midnight)];
+    let y = M;
+    parts.push(eyebrow(`Data story · Case ${caseNo(cd)} · ${cd.company || ''}`, M, y + 13, T.amber), eyebrow(cd.period || '', CANVAS.w - M, y + 13, soft, 'end'));
+    y += 13 + 48 + sp;
+    const h = fit(asSentence(cd.postAngle || cd.documentedProblem), CW, { fam: 'head', weight: 800, sizes: lv.head, lh: 1.05, maxLines: lv.headLines });
+    parts.push(block(h, M, y, T.white));
+    y += h.height + lv.gap + sp;
+
+    const pad = 32;
+    const panelTop = y;
+    let inner = '';
+    let iy = panelTop + pad;
+    if (chart) {
+      const figs = chart.figs.slice(0, 5);
+      const max = Math.max(...figs.map((f) => f.value));
+      const bh = lv.bar, vs = Math.round(bh * 0.6);
+      const labelW = Math.min(320, Math.max(...figs.map((f) => measure(f.label, 'body', 600, 20))) + 28);
+      const valueW = Math.max(...figs.map((f) => measure(f.raw, 'mono', 700, vs))) + 24;
+      const barX = M + pad + labelW, barMax = CW - 2 * pad - labelW - valueW;
+      const neg = /loss|penalt|fine|charge|impairment|decline|reduc/i;
+      inner += eyebrow(chart.figs[0].unit === '%' ? 'Share, as reported' : 'As reported', M + pad, iy + 13, T.amber);
+      iy += 13 + 32;
+      figs.forEach((f, i) => {
+        const w = Math.max(6, (f.value / max) * barMax);
+        const isLast = i === figs.length - 1;
+        const color = f.trend === 'down' || neg.test(f.label) ? T.coral : (isLast ? T.blue : '#8CA9CB');
+        inner += `<text x="${M + pad}" y="${(iy + bh / 2 + 7).toFixed(1)}" font-family="${FONT_FAMILY.body}" font-weight="600" font-size="20" fill="${T.white}">${esc(f.label)}</text>
+    <rect x="${barX}" y="${iy}" width="${barMax}" height="${bh}" rx="8" fill="${track}"/>
+    <rect x="${barX}" y="${iy}" width="${w.toFixed(1)}" height="${bh}" rx="8" fill="${color}"><animate attributeName="width" from="0" to="${w.toFixed(1)}" dur="1.1s" begin="${(0.2 + i * 0.25).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1" keyTimes="0;1"/></rect>
+    <text x="${(barX + w + 16).toFixed(1)}" y="${(iy + bh / 2 + vs * 0.36).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${vs}" fill="${T.white}">${esc(f.raw)}</text>`;
+        iy += bh + 24;
+      });
+      iy += 8;
+    } else if (single) {
+      const f = single.figs[0];
+      inner += eyebrow('The number', M + pad, iy + 13, T.amber);
+      iy += 13 + 24;
+      const ks = Math.min(200, Math.floor((CW - 2 * pad) / Math.max(1, measure(f.raw, 'mono', 700, 1))));
+      inner += `<text x="${M + pad}" y="${(iy + ks * 0.78).toFixed(1)}" font-family="${FONT_FAMILY.mono}" font-weight="700" font-size="${ks}" fill="${T.coral}" letter-spacing="-4" opacity="1"><animate attributeName="opacity" from="0" to="1" dur="0.9s" fill="freeze"/>${esc(f.raw)}</text>`;
+      iy += ks * 0.8 + 24;
+    }
+    const cap2 = fit((chart || single).sentence, CW - 2 * pad, { fam: 'body', weight: 400, sizes: lv.body, lh: 1.45, maxLines: lv.bodyLines });
+    inner += block(cap2, M + pad, iy, soft);
+    iy += cap2.height + pad;
+    parts.push(`<rect x="${M}" y="${panelTop}" width="${CW}" height="${(iy - panelTop).toFixed(0)}" rx="14" fill="#132238" stroke="${rule}" stroke-width="1"/>`, inner);
+    y = iy + lv.gap + sp;
+
+    // Root cause + the lesson
+    const why = fit(cd.rootCauseAnalysis || '', CW, { fam: 'body', weight: 400, sizes: lv.body, lh: 1.45, maxLines: lv.bodyLines + 1 });
+    parts.push(eyebrow('Why it happened', M, y + 13, T.amber), block(why, M, y + 13 + 20, T.white));
+    y += 13 + 20 + why.height + 40 + sp;
+    const lesson = actionItems(cd.recommendedFix)[0] || '';
+    const ls = fit(lesson + '.', CW - 40, { fam: 'head', weight: 700, sizes: [32, 30, 28, 26, 24], lh: 1.25, maxLines: 3 });
+    parts.push(`<rect x="${M}" y="${y}" width="4" height="${(13 + 16 + ls.height).toFixed(0)}" rx="2" fill="${T.teal}"/>`,
+      eyebrow('Operator lesson', M + 24, y + 13, '#42BFA9'), block(ls, M + 24, y + 13 + 16, T.white));
+    y += 13 + 16 + ls.height;
+    parts.push(footer(`Data story · ${cd.theme || ''}`, `Source: ${sourceLabel(cd)}`, { rule, text: '#8A97A8' }), '</svg>');
+    return { svg: parts.join('\n  '), bottom: y };
+  });
+}
+
 export const EDITORIAL_TEMPLATES = {
   bi_failure_autopsy: generateFailureAutopsy,
   bi_editorial_cover: generateEditorialCover,
   bi_exec_cheatsheet: generateExecCheatSheet,
+  bi_data_story: generateDataStory,
 };
 
-// Deterministic rotation so consecutive posts look different but stay in one publication style.
+// Chooses the ONE best template for this case's content:
+// sourced figures -> data story (bars, or one hero number); dramatic outcome -> dark cover with timeline;
+// a multi-step fix -> cheat sheet; otherwise the failure autopsy.
 export function pickEditorialTemplate(caseData) {
-  const keys = ['bi_failure_autopsy', 'bi_editorial_cover', 'bi_exec_cheatsheet'];
-  const n = Number(caseData?.caseNumber) || 1;
-  return keys[(n - 1) % keys.length];
+  const cd = caseData || {};
+  if (chartData(cd) || extractFigures(cd)) return 'bi_data_story';
+  if (DRAMA.test(`${cd.documentedProblem} ${cd.businessImpact}`)) return 'bi_editorial_cover';
+  if (actionItems(cd.recommendedFix).length >= 3) return 'bi_exec_cheatsheet';
+  return 'bi_failure_autopsy';
+}
+
+// Animations are for the live preview / SVG file; JPEG, PDF and LinkedIn need the finished frame.
+export function stripAnimations(svg) {
+  return String(svg).replace(/<animate\b[^>]*\/>/g, '');
 }
 
 // Injects the embedded @font-face CSS so the SVG renders with the right fonts as a file / <img> / JPEG export.

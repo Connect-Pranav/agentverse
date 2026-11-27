@@ -463,7 +463,7 @@ test('case visual never shows another company\'s facts (old Kodak bullets are re
   assert.ok(/Yahoo/i.test(s.drafts.p.visual.svg) && !/film gross/.test(s.drafts.p.visual.svg));
 });
 
-test('editorial visuals: every case renders in all three templates without cutting sourced text, unpublished drafts migrate', async () => {
+test('editorial visuals: every case renders in every template without cutting sourced text, unpublished drafts migrate', async () => {
   const E = await import('../src/editorial_templates.mjs');
   const { CASE_BANK } = await import('../src/case_bank.mjs');
   for (const c of CASE_BANK) for (const [k, fn] of Object.entries(E.EDITORIAL_TEMPLATES)) {
@@ -474,12 +474,25 @@ test('editorial visuals: every case renders in all three templates without cutti
     assert.ok(!/NaN|undefined/.test(svg), `${k} case ${c.caseNumber} has NaN/undefined`);
   }
   assert.ok(E.withFonts('<style>/*@signal-fonts*/</style>', '@font-face{}').includes('@font-face{}'));
+  // One best template per case: sourced numbers get a chart, and charts only ever show sourced numbers.
+  const yahoo = CASE_BANK.find((c) => c.caseNumber === 5);
+  assert.equal(E.pickEditorialTemplate(yahoo), 'bi_data_story');
+  assert.deepEqual(E.chartData(yahoo).figs.map((f) => f.raw), ['$4.83bn', '$4.48bn']);
+  for (const c of CASE_BANK) {
+    const svg = E.EDITORIAL_TEMPLATES[E.pickEditorialTemplate(c)]({ caseData: c });
+    const text = [c.businessImpact, c.documentedResponse, c.documentedProblem].join(' ').replace(/\s+/g, '');
+    for (const m of svg.matchAll(/font-family="'IBM Plex Mono'[^"]*" font-weight="700" font-size="(\d+)"[^>]*>(?:<animate[^>]*\/>)?([^<]+)</g)) {
+      if (+m[1] >= 24 && /\d/.test(m[2])) assert.ok(text.includes(m[2].replace(/&amp;/g, '&')), `case ${c.caseNumber} shows ${m[2]} which is not in its sources`);
+    }
+  }
+  assert.ok(!E.stripAnimations('<rect><animate attributeName="width"/></rect>').includes('animate'));
   const kv = memKv();
-  await kv.put('signal/state', JSON.stringify({ schemaVersion: 3, usedCaseNumbers: [1, 2, 3, 4, 5], runs: {}, drafts: {
+  await kv.put('signal/state', JSON.stringify({ schemaVersion: 4, usedCaseNumbers: [1, 2, 3, 4, 5], runs: {}, drafts: {
     a: { id: 'a', case_number: 5, status: 'pending', visual: { archetype: 'company_case_matrix', svg: '<svg>old</svg>' } },
     b: { id: 'b', case_number: 4, status: 'published', visual: { archetype: 'company_case_matrix', svg: '<svg>kept</svg>' } } } }));
   const s = await signal.load(kv);
   assert.equal(s.drafts.a.visual.height, 1500);
-  assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-v1') && /Yahoo/.test(s.drafts.a.visual.svg));
+  assert.equal(s.drafts.a.visual.archetype, 'bi_data_story');
+  assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-v1') && /Yahoo/i.test(s.drafts.a.visual.svg));
   assert.equal(s.drafts.b.visual.svg, '<svg>kept</svg>');
 });
