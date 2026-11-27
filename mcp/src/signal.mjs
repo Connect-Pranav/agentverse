@@ -9,6 +9,7 @@ import * as telegram from './telegram.mjs';
 import * as adobe from './adobe_express.mjs';
 import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
 import { withFonts, DESIGN_ID } from './editorial_templates.mjs';
+import { nextSlot, fmtIst } from './post_schedule.mjs';
 import { CASE_BANK, getCaseByNumber, getNextUnusedCase, buildLinkedInPostFromCase } from './case_bank.mjs';
 import {
   TEMPLATE_REGISTRY,
@@ -156,7 +157,7 @@ export async function load(kv) {
   }
   s.positioning = s.positioning || PRANAV_POSITIONING;
   s.settings = {
-    dailySchedule: '09:30 Asia/Kolkata',
+    dailySchedule: 'Drafts 09:30 IST Wed + Fri; LinkedIn posts Wed 4:00 PM + Fri 3:30 PM IST',
     autoDraft: true,
     requireApproval: true,
     publishMode: 'draft_only', // 'draft_only' | 'manual' | 'api'
@@ -268,7 +269,7 @@ export async function resetSignalState(kv) {
   const cleanState = {
     positioning: PRANAV_POSITIONING,
     settings: {
-      dailySchedule: '09:30 Asia/Kolkata',
+      dailySchedule: 'Drafts 09:30 IST Wed + Fri; LinkedIn posts Wed 4:00 PM + Fri 3:30 PM IST',
       autoDraft: true,
       requireApproval: true,
       publishMode: 'draft_only',
@@ -2020,6 +2021,37 @@ export async function submitForApproval(kv, env, draftId = null, fetchImpl = fet
 // -------------------------------------------------------------
 // 10. Publisher & Performance Analyst
 // -------------------------------------------------------------
+// Approval does not publish on the spot: the post waits for the next LinkedIn slot (Wed 4:00 PM / Fri 3:30 PM IST)
+// unless the owner says "now". The Worker's 10-minute cron publishes it when the slot comes (publishDueLinkedIn).
+export async function approveLinkedInPost(kv, env, draftId = null, { now = false, at = null } = {}, fetchImpl = fetch) {
+  if (now) return publishLinkedInPost(kv, env, draftId, { mode: env.LINKEDIN_ACCESS_TOKEN || (await kv.get('signal/linkedin_token')) ? 'api' : 'manual' }, fetchImpl);
+  const s = await load(kv);
+  const id = draftId || s.latestDraftId || `post_${todayDate()}`;
+  const d = s.drafts[id];
+  if (!d) throw new SignalError(404, `Draft "${id}" not found.`);
+  if (d.status === 'published') return { ok: true, status: 'published', draft_id: id };
+  const when = at ? new Date(at) : nextSlot('linkedin', new Date());
+  Object.assign(d, { status: 'scheduled', scheduledFor: when.toISOString(), approvedAt: nowIso() });
+  logActivity(s, 'Publishing Scheduler', `"${id}" approved; goes live ${fmtIst(when)} (LinkedIn slot).`);
+  await save(kv, s);
+  return { ok: true, status: 'scheduled', draft_id: id, scheduled_for: d.scheduledFor, scheduled_label: fmtIst(when), mode: 'scheduled' };
+}
+// Publishes approved posts whose slot has come. Called by the Worker cron every 10 minutes.
+export async function publishDueLinkedIn(kv, env, now = Date.now(), fetchImpl = fetch) {
+  const s = await load(kv);
+  const due = Object.values(s.drafts || {}).filter((d) => d?.status === 'scheduled' && Date.parse(d.scheduledFor) <= now);
+  const out = [];
+  for (const d of due) {
+    try {
+      const hasToken = env.LINKEDIN_ACCESS_TOKEN || (await kv.get('signal/linkedin_token'));
+      out.push({ id: d.id, ...(await publishLinkedInPost(kv, env, d.id, { mode: hasToken ? 'api' : 'manual' }, fetchImpl)) });
+    } catch (e) {
+      out.push({ id: d.id, ok: false, error: String(e?.message || e).slice(0, 200) });
+    }
+  }
+  return out;
+}
+
 export async function publishLinkedInPost(kv, env, draftId = null, options = {}, fetchImpl = fetch) {
   const s = await load(kv);
   const id = draftId || `post_${todayDate()}`;

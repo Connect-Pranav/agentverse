@@ -1033,8 +1033,8 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
         </details>
         <details class="mt-more" id="mtPlanBox"><summary>Weekly planner &middot; auto-post to YouTube</summary>
           <label class="mt-chk"><input type="checkbox" id="mtPlanOn"> Put these songs on the posting calendar</label>
-          <div class="mt-two"><input type="date" id="mtPlanDate" aria-label="First post date"><input type="time" id="mtPlanTime" value="19:00" aria-label="Post time"></div>
-          <div class="mt-two"><select id="mtPlanEvery" aria-label="How often"><option value="1">One song every day</option><option value="2">Every 2 days</option><option value="3">Every 3 days</option><option value="7">One a week</option></select>
+          <div class="mt-two"><input type="date" id="mtPlanDate" aria-label="First post date"><input type="time" id="mtPlanTime" value="10:00" aria-label="Post time"></div>
+          <div class="mt-two"><select id="mtPlanEvery" aria-label="How often"><option value="1">One song every day</option><option value="2">Every 2 days</option><option value="3">Every 3 days</option><option value="7" selected>One a week (Sunday 10 AM, best slot)</option></select>
             <select id="mtPlanPriv" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>
           <label class="mt-chk"><input type="checkbox" id="mtPlanAuto" checked> Make and post automatically &mdash; don't ask me</label>
           <p class="mt-sh" id="mtPlanPrev"></p>
@@ -1196,11 +1196,13 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 
           <!-- Controls Bar -->
           <div class="sig-acts">
-            <button class="sig-btn primary" id="sigApproveBtn" type="button"><span data-i="check"></span> Approve & Queue</button>
+            <button class="sig-btn primary" id="sigApproveBtn" type="button"><span data-i="check"></span> Approve & Schedule</button>
+            <button class="sig-btn" id="sigPublishNowBtn" type="button" title="Skip the slot and publish immediately"><span data-i="send"></span> Publish now</button>
             <button class="sig-btn gold" id="sigCopyBtn" type="button"><span data-i="copy"></span> Copy Post Text</button>
             <button class="sig-btn danger" id="sigRejectBtn" type="button"><span data-i="x"></span> Reject & Retry</button>
             <span id="sigActionMsg" style="font-size:12px;color:var(--mut);align-self:center;margin-left:auto"></span>
           </div>
+          <div id="postCal" style="margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--mut)"></div>
         </div>
       </div>
 
@@ -3339,7 +3341,7 @@ function mtRender(){
     h+='<div class="acts"><a href="'+esc(j.video_url)+'?dl=1" download><span data-i="download"></span>MP4'+(j.video_mb?' &middot; '+j.video_mb+' MB':'')+'</a>'+(j.thumbnail_url?'<a href="'+esc(j.thumbnail_url)+'" download><span data-i="image"></span>Thumbnail</a>':'')+'</div>';
     var sh=j.short;
     if(sh&&sh.preview_url)h+='<p class="mt-sh">YouTube Short preview (vertical, ~40 s)</p><video controls preload="metadata" playsinline src="'+esc(sh.preview_url)+'" style="max-width:240px;border-radius:12px;display:block;margin:6px 0"></video>';
-    if(sh&&sh.state==="published")h+='<div class="acts"><a href="'+esc(sh.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Short is live</a></div>';
+    if(sh&&sh.state==="published")h+='<div class="acts"><a href="'+esc(sh.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>'+(sh.publish_at&&Date.parse(sh.publish_at)>Date.now()?'Short goes live '+esc(fmtWhen(sh.publish_at)):'Short is live')+'</a></div>';
     else if(sh&&(sh.state==="requested"||sh.state==="making"))h+='<p class="mt-sh">Short: '+(sh.state==="making"?"cutting &amp; uploading…":"queued")+'</p>';
     else h+='<div class="acts"><button data-mt="short" type="button"><span data-i="film"></span>'+(sh&&sh.state==="failed"?"Retry YouTube Short":"Make YouTube Short (chorus, 40 s)")+'</button></div>'+(sh&&sh.error?'<p class="r">'+esc(String(sh.error).slice(0,160))+'</p>':'');
     if(pub&&pub.state==="published"){
@@ -3518,7 +3520,8 @@ function planNext(n){
   var dv=$("mtPlanDate")&&$("mtPlanDate").value;
   if(dv){ var q=dv.split("-"); start=new Date(+q[0],+q[1]-1,+q[2],+tm[0],+tm[1]||0); }
   else { var last=0; (STU.jobs||[]).forEach(function(j){ if(j.schedule&&!(j.publish&&j.publish.state==="published")){ var t=Date.parse(j.schedule.publish_at); if(t>last)last=t; } });
-    var b=new Date(Math.max(Date.now(),last)); start=new Date(b.getFullYear(),b.getMonth(),b.getDate()+1,+tm[0],+tm[1]||0); }
+    var b=new Date(Math.max(Date.now(),last)); start=new Date(b.getFullYear(),b.getMonth(),b.getDate()+1,+tm[0],+tm[1]||0);
+    if(every===7){ while(start.getDay()!==0) start.setDate(start.getDate()+1); } } // weekly songs go out on Sunday (posting calendar)
   for(var i=0;i<n;i++)out.push(new Date(start.getFullYear(),start.getMonth(),start.getDate()+i*every,start.getHours(),start.getMinutes()));
   return out;
 }
@@ -3815,7 +3818,17 @@ function sigApi(method, path, body){
     });
 }
 
+function postCalLoad(){
+  var el=$("postCal"); if(!el) return;
+  fetch("/api/schedule").then(function(r){ return r.json(); }).then(function(d){
+    var rows=(d.platforms||[]).map(function(p){
+      return '<div><b style="color:#fff">'+esc(p.label)+'</b> &middot; next '+esc(p.next_label)+' <span style="opacity:.7">('+esc(p.slots.join(", "))+')</span>'+(p.automated?'':' <span style="opacity:.7">&middot; '+esc(p.note)+'</span>')+'</div>';
+    });
+    el.innerHTML='<div style="font-weight:700;color:#fff;margin-bottom:4px">Posting calendar (IST)</div>'+rows.join("");
+  }).catch(function(){});
+}
 function sigLoad(){
+  postCalLoad();
   sigApi("GET", "/api/signal/draft?t=" + Date.now()).then(function(r){
     if(r && r.state){
       SIG.state = r.state;
@@ -4174,13 +4187,26 @@ function sigInitControls(){
       b.disabled = true;
       sigApi("POST", "/api/signal/decide", { decision: "approve", reviewer: CONFIG.owner }).then(function(r){
         b.disabled = false;
-        toast("Post approved and queued for publish!", true);
-        if($("sigActionMsg")) $("sigActionMsg").textContent = "Approved & queued in AgentVerse & @VaniPro_Bot";
+        var when = r && r.scheduled_label ? r.scheduled_label : "the next LinkedIn slot";
+        toast("Approved. Goes live " + when, true);
+        if($("sigActionMsg")) $("sigActionMsg").textContent = "Scheduled: " + when;
         sigLoad();
       }).catch(function(err){
         b.disabled = false;
         toast("Approve error: " + err.message, false);
       });
+    };
+  }
+
+  if($("sigPublishNowBtn")){
+    $("sigPublishNowBtn").onclick = function(){
+      var b = $("sigPublishNowBtn");
+      b.disabled = true;
+      sigApi("POST", "/api/signal/decide", { decision: "approve", now: true, reviewer: CONFIG.owner }).then(function(r){
+        b.disabled = false;
+        toast(r && r.mode === "api" ? "Published on LinkedIn" : "Approved for manual publish", true);
+        sigLoad();
+      }).catch(function(err){ b.disabled = false; toast("Publish error: " + err.message, false); });
     };
   }
 

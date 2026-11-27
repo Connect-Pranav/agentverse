@@ -2,8 +2,8 @@ name: PRANAV SIGNAL — LinkedIn Growth Studio
 
 on:
   schedule:
-    # 09:30 Asia/Kolkata = 04:00 UTC every day
-    - cron: '0 4 * * *'
+    # 09:30 IST on LinkedIn slot days (Wed, Fri) so the post can be approved before its 4:00 / 3:30 PM slot
+    - cron: '0 4 * * 3,5'
   workflow_dispatch:
 
 concurrency:

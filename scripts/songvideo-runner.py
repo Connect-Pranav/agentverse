@@ -18,7 +18,7 @@ optional GEMINI_API_KEY (paid Gemini listening + images), OPENAI_API_KEY for the
 YouTube: YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.force-ssl).
 Optional: GEMINI_TEXT_MODEL, GEMINI_IMAGE_MODEL, OPENAI_IMAGE_MODEL, SONGVIDEO_IMAGE_ENGINE, SONGVIDEO_IMAGE_USD.
 """
-import base64, json, math, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request
+import base64, datetime, json, math, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request
 
 GL = "https://generativelanguage.googleapis.com"
 PART = 22 * 1024 * 1024
@@ -1322,8 +1322,18 @@ def make_short(job, work):
     desc = (f"Full song: https://youtu.be/{full}\n\n" if full else "Full song on the SUNVERSE channel.\n\n") + \
         f"Lyrics: {cr.get('lyrics', 'COCO')} | Singer: {cr.get('singer', 'KoBhit')}\n#Shorts #Sunverse #HindiSongs"
     tags = ((job.get("youtube") or {}).get("tags") or [])[:10] + ["shorts", "sunverse"]
-    meta = {"snippet": {"title": base_title, "description": desc, "tags": tags, "categoryId": "10"},
-            "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True}}
+    status = {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True}
+    # Posting calendar: a public Short is uploaded now and YouTube makes it public at the next Shorts slot.
+    pub_at = sh.get("publishAt")
+    if pub_at and privacy == "public":
+        try:
+            when = datetime.datetime.fromisoformat(pub_at.replace("Z", "+00:00"))
+            if when > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15):
+                status.update({"privacyStatus": "private", "publishAt": when.strftime("%Y-%m-%dT%H:%M:%SZ")})
+                log(f"[{jid}] Short scheduled by YouTube for {status['publishAt']}")
+        except ValueError:
+            pass
+    meta = {"snippet": {"title": base_title, "description": desc, "tags": tags, "categoryId": "10"}, "status": status}
     req = urllib.request.Request("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
                                  data=json.dumps(meta).encode(), method="POST",
                                  headers={"authorization": f"Bearer {token}", "content-type": "application/json; charset=UTF-8",

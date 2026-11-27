@@ -240,7 +240,9 @@ test('PRANAV SIGNAL: REST endpoints /api/signal and decision flow', async () => 
   }), env);
   assert.equal(decRes.status, 200);
   const decData = await decRes.json();
-  assert.equal(decData.success, true);
+  assert.equal(decData.ok, true);
+  assert.equal(decData.status, 'scheduled', 'approval waits for the next LinkedIn slot');
+  assert.match(decData.scheduled_label, /(Wed|Fri) .*(4:00 PM|3:30 PM) IST/);
 });
 
 test('PRANAV SIGNAL: Public endpoints for UI visual, draft state, and OAuth callback', async () => {
@@ -600,4 +602,24 @@ test('12 print styles: a different style each day (12 consecutive cases = 12 sty
     assert.ok(svg.includes(`data-design="${E.DESIGN_ID}"`), `${k} carries the design id`);
     assert.ok(/Yahoo|YAHOO/.test(svg), `${k} names the company`);
   }
+});
+
+test('posting calendar: LinkedIn approvals wait for Wed 4:00 PM / Fri 3:30 PM IST and the cron publishes them then', async () => {
+  const S = await import('../src/post_schedule.mjs');
+  assert.equal(S.nextSlot('linkedin', new Date('2026-11-28T00:00:00Z')).toISOString(), '2026-12-02T10:30:00.000Z');
+  assert.equal(S.nextSlot('linkedin', new Date('2026-12-02T10:30:00Z')).toISOString(), '2026-12-04T10:00:00.000Z');
+  assert.equal(S.nextSlot('youtube_long', new Date('2026-11-28T00:00:00Z')).toISOString(), '2026-11-29T04:30:00.000Z');
+  assert.equal(S.nextSlot('youtube_short', new Date('2026-11-28T00:00:00Z')).toISOString(), '2026-11-28T14:00:00.000Z');
+  const kv = memKv();
+  const calls = [];
+  const f = async (url, init) => { calls.push(String(url)); return { ok: true, status: 201, headers: { get: () => 'urn:li:share:1' }, json: async () => ({ id: 'urn:li:share:1' }), text: async () => '{}' }; };
+  const r = await signal.runLinkedinPostGenerator(kv, envFor(), { skipEngagement: true }, f);
+  const env = { ...envFor(), LINKEDIN_ACCESS_TOKEN: 'x', LINKEDIN_PERSON_URN: 'urn:li:person:1' };
+  const a = await signal.approveLinkedInPost(kv, env, r.post_id, {}, f);
+  assert.equal(a.status, 'scheduled');
+  const before = calls.filter((u) => u.includes('linkedin.com/rest/posts')).length;
+  assert.deepEqual(await signal.publishDueLinkedIn(kv, env, Date.parse(a.scheduled_for) - 60000, f), [], 'nothing before the slot');
+  const done = await signal.publishDueLinkedIn(kv, env, Date.parse(a.scheduled_for) + 1000, f);
+  assert.equal(done.length, 1);
+  assert.ok(calls.filter((u) => u.includes('linkedin.com/rest/posts')).length > before, 'published at the slot');
 });

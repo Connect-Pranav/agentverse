@@ -23,6 +23,7 @@ import * as vani from './vani.mjs';
 import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
 import * as engagement from './engagement.mjs';
+import { nextSlot, calendar as postingCalendar, isSlotDay } from './post_schedule.mjs';
 import { withFonts } from './editorial_templates.mjs';
 import * as signal from './signal.mjs';
 import { VISUAL_JPG_BASE64 } from './visual_jpg.mjs';
@@ -105,7 +106,7 @@ function view(env, request, j) {
     publish: j.publish ? { state: j.publish.state, privacy: j.publish.privacy, url: j.publish.url ?? null, video_id: j.publish.videoId ?? null, privacy_effective: j.publish.privacyEffective ?? null, error: j.publish.error ?? null, requested_at: j.publish.requestedAt ?? null, at: j.publish.at ?? null } : null,
     images: j.imgTicket ? (j.images ?? []).slice().sort((x, y) => x.n - y.n).map((i) => ({ n: i.n, summary: i.summary, url: `${b}/sv/${j.imgTicket}/${i.n}.jpg?v=${encodeURIComponent(i.at || '')}` })) : [],
     image_total: j.analysis?.scenes?.length ?? null,
-    short: j.short ? { preview_url: j.short.preview && j.ticket ? `${b}/sv/${j.ticket}/short.mp4` : null, state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
+    short: j.short ? { publish_at: j.short.publishAt ?? null, preview_url: j.short.preview && j.ticket ? `${b}/sv/${j.ticket}/short.mp4` : null, state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
     schedule: j.schedule ? { publish_at: j.schedule.at, auto: Boolean(j.schedule.auto), privacy: j.schedule.privacy } : null,
     corrections: (j.corrections ?? []).slice(-3), lyric_shift_s: j.lyricShift ?? 0, own_images: (j.own ?? []).length,
     instant_start: Boolean(env.GH_DISPATCH_TOKEN), queued_at: j.queuedAt ?? null, decided_at: j.decidedAt ?? null,
@@ -249,7 +250,10 @@ async function requestShort(env, j, a = {}) {
   await kv(env).delete('sv/youtube-auth-blocked');
   if (j.status !== 'ready') throw new HttpError(409, `Video is ${j.status}; it must be ready first`);
   if (j.short && ['requested', 'making', 'published'].includes(j.short.state)) throw new HttpError(409, `Short already ${j.short.state}${j.short.url ? ': ' + j.short.url : ''}`);
-  j.short = { state: 'requested', privacy: PRIVACY.includes(a.privacy) ? a.privacy : (j.publish?.privacy || 'public'), requestedAt: nowIso(), attempts: 0 };
+  const privacy = PRIVACY.includes(a.privacy) ? a.privacy : (j.publish?.privacy || 'public');
+  // Public Shorts are uploaded now and set by YouTube to go live in the next Shorts slot (Thu 7 PM / Fri 6:30 PM / Sat 7:30 PM IST).
+  const publishAt = privacy === 'public' && !a.now ? nextSlot('youtube_short', new Date()).toISOString() : null;
+  j.short = { state: 'requested', privacy, publishAt, requestedAt: nowIso(), attempts: 0 };
   j.progress = null;
   return saveJob(env, j);
 }
@@ -867,7 +871,9 @@ async function route(request, env) {
           if (id.startsWith('sig_')) {
             const sigId = id.replace(/^sig_/, '');
             if (action === 'approve') {
-              await signal.publishLinkedInPost(kv(env), env, sigId, { mode: env.LINKEDIN_ACCESS_TOKEN ? 'api' : 'manual' });
+              const r = await signal.approveLinkedInPost(kv(env), env, sigId);
+              await work.decide(kv(env), id, action);
+              return { message: r.status === 'scheduled' ? `✅ Approved. Goes live on LinkedIn ${r.scheduled_label}` : '✅ Approved' };
             } else {
               const s = await signal.load(kv(env));
               if (s.drafts[sigId]) { s.drafts[sigId].status = 'rejected'; await signal.save(kv(env), s); }
@@ -899,8 +905,8 @@ async function route(request, env) {
         }
         if (type === 'signal' || type === 'sig') {
           if (action === 'approve') {
-            const pubRes = await signal.publishLinkedInPost(kv(env), env, id, { mode: env.LINKEDIN_ACCESS_TOKEN ? 'api' : 'manual' });
-            return { message: pubRes.mode === 'api' ? '🚀 LinkedIn post published!' : '✅ LinkedIn post approved for manual publish' };
+            const r = await signal.approveLinkedInPost(kv(env), env, id);
+            return { message: r.status === 'scheduled' ? `✅ Approved. Goes live on LinkedIn ${r.scheduled_label}` : '✅ Approved' };
           } else {
             const s = await signal.load(kv(env));
             if (s.drafts[id]) { s.drafts[id].status = 'rejected'; await signal.save(kv(env), s); }
@@ -936,6 +942,8 @@ async function route(request, env) {
     }
     throw new HttpError(404, 'Not found');
   }
+  // Posting calendar (IST) for every platform, with the next slot. Read-only, no secrets.
+  if (seg[0] === 'api' && seg[1] === 'schedule' && method === 'GET') return json({ timezone: 'Asia/Kolkata', platforms: postingCalendar(new Date()) }, 200, { 'cache-control': 'no-store' });
   if (seg[0] === 'api' && seg[1] === 'signal') {
     const k = kv(env);
 
@@ -1333,7 +1341,7 @@ async function route(request, env) {
       const today = signal.todayDate();
       const draftId = payload.draft_id || payload.id || `post_${today}`;
       if (action === 'approve') {
-        const res = await signal.publishLinkedInPost(k, env, draftId, { mode: env.LINKEDIN_ACCESS_TOKEN ? 'api' : 'manual' });
+        const res = await signal.approveLinkedInPost(k, env, draftId, { now: Boolean(payload.now), at: payload.at || null });
         return json(res, 200, { 'access-control-allow-origin': '*' });
       } else {
         if (s.drafts[draftId]) {
@@ -1553,11 +1561,19 @@ async function heartbeat(env, when = new Date()) {
     out.dispatched = {};
     for (const w of wf) out.dispatched[w] = await kick(env, null, w);
   }
-  if (first && hour === 4) { // 09:30 IST: today's LinkedIn draft, made inside the Worker; publishing still needs the owner's OK
+  // Approved LinkedIn posts go live in their slot (Wed 4:00 PM / Fri 3:30 PM IST).
+  try {
+    const done = await signal.publishDueLinkedIn(kv(env), env, when.getTime());
+    if (done.length) out.linkedinPublished = done.map((d) => `${d.id}: ${d.ok === false ? d.error : d.status || d.mode || 'ok'}`);
+  } catch (e) { out.linkedinPublishError = String(e?.message ?? e).slice(0, 200); }
+  // 09:30 IST on LinkedIn slot days only: the day's draft, so the owner can approve it before the afternoon slot.
+  if (first && hour === 4 && isSlotDay('linkedin', when)) {
     try {
       const k = kv(env);
       const st = await signal.load(k);
-      if (!st.drafts?.[`post_${signal.todayDate()}`]) {
+      const waiting = Object.values(st.drafts || {}).find((d) => ['draft', 'waiting_approval', 'scheduled'].includes(d?.status));
+      if (waiting) out.signal = `previous post ${waiting.id} is still ${waiting.status}: no new draft`;
+      else if (!st.drafts?.[`post_${signal.todayDate()}`]) {
         const r = await signal.runLinkedinPostGenerator(k, env, { trigger: 'worker_cron', time: when.toISOString(), ai: (system, prompt) => cloudBrain(env, { system, prompt, quick: true }).then((x) => x.text) });
         out.signal = r.generation_status;
       } else out.signal = 'already drafted today';

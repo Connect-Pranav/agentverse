@@ -679,8 +679,11 @@ test('Worker cron heartbeat runs by itself and reports honestly', async () => {
   const e = env();
   let job; await worker.scheduled({ scheduledTime: Date.parse('2026-11-28T04:03:00Z'), cron: '*/10 * * * *' }, e, { waitUntil: (p) => { job = p; } });
   await job;
+  assert.equal((await e.MEDIA.get('system/heartbeat', 'json')).signal, undefined, 'Saturday is not a LinkedIn day: no draft');
+  await worker.scheduled({ scheduledTime: Date.parse('2026-12-02T04:03:00Z'), cron: '*/10 * * * *' }, e, { waitUntil: (p) => { job = p; } });
+  await job;
   const hb = await e.MEDIA.get('system/heartbeat', 'json');
-  assert.ok(hb && hb.at === '2026-11-28T04:03:00.000Z', 'heartbeat stored');
+  assert.ok(hb && hb.at === '2026-12-02T04:03:00.000Z', 'heartbeat stored');
   assert.equal(hb.songsWaiting, 0);
   assert.equal(hb.dispatched, undefined, 'no GitHub dispatch without GH_DISPATCH_TOKEN');
   assert.ok(hb.signal || hb.signalError, 'daily LinkedIn draft attempted at 04:xx UTC, result recorded');
@@ -755,4 +758,14 @@ test('expired YouTube login: posting pauses instead of looping; a past date can 
   await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: new Date(Date.now() - 1000).toISOString() });
   await f('/api/songvideo/start', 'POST', {});
   assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 1);
+});
+
+test('posting calendar is served for the dashboard', async () => {
+  const e = env();
+  const d = await (await worker.fetch(new Request(B + '/api/schedule'), e)).json();
+  assert.equal(d.timezone, 'Asia/Kolkata');
+  const li = d.platforms.find((p) => p.id === 'linkedin');
+  assert.deepEqual(li.slots, ['Wed 16:00', 'Fri 15:30']);
+  assert.equal(d.platforms.length, 6);
+  assert.equal(d.platforms.find((p) => p.id === 'x').automated, false);
 });
