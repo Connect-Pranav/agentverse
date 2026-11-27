@@ -481,13 +481,15 @@ test('editorial visuals: every case renders in every template without cutting so
   assert.ok(E.withFonts('<style>/*@signal-fonts*/</style>', '@font-face{}').includes('@font-face{}'));
   // One best template per case: sourced numbers get a chart, and charts only ever show sourced numbers.
   const yahoo = CASE_BANK.find((c) => c.caseNumber === 5);
-  assert.equal(E.pickEditorialTemplate(yahoo), 'bi_data_story');
+  assert.equal(E.pickEditorialTemplate(yahoo), 'bi_newspaper');
+  assert.equal(E.figureNote(E.chartData(yahoo)), '-$350m gone', 'handwritten arithmetic: 4.48bn - 4.83bn');
+  assert.ok(E.headlineFor(yahoo).startsWith('Yahoo: '));
   assert.deepEqual(E.chartData(yahoo).figs.map((f) => f.raw), ['$4.83bn', '$4.48bn']);
   for (const c of CASE_BANK) {
     const svg = E.EDITORIAL_TEMPLATES[E.pickEditorialTemplate(c)]({ caseData: c });
     const text = [c.businessImpact, c.documentedResponse, c.documentedProblem].join(' ').replace(/\s+/g, '');
     for (const m of svg.matchAll(/font-family="'IBM Plex Mono'[^"]*" font-weight="700" font-size="(\d+)"[^>]*>(?:<animate[^>]*\/>)?([^<]+)</g)) {
-      if (+m[1] >= 24 && /\d/.test(m[2])) assert.ok(text.includes(m[2].replace(/&amp;/g, '&')), `case ${c.caseNumber} shows ${m[2]} which is not in its sources`);
+      if (+m[1] >= 20 && /[$£€₹%]/.test(m[2])) assert.ok(text.includes(m[2].replace(/&amp;/g, '&')), `case ${c.caseNumber} shows ${m[2]} which is not in its sources`);
     }
   }
   assert.ok(!E.stripAnimations('<rect><animate attributeName="width"/></rect>').includes('animate'));
@@ -497,7 +499,7 @@ test('editorial visuals: every case renders in every template without cutting so
     b: { id: 'b', case_number: 4, status: 'published', visual: { archetype: 'company_case_matrix', svg: '<svg>kept</svg>' } } } }));
   const s = await signal.load(kv);
   assert.equal(s.drafts.a.visual.height, 1500);
-  assert.equal(s.drafts.a.visual.archetype, 'bi_data_story');
+  assert.equal(s.drafts.a.visual.archetype, 'bi_newspaper');
   assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-') && /Yahoo/i.test(s.drafts.a.visual.svg));
   assert.equal(s.drafts.b.visual.svg, '<svg>kept</svg>');
 });
@@ -508,12 +510,16 @@ test('animation: frames sample SMIL correctly; finished frame equals the static 
   const yahoo = CASE_BANK.find((c) => c.caseNumber === 5);
   const svg = E.EDITORIAL_TEMPLATES[E.pickEditorialTemplate(yahoo)]({ caseData: yahoo });
   const len = E.animationLength(svg);
-  assert.ok(len > 1 && len < 6, `animation length ${len}`);
+  assert.ok(len > 1 && len < 8, `animation length ${len}`);
   const start = E.sampleSvgAt(svg, 0), end = E.sampleSvgAt(svg, Infinity);
   assert.ok(!/<animate/.test(start) && !/<animate/.test(end));
-  assert.match(start, /width="0" height="\d+" rx="8"/, 'bars start empty');
+  assert.match(start, /width="0" height="30" fill="#(?:1B2433|8C8679)"/, 'bars start empty');
   // finished frame keeps every bar at its full width (base values are the final state)
-  for (const m of svg.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="\d+" rx="8" fill="#(?:DC6656|2870C8|8CA9CB)">/g)) assert.ok(end.includes(`width="${m[1]}"`));
+  const bars = [...svg.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="30" fill="#(?:1B2433|8C8679)">/g)];
+  assert.equal(bars.length, 2);
+  for (const m of bars) assert.ok(end.includes(`width="${m[1]}"`));
+  // pen strokes start undrawn and end fully drawn
+  assert.match(start, /stroke-dasharray="(\d+)" stroke-dashoffset="\1"/);
   assert.equal(E.stripAnimations(svg), end);
 
   const kv = memKv();
@@ -548,4 +554,34 @@ test('animation: frames sample SMIL correctly; finished frame equals the static 
   const s2 = await signal.load(kv2);
   assert.ok(s2.drafts.p.visual.svg.includes(`data-design="${E.DESIGN_ID}"`) && s2.drafts.p.visual.gif.stale);
   assert.ok(s2.drafts.q.visual.svg.includes('kept'));
+});
+
+test('hero illustration: made once on Workers AI, used by the newspaper visual, inlined for files; MP4 goes to Telegram as video once', async () => {
+  const kv = memKv();
+  const calls = [];
+  const f = async (url) => { calls.push(String(url)); return { ok: true, status: 200, json: async () => ({ ok: true }), text: async () => '{}' }; };
+  const tinyJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1, 0xff, 0xd9]).toString('base64');
+  let runs = 0;
+  const env = { ...envFor(), AI: { run: async (model, input) => { runs++; assert.match(input.prompt, /No text, no letters/); assert.ok(!/Yahoo/.test(input.prompt)); return { image: tinyJpeg }; } } };
+  const r = await signal.runLinkedinPostGenerator(kv, env, { skipEngagement: true, ai: async () => 'A cracked padlock made of Yahoo glass over a dark city' }, f);
+  assert.equal(r.case_number, 5);
+  const st = await signal.load(kv);
+  const d = st.drafts[r.post_id];
+  assert.equal(runs, 1);
+  assert.ok(d.visual.svg.includes('href="/api/signal/hero.jpg?post_id='));
+  assert.equal(d.visual.archetype, 'bi_newspaper');
+  const again = await signal.ensureHeroImage(kv, env, r.post_id, {});
+  assert.equal(again.status, 'EXISTS');
+  assert.equal(runs, 1, 'the picture is generated once per post');
+  const inlined = await signal.inlineHero(kv, d.visual.svg);
+  assert.ok(inlined.includes('href="data:image/jpeg;base64,') && !inlined.includes('/api/signal/hero.jpg'));
+
+  const mp4 = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109]).buffer;
+  const before = calls.length;
+  const m = await signal.attachVisualMedia(kv, env, r.post_id, mp4, { kind: 'mp4', fetchImpl: f, design: 'x' });
+  assert.equal(m.telegram_sent, true);
+  assert.ok(calls.slice(before).some((u) => u.includes('/sendVideo')));
+  const n = calls.length;
+  await signal.attachVisualMedia(kv, env, r.post_id, new TextEncoder().encode('GIF89a').buffer, { kind: 'gif', fetchImpl: f, design: 'x' });
+  assert.equal(calls.length, n, 'only one motion version is sent to Telegram per post');
 });

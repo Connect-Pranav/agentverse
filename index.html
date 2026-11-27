@@ -1232,6 +1232,7 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
               <small id="sigAdobeStatus" style="color:var(--mut);font-size:11px"></small>
               <button class="sig-btn" id="sigRegenVisualBtn" type="button" title="Regenerate visual"><span data-i="rotate-ccw"></span> Regenerate</button>
               <a class="sig-btn primary" id="sigDownloadJpgBtn" download="pranav-signal-visual.jpg" href="#" title="Download crisp JPEG image"><span data-i="image"></span> Download Image (JPEG)</a>
+              <a class="sig-btn" id="sigDownloadMp4Btn" style="display:none" download href="#" title="Video clip for LinkedIn"><span data-i="image"></span> Download Video</a>
               <a class="sig-btn" id="sigDownloadGifBtn" style="display:none" download href="#" title="Animated GIF for LinkedIn"><span data-i="image"></span> Download GIF</a>
               <button class="sig-btn" id="sigDownloadPdfBtn" type="button" title="Download PDF document"><span data-i="file-text"></span> Download PDF</button>
               <a class="sig-btn" id="sigDownloadVisualBtn" download="pranav-signal.svg" href="/api/signal/visual" title="Download vector SVG"><span data-i="download"></span> SVG</a>
@@ -3938,6 +3939,11 @@ function sigRender(){
       }).catch(function(e){ console.warn("Visual fetch:", e); });
     }
     if($("sigDownloadVisualBtn")) $("sigDownloadVisualBtn").href = "/api/signal/visual";
+    if($("sigDownloadMp4Btn")){
+      var mv = v.mp4;
+      $("sigDownloadMp4Btn").style.display = mv && mv.url ? "" : "none";
+      if(mv && mv.url){ $("sigDownloadMp4Btn").href = mv.url; $("sigDownloadMp4Btn").setAttribute("download", "pranav-signal-clip.mp4"); }
+    }
     if($("sigDownloadGifBtn")){
       var g = v.gif;
       $("sigDownloadGifBtn").style.display = g && g.url ? "" : "none";
@@ -4244,7 +4250,24 @@ function sigInitControls(){
     function doExport(el){
       var svgXml = new XMLSerializer().serializeToString(el);
       // Bars/timelines animate in the preview; files must show the finished frame.
-      if(format !== 'svg') svgXml = svgXml.replace(/<animate\b[^>]*\/>/g, "");
+      if(format !== 'svg') svgXml = svgXml.replace(/<animate(?:Transform)?\b[^>]*\/>/g, "");
+      // The illustration is referenced by URL in the page; files must carry it inside.
+      var heroM = /href="(\/api\/signal\/hero\.jpg\?post_id=[\w%-]+)"/.exec(svgXml);
+      if(heroM && !el.__heroInlined){
+        fetch(heroM[1]).then(function(r){ return r.ok ? r.blob() : null; }).then(function(b){
+          if(!b){ el.__heroInlined = true; doExport(el); return; }
+          var fr = new FileReader();
+          fr.onload = function(){
+            var clone = el.cloneNode(true);
+            var imgs = clone.querySelectorAll("image");
+            for(var i = 0; i < imgs.length; i++){ if((imgs[i].getAttribute("href") || "").indexOf("/api/signal/hero.jpg") === 0) imgs[i].setAttribute("href", fr.result); }
+            clone.__heroInlined = true;
+            doExport(clone);
+          };
+          fr.readAsDataURL(b);
+        }).catch(function(){ el.__heroInlined = true; doExport(el); });
+        return;
+      }
       if(format === 'svg'){
         var blob = new Blob([svgXml], { type: "image/svg+xml;charset=utf-8" });
         var url = URL.createObjectURL(blob);

@@ -200,10 +200,9 @@ export async function load(kv) {
     if (!svg || d.status === 'published' || !/data-design="bi-editorial-/.test(svg) || svg.includes(`data-design="${DESIGN_ID}"`)) continue;
     const cd = getCaseByNumber(d.caseNumber || d.case_number);
     if (!cd) continue;
-    const archetype = pickTemplate(cd);
-    const fresh = generateVisualSvg(archetype, { caseData: cd, hook: d.hook || '', body: d.body || '', theme: cd.theme });
-    Object.assign(d.visual, { archetype, templateName: archetype, svg: fresh, dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(fresh)}` });
+    renderCaseVisual(d, cd);
     if (d.visual.gif) d.visual.gif = { ...d.visual.gif, stale: true };
+    if (d.visual.mp4) d.visual.mp4 = { ...d.visual.mp4, stale: true };
     if (s.visuals?.[d.id]) s.visuals[d.id] = d.visual;
   }
   s.latestDraftId = s.latestDraftId || null;
@@ -1682,24 +1681,111 @@ export async function signalFontCss(env) {
   } catch (_) { return ''; }
 }
 
-// Stores the animated GIF for a post and sends it to Telegram once (the approval chat sees the motion version).
-export async function attachVisualGif(kv, env, postId, buf, fetchImpl = fetch, design = '') {
+// Stores the animated GIF / MP4 clip for a post. Telegram gets ONE motion version per post: the MP4 when there is
+// one (it plays inline), otherwise the GIF.
+export async function attachVisualMedia(kv, env, postId, buf, { kind = 'gif', fetchImpl = fetch, design = '' } = {}) {
   const s = await load(kv);
   const d = s.drafts[postId];
   if (!d) throw new SignalError(404, `Draft "${postId}" not found.`);
-  design = design || d.visual?.gif?.design || '';
-  await kv.put(`signal/gif/${postId}`, buf, { expirationTtl: 120 * 86400, metadata: { design } });
-  const already = Boolean(d.visual?.gif?.telegram_sent);
-  let sent = already;
-  if (!already && d.status !== 'published') {
-    sent = await telegram.sendTelegramDocument(env, `case-${d.case_number || d.caseNumber || 'x'}-animated.gif`, buf, 'image/gif',
-      `Animated visual for ${d.company || postId}. Same post, same facts; download from the dashboard to upload to LinkedIn.`, fetchImpl);
+  const v = d.visual || {};
+  design = design || v[kind]?.design || '';
+  await kv.put(`signal/${kind}/${postId}`, buf, { expirationTtl: 120 * 86400, metadata: { design } });
+  const motionSent = Boolean(v.gif?.telegram_sent || v.mp4?.telegram_sent);
+  let sent = false;
+  if (!motionSent && d.status !== 'published') {
+    const name = `case-${d.case_number || d.caseNumber || 'x'}-${kind === 'mp4' ? 'clip.mp4' : 'animated.gif'}`;
+    const caption = `${kind === 'mp4' ? 'Video clip' : 'Animated visual'} for ${d.company || postId}. Same post, same facts; download it from the dashboard to upload to LinkedIn.`;
+    sent = kind === 'mp4'
+      ? await telegram.sendTelegramVideo(env, name, buf, caption, fetchImpl)
+      : await telegram.sendTelegramDocument(env, name, buf, 'image/gif', caption, fetchImpl);
   }
-  d.visual = { ...(d.visual || {}), gif: { url: `/api/signal/visual.gif?post_id=${encodeURIComponent(postId)}`, bytes: buf.byteLength, updatedAt: nowIso(), design, telegram_sent: Boolean(sent) } };
+  d.visual = { ...v, [kind]: { url: `/api/signal/visual.${kind}?post_id=${encodeURIComponent(postId)}`, bytes: buf.byteLength, updatedAt: nowIso(), design, telegram_sent: Boolean(sent || v[kind]?.telegram_sent) } };
   if (s.visuals?.[postId]) s.visuals[postId] = d.visual;
-  logActivity(s, 'Visual Creative Agent', `Animated GIF stored for "${postId}" (${(buf.byteLength / 1024).toFixed(0)} KB)${sent && !already ? ', sent to Telegram' : ''}.`);
+  logActivity(s, 'Visual Creative Agent', `${kind.toUpperCase()} stored for "${postId}" (${(buf.byteLength / 1024).toFixed(0)} KB)${sent ? ', sent to Telegram' : ''}.`);
   await save(kv, s);
-  return { post_id: postId, bytes: buf.byteLength, telegram_sent: Boolean(sent) };
+  return { post_id: postId, kind, bytes: buf.byteLength, telegram_sent: Boolean(sent || motionSent) };
+}
+export const attachVisualGif = (kv, env, postId, buf, fetchImpl = fetch, design = '') => attachVisualMedia(kv, env, postId, buf, { kind: 'gif', fetchImpl, design });
+
+// ─── Hero picture: one original AI illustration per post (Cloudflare Workers AI, free tier) ───
+const HERO_MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const METAPHORS = [
+  [/breach|cyber|security|privacy|hack|data/i, 'a shattered glowing padlock floating above a dark server room, thin streams of light leaking from the cracks'],
+  [/supply|logistic|distribut|warehouse|inventory/i, 'an empty conveyor belt in a dim warehouse, one red warning light, scattered empty crates'],
+  [/pric|promot|discount|coupon/i, 'paper price tags falling through darkness like autumn leaves under a single spotlight'],
+  [/network|social|user|platform|community/i, 'a constellation of glowing nodes going dark one by one, broken connection lines'],
+  [/recall|safety|quality|defect|emission/i, 'a cracked precision gear under a hard spotlight on a factory floor'],
+  [/bankrupt|collapse|closure|insolv|administration/i, 'a tall glass office tower at night with lights switching off floor by floor'],
+  [/advertis|revenue|monetis|ad /i, 'a tall stack of coins balanced on a single narrow pillar above a dark void'],
+  [/stream|media|rental|retail|store/i, 'an empty store aisle at night lit only by the glow of one screen'],
+  [/acqui|merger|deal|valuation/i, 'two puzzle pieces that do not fit, cracked at the joint, on a dark boardroom table'],
+  [/regulat|compliance|governance|fraud|audit/i, 'a stack of documents with a broken wax seal under a desk lamp'],
+];
+export function heroPrompt(cd, metaphor = '') {
+  const text = `${cd.theme} ${cd.documentedProblem} ${cd.industry}`;
+  const m = metaphor || (METAPHORS.find(([re]) => re.test(text)) || [0, 'a chessboard in dramatic light with one fallen king piece'])[1];
+  return `Cinematic editorial illustration for a business newspaper: ${m}. Moody dark navy and deep blue tones with one warm red accent light, dramatic volumetric lighting, shallow depth of field, photorealistic, high detail. No text, no letters, no numbers, no logos, no brand names, no human faces.`;
+}
+const HERO_URL = (postId) => `/api/signal/hero.jpg?post_id=${encodeURIComponent(postId)}`;
+function b64ToBytes(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bytesToB64(bytes) {
+  const u = new Uint8Array(bytes);
+  let s = '';
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+// Replaces the hero URL in an SVG with the picture itself, so files, GIF frames and exports are self-contained.
+export async function inlineHero(kv, svg) {
+  const m = /href="\/api\/signal\/hero\.jpg\?post_id=([\w%-]+)"/.exec(String(svg));
+  if (!m) return svg;
+  const bytes = await kv.get(`signal/hero/${decodeURIComponent(m[1])}`, 'arrayBuffer');
+  return bytes ? String(svg).split(m[0]).join(`href="data:image/jpeg;base64,${bytesToB64(bytes)}"`) : svg;
+}
+function renderCaseVisual(d, cd) {
+  const archetype = pickTemplate(cd);
+  const svg = generateVisualSvg(archetype, { caseData: cd, hook: d.hook || '', body: d.body || '', theme: cd.theme, heroHref: d.visual?.hero?.url || '' });
+  Object.assign(d.visual, { archetype, templateName: archetype, width: 1200, height: 1500, aspectRatio: '4:5', svg, dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}` });
+}
+// Makes sure the post has its picture and that the visual uses it. Never blocks the post: errors are recorded.
+export async function ensureHeroImage(kv, env, postId, { ai } = {}) {
+  const s0 = await load(kv);
+  const d0 = s0.drafts[postId];
+  if (!d0?.visual) throw new SignalError(404, `Draft "${postId}" has no visual yet.`);
+  const cd = getCaseByNumber(d0.caseNumber || d0.case_number);
+  if (!cd) return { status: 'NO_CASE' };
+  let status = 'EXISTS', prompt = d0.visual.hero?.prompt || '';
+  if (!(await kv.get(`signal/hero/${postId}`, 'arrayBuffer'))) {
+    if (!env?.AI) return { status: 'NO_AI_BINDING' };
+    let metaphor = '';
+    if (ai) {
+      try {
+        const t = await ai('You are a newspaper art director. Reply with ONE short visual metaphor (max 25 words) for an illustration. No brand names, no logos, no text, no real people.',
+          `Business case: ${cd.documentedProblem}\nTheme: ${cd.theme}\nIndustry: ${cd.industry}`);
+        metaphor = String(t || '').split('\n')[0].replace(/["“”]/g, '').replace(new RegExp(String(cd.company).replace(/[^\w ]/g, ''), 'gi'), '').slice(0, 220).trim();
+      } catch (_) { metaphor = ''; }
+    }
+    prompt = heroPrompt(cd, metaphor);
+    const r = await env.AI.run(HERO_MODEL, { prompt, steps: 6 });
+    if (!r?.image) return { status: 'MODEL_RETURNED_NOTHING' };
+    await kv.put(`signal/hero/${postId}`, b64ToBytes(r.image), { expirationTtl: 120 * 86400 });
+    status = 'CREATED';
+  }
+  const s = await load(kv);
+  const d = s.drafts[postId];
+  const needs = !d.visual.hero || !String(d.visual.svg || '').includes('/api/signal/hero.jpg');
+  if (needs) {
+    d.visual.hero = { url: HERO_URL(postId), prompt, model: HERO_MODEL, createdAt: nowIso() };
+    renderCaseVisual(d, cd);
+    if (s.visuals?.[postId]) s.visuals[postId] = d.visual;
+    logActivity(s, 'Visual Creative Agent', `Hero illustration ${status === 'CREATED' ? 'created' : 'attached'} for "${postId}".`);
+    await save(kv, s);
+  }
+  return { status, post_id: postId, prompt };
 }
 
 // Linkedin_Post_Generator: one Excel/CSV case per day -> draft -> visual -> persist -> Telegram.
@@ -1760,7 +1846,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
 
   // ---- Stage 3: visual — Adobe Express API (generate variation from the tagged template). No Canva, no fake IDs.
   if (run.stages.visual !== 'DONE') {
-    const vis = await createLinkedInVisual(kv, postId, 'company_case_matrix');
+    const vis = await createLinkedInVisual(kv, postId); // template chosen from the case (pickTemplate)
     const ax = await adobe.generateCaseDesign(env, caseData, fetchImpl, options.adobeOpts);
     const st = await load(kv);
     const v = st.drafts[postId].visual;
@@ -1784,6 +1870,14 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       adobe_express_url: v.adobe_express_url ?? null,
       error_details: ax.status === 'FAILED' ? `visual: ${ax.error}` : run.error_details,
     });
+  }
+
+  // ---- Stage 3b: the post's own illustration (Workers AI). Optional: a failure never blocks the post.
+  try {
+    const hero = await ensureHeroImage(kv, env, postId, { ai: options.ai });
+    await patch({ hero_status: hero.status });
+  } catch (e) {
+    await patch({ hero_status: `FAILED: ${String(e?.message || e).slice(0, 120)}` });
   }
 
   // ---- Stage 4: quality check + approval queue (NO auto-publish: approval comes from Telegram/dashboard)
@@ -1833,7 +1927,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       console.error('[signal] Telegram error:', e?.message);
     }
     if (sent && d.visual?.svg && run.stages.telegram_visual !== 'DONE') {
-      const okDoc = await telegram.sendTelegramDocument(env, `case-${run.case_number}-${String(run.company).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.svg`, withFonts(d.visual.svg, await signalFontCss(env)), 'image/svg+xml', `Visual — Case #${run.case_number} ${run.company} (${run.image_generation_status})`, fetchImpl);
+      const okDoc = await telegram.sendTelegramDocument(env, `case-${run.case_number}-${String(run.company).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.svg`, withFonts(await inlineHero(kv, d.visual.svg), await signalFontCss(env)), 'image/svg+xml', `Visual — Case #${run.case_number} ${run.company} (${run.image_generation_status})`, fetchImpl);
       if (okDoc) run.stages.telegram_visual = 'DONE';
     }
     run.stages.telegram = sent ? 'DONE' : 'FAILED';

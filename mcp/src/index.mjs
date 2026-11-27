@@ -918,27 +918,46 @@ async function route(request, env) {
     const k = kv(env);
 
     // Animated GIF of a post's visual (rendered by scripts/signal-gif.mjs on GitHub Actions).
-    if (seg[2] === 'visual.gif' && (method === 'GET' || method === 'HEAD')) {
+    if (seg[2] === 'hero.jpg' && (method === 'GET' || method === 'HEAD')) {
+      const postId = url.searchParams.get('post_id') || '';
+      if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(400, 'Bad post_id');
+      const img = await k.get(`signal/hero/${postId}`, 'arrayBuffer');
+      if (!img) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
+      return new Response(method === 'HEAD' ? null : img, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=86400', 'access-control-allow-origin': '*' } });
+    }
+    // Runner: make sure the latest post has its illustration before rendering motion versions.
+    if (seg[2] === 'visual-refresh' && method === 'POST') {
+      await runner(request, env);
+      const st = await signal.load(k);
+      const postId = url.searchParams.get('post_id') || st.latestDraftId;
+      if (!postId || !st.drafts[postId]) return json({ ok: false, status: 'NO_POST' }, 404);
+      const out = await signal.ensureHeroImage(k, env, postId, { ai: (system, prompt) => cloudBrain(env, { system, prompt, quick: true }).then((r) => r.text) });
+      return json({ ok: true, ...out });
+    }
+    if ((seg[2] === 'visual.gif' || seg[2] === 'visual.mp4') && (method === 'GET' || method === 'HEAD')) {
+      const kind = seg[2].slice(-3);
       const postId = url.searchParams.get('post_id') || (await signal.load(k)).latestDraftId || `post_${signal.todayDate()}`;
       if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(400, 'Bad post_id');
-      const { value: gif, metadata } = await k.getWithMetadata(`signal/gif/${postId}`, 'arrayBuffer');
-      if (!gif) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
-      return new Response(method === 'HEAD' ? null : gif, { headers: {
+      const { value: media, metadata } = await k.getWithMetadata(`signal/${kind}/${postId}`, 'arrayBuffer');
+      if (!media) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
+      return new Response(method === 'HEAD' ? null : media, { headers: {
         'x-design': String(metadata?.design || ''), 'access-control-expose-headers': 'x-design',
-        'content-type': 'image/gif', 'content-length': String(gif.byteLength), 'cache-control': 'public, max-age=300',
-        'content-disposition': `inline; filename="pranav-signal-${postId}.gif"`, 'access-control-allow-origin': '*' } });
+        'content-type': kind === 'mp4' ? 'video/mp4' : 'image/gif', 'content-length': String(media.byteLength), 'cache-control': 'public, max-age=300',
+        'content-disposition': `inline; filename="pranav-signal-${postId}.${kind}"`, 'access-control-allow-origin': '*' } });
     }
-    if (seg[2] === 'visual-gif' && method === 'PUT') {
+    if ((seg[2] === 'visual-gif' || seg[2] === 'visual-mp4') && method === 'PUT') {
+      const kind = seg[2].slice(-3);
       await runner(request, env);
       const postId = url.searchParams.get('post_id') || '';
       if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(400, 'Bad post_id');
       const len = Number(request.headers.get('content-length') ?? 0);
-      if (!(len > 0 && len <= 10 * 1024 * 1024)) throw new HttpError(413, 'GIF must be under 10 MB');
+      if (!(len > 0 && len <= 20 * 1024 * 1024)) throw new HttpError(413, 'File must be under 20 MB');
       const buf = await request.arrayBuffer();
-      const head = new TextDecoder().decode(new Uint8Array(buf, 0, 6));
-      if (head !== 'GIF89a' && head !== 'GIF87a') throw new HttpError(415, 'Not a GIF');
+      const head = new TextDecoder().decode(new Uint8Array(buf, 0, 12));
+      const ok = kind === 'gif' ? (head.startsWith('GIF89a') || head.startsWith('GIF87a')) : head.slice(4, 8) === 'ftyp';
+      if (!ok) throw new HttpError(415, kind === 'gif' ? 'Not a GIF' : 'Not an MP4');
       const design = String(url.searchParams.get('design') || '').slice(0, 40);
-      const out = await signal.attachVisualGif(k, env, postId, buf, fetch, design);
+      const out = await signal.attachVisualMedia(k, env, postId, buf, { kind, design });
       return json({ ok: true, ...out });
     }
 
@@ -987,7 +1006,7 @@ async function route(request, env) {
       const d = (draftId && s.drafts[draftId]) || s.drafts[`post_${signal.todayDate()}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
       if (!d?.visual?.svg) return json({ ok: false, error: 'NO_POST_GENERATED_YET' }, 404, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
       // Fonts are embedded on the way out so the file looks the same in any viewer.
-      const svg = withFonts(d.visual.svg, await signal.signalFontCss(env));
+      const svg = withFonts(await signal.inlineHero(k, d.visual.svg), await signal.signalFontCss(env));
       return new Response(method === 'HEAD' ? null : svg, {
         status: 200,
         headers: {

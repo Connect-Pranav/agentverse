@@ -44,3 +44,13 @@ jobs:
           command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
           npm install --no-save --no-package-lock --silent @resvg/resvg-js@2
           node scripts/signal-gif.mjs
+        env:
+          SIGNAL_OUT: signal-out
+      - name: Keep the files for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signal-motion
+          path: signal-out/
+          if-no-files-found: ignore
+          retention-days: 7

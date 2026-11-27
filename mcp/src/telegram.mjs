@@ -224,3 +224,26 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+// Sends an MP4 so Telegram plays it inline (sendDocument would show it as a file).
+export async function sendTelegramVideo(env, filename, content, caption = '', fetchImpl = fetch) {
+  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  let chatId = env.TELEGRAM_CHAT_ID;
+  if (!chatId && env.KV) {
+    try { chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id')); } catch {}
+  }
+  if (!token || !chatId) return false;
+  const form = new FormData();
+  form.append('chat_id', String(chatId));
+  form.append('supports_streaming', 'true');
+  if (caption) form.append('caption', caption.slice(0, 1000));
+  form.append('video', new Blob([content], { type: 'video/mp4' }), filename);
+  try {
+    const r = await fetchImpl(`${TG_API}/bot${token}/sendVideo`, { method: 'POST', body: form });
+    return r.ok;
+  } catch (e) {
+    console.error('[telegram] sendVideo failed:', e?.message);
+    return false;
+  }
+}
+
