@@ -532,7 +532,7 @@ export async function generatePranavPov(kv, topicId = null) {
   const problemNumStr = problemNum ? `#${problemNum} ` : '';
 
   // Situation: the real-world context where this problem occurs
-  const situationText = `Across Indian B2B marketplaces, SMEs, and scaling businesses, "${problemTitle}" is a persistent operational challenge in the ${category} domain.`;
+  let situationText = `Across Indian B2B marketplaces, SMEs, and scaling businesses, "${problemTitle}" is a persistent operational challenge in the ${category} domain.`;
 
   let frameworkData = null;
   let operatorPerspective = '';
