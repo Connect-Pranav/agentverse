@@ -3263,6 +3263,7 @@ function svEta(j){
   else if(j.status==="ready"&&j.short&&j.short.state==="making"){ x=fromP("short"); if(x===null)x=150; label="until the Short is live"; }
   else if(j.status==="ready"&&j.publish&&j.publish.state==="requested"){ x=svWait(j,since(j.publish.requested_at))+svPublishEst(j); label="until it is live on YouTube"; }
   else if(j.status==="ready"&&j.publish&&j.publish.state==="publishing"){ x=fromP("publish"); if(x===null)x=svPublishEst(j); label="until it is live on YouTube"; }
+  if(j.status==="ready"&&((j.publish&&j.publish.state==="blocked")||(j.short&&j.short.state==="blocked"))){ x=null; label="paused: YouTube login expired"; }
   if(x!==null&&x<0){ x=null; label="overdue"; }
   return {s:x,label:label,after:after};
 }
@@ -3323,8 +3324,11 @@ function mtRender(){
   }
   if(!(pub&&pub.state==="published")&&["failed","rejected"].indexOf(j.status)<0){
     var sc=j.schedule;
+    if(pub&&pub.state==="blocked"||(j.short&&j.short.state==="blocked"))h+='<div class="mt-ask"><p><b>Posting paused: YouTube login expired.</b> Retrying cannot fix this, so nothing will run until the login is renewed: run <code>scripts/yt-refresh-token.py</code>, put the new value in the <code>YT_REFRESH_TOKEN</code> secret, then tap Retry.</p><div class="acts"><button class="ap" data-mt="yt-retry" type="button"><span data-i="refresh-cw"></span>Retry YouTube now</button></div></div>';
+    var overdue=sc&&Date.parse(sc.publish_at)<Date.now();
     if(sc)h+='<div class="mt-sched"><span data-i="calendar-clock"></span><span>Posts <b>'+esc(fmtWhen(sc.publish_at))+'</b> &middot; '+esc(sc.privacy)+(sc.auto?' &middot; automatic':'')+(j.status!=="ready"&&Date.parse(sc.publish_at)<Date.now()?' &middot; as soon as the video is ready':'')+'</span></div>';
-    h+='<details class="mt-redo"><summary>'+(sc?"Change posting date":"Schedule YouTube post")+'</summary><div class="sch-ed"><input type="datetime-local" id="mtSchAt" value="'+esc(sc?toLocalInput(sc.publish_at):toLocalInput(planNext(1)[0].toISOString()))+'" aria-label="Post date and time"><select id="mtSchP" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>'+
+    if(overdue&&j.status==="ready")h+='<div class="acts"><button class="ap" data-mt="sch-now" type="button"><span data-i="send"></span>Post now</button><button data-mt="sch-tmr" type="button"><span data-i="calendar-clock"></span>Tomorrow 10:00 AM</button></div>';
+    h+='<details class="mt-redo"'+(overdue?' open':'')+'><summary>'+(sc?(overdue?"Pick a new date (the old one has passed)":"Change posting date"):"Schedule YouTube post")+'</summary><div class="sch-ed"><input type="datetime-local" id="mtSchAt" value="'+esc(sc?toLocalInput(sc.publish_at):toLocalInput(planNext(1)[0].toISOString()))+'" aria-label="Post date and time"><select id="mtSchP" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>'+
       '<div class="acts"><button class="ap" data-mt="sch-save" type="button"><span data-i="calendar-clock"></span>'+(sc?"Save date":"Schedule — post automatically")+'</button>'+(sc?'<button data-mt="sch-del" type="button"><span data-i="x"></span>Remove from calendar</button>':'')+'</div></details>';
   }
   if(j.status==="needs_approval"){
@@ -3408,6 +3412,19 @@ $("mtJob").onclick=function(e){
     var redo=function(){ return stuApi("POST","/api/songvideo/"+id+"/redo",{corrections:fx,areas:ar,lyric_shift:sh,theme:th,style:sy,lyrics:ly}); };
     var pre=(fim.length||toAI)?stuApi("DELETE","/api/songvideo/"+id+"/own").then(function(){ return fim.length?ownUpload(id,fim,function(k,n){ b.lastChild.nodeValue="Uploading image "+k+"/"+n; }):null; }):Promise.resolve();
     pre.then(redo).then(function(r){ STU.fixAreas[id]=[]; STU.fixImgs[id]=[]; STU.redoOpen=null; toast(fim.length?"Re-engineering with your "+fim.length+" images":"Re-engineering with your notes",true); upd(r.job); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    return;
+  }
+  if(a==="yt-retry"){
+    b.disabled=true;
+    stuApi("POST","/api/songvideo/start",{}).then(function(){ toast("Retrying YouTube now",true); stuLoad(); },function(e2){ toast(e2.message,false); b.disabled=false; });
+    return;
+  }
+  if(a==="sch-now"||a==="sch-tmr"){
+    var when=new Date();
+    if(a==="sch-now") when=new Date(Date.now()+60000);
+    else { when.setDate(when.getDate()+1); when.setHours(10,0,0,0); }
+    b.disabled=true;
+    stuApi("POST","/api/songvideo/"+id+"/schedule",{publish_at:when.toISOString(),privacy:(STU.cur&&STU.cur.schedule&&STU.cur.schedule.privacy)||"public",auto:true}).then(function(r){ toast(a==="sch-now"?"Posting now":"Moved to tomorrow 10:00 AM",true); upd(r.job); stuRender(); if(a==="sch-now") stuApi("POST","/api/songvideo/start",{}).then(function(){},function(){}); },function(e2){ toast(e2.message,false); b.disabled=false; });
     return;
   }
   if(a==="sch-save"||a==="sch-del"){

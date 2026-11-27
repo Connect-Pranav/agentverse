@@ -125,25 +125,34 @@ function scheduleOf(a = {}) {
 }
 async function setSchedule(env, j, a = {}) {
   if (a.publish_at === null || a.clear) { delete j.schedule; return saveJob(env, j); }
-  if (j.publish && ['requested', 'publishing', 'published'].includes(j.publish.state)) throw new HttpError(409, `Already ${j.publish.state} on YouTube`);
+  if (j.publish && ['publishing', 'published'].includes(j.publish.state)) throw new HttpError(409, `Already ${j.publish.state} on YouTube`);
+  if (j.publish && ['requested', 'failed', 'blocked'].includes(j.publish.state)) j.publish = null; // new date = fresh attempt
   j.schedule = scheduleOf(a) ?? (j.schedule ? { ...j.schedule, auto: a.auto ?? j.schedule.auto, privacy: PRIVACY.includes(a.privacy) ? a.privacy : j.schedule.privacy } : null);
   if (!j.schedule) throw new HttpError(400, 'publish_at is required');
   return saveJob(env, j);
+}
+// A scheduled post is due when its time has passed and it was never tried, or it failed for a non-login reason
+// fewer than 4 times (waits 15, 30, 60 min between tries). Blocked (login) posts wait for the owner.
+function autoPublishDue(j, now) {
+  const s = j.schedule;
+  if (!s?.auto || j.status !== 'ready' || Date.parse(s.at) > now) return false;
+  if (!j.publish) return true;
+  if (j.publish.state !== 'failed') return false;
+  const tries = j.publish.autoTries ?? 0;
+  const since = now - Date.parse(j.publish.requestedAt || j.updatedAt || 0);
+  return tries < 4 && since > 15 * 60e3 * 2 ** tries;
 }
 // runs every time the renderer checks in (~every 15 min): approve planner songs and post the ones that are due
 async function autopilot(env, j) {
   const s = j.schedule;
   if (!s?.auto) return false;
   if (j.status === 'needs_approval') { await decide(env, j, 'approve'); j.autoApproved = true; await saveJob(env, j); return true; }
-  const isPublishFailed = j.publish?.state === 'failed';
-  const timeSinceFail = isPublishFailed ? (Date.now() - Date.parse(j.publish?.requestedAt || j.updatedAt || 0)) : 0;
-  const canAutoRetry = isPublishFailed && ((j.publish.autoTries ?? 0) < 5 || timeSinceFail > 15 * 60e3);
-  if (j.status === 'ready' && (!j.publish || canAutoRetry) && Date.parse(s.at) <= Date.now()) {
+  if (j.status === 'ready' && autoPublishDue(j, Date.now()) && !(await kv(env).get('sv/youtube-auth-blocked'))) {
     const tries = (j.publish?.autoTries ?? 0) + (j.publish ? 1 : 0);
     j.publish = null;
     if (!clean(j.youtube?.title, 100)) j.youtube = { ...(j.youtube ?? {}), title: `${j.title || 'New song'} | Sunverse` };
-    await requestPublish(env, j, { privacy: s.privacy });
-    j.publish.auto = true; j.publish.autoTries = tries > 10 ? 1 : tries;
+    await requestPublish(env, j, { privacy: s.privacy, auto: true });
+    j.publish.auto = true; j.publish.autoTries = tries;
     await saveJob(env, j);
     return true;
   }
@@ -222,6 +231,7 @@ async function decide(env, j, decision) {
   return saveJob(env, j);
 }
 async function requestPublish(env, j, a = {}) {
+  if (!a.auto) await kv(env).delete('sv/youtube-auth-blocked'); // owner asked: try the YouTube login again
   if (j.status !== 'ready') throw new HttpError(409, `Video is ${j.status}; it must be ready before posting`);
   if (j.publish && ['requested', 'publishing', 'published'].includes(j.publish.state)) throw new HttpError(409, `Already ${j.publish.state}${j.publish.url ? ': ' + j.publish.url : ''}`);
   const privacy = PRIVACY.includes(a.privacy) ? a.privacy : 'public';
@@ -236,6 +246,7 @@ async function requestPublish(env, j, a = {}) {
   return saveJob(env, j);
 }
 async function requestShort(env, j, a = {}) {
+  await kv(env).delete('sv/youtube-auth-blocked');
   if (j.status !== 'ready') throw new HttpError(409, `Video is ${j.status}; it must be ready first`);
   if (j.short && ['requested', 'making', 'published'].includes(j.short.state)) throw new HttpError(409, `Short already ${j.short.state}${j.short.url ? ': ' + j.short.url : ''}`);
   j.short = { state: 'requested', privacy: PRIVACY.includes(a.privacy) ? a.privacy : (j.publish?.privacy || 'public'), requestedAt: nowIso(), attempts: 0 };
@@ -442,6 +453,7 @@ async function markPublished(env, j, a) {
   if (!j.publish || j.publish.state !== 'publishing') throw new HttpError(409, 'Not publishing');
   const id = clean(a.video_id, 20);
   if (!/^[\w-]{6,20}$/.test(id)) throw new HttpError(400, 'video_id is required');
+  await kv(env).delete('sv/youtube-auth-blocked');
   Object.assign(j.publish, { state: 'published', videoId: id, url: `https://youtu.be/${id}`, privacyEffective: clean(a.privacy, 20) || j.publish.privacy, leaseUntil: null, error: null, at: nowIso() });
   j.progress = null;
   return saveJob(env, j);
@@ -454,7 +466,16 @@ async function markShort(env, j, a) {
   j.progress = null;
   return saveJob(env, j);
 }
+// An expired / revoked YouTube login cannot fix itself by retrying: stop and say so, instead of looping.
+const YT_AUTH_ERR = /invalid_grant|login expired|unauthorized_client|invalid_client|Token has been expired or revoked/i;
 async function failJob(env, j, error, stage) {
+  if (j.status === 'ready' && YT_AUTH_ERR.test(String(error || '')) && (j.publish?.state === 'publishing' || j.short?.state === 'making')) {
+    const target = j.publish?.state === 'publishing' ? j.publish : j.short;
+    Object.assign(target, { state: 'blocked', error: clean(error, 1000), blockedAt: nowIso(), leaseUntil: null });
+    j.progress = null;
+    await kv(env).put('sv/youtube-auth-blocked', JSON.stringify({ at: nowIso(), error: clean(error, 300) }), { expirationTtl: 30 * 86400 });
+    return saveJob(env, j);
+  }
   if (j.status === 'ready' && j.short?.state === 'making' && (stage === 'short' || j.publish?.state !== 'publishing')) {
     j.short.state = (j.short.attempts ?? 0) >= MAX_ATTEMPTS ? 'failed' : 'requested';
     j.short.error = clean(error, 1000) || 'unknown error';
@@ -729,6 +750,7 @@ const quotaRetry = (j) => {
 };
 async function pending(env) {
   const now = Date.now();
+  const authBlocked = Boolean(await kv(env).get('sv/youtube-auth-blocked'));
   let n = 0;
   for (const id of await index(env)) {
     const j = await kv(env).get(jobKey(id), 'json');
@@ -736,7 +758,7 @@ async function pending(env) {
     try { await autopilot(env, j); } catch (e) { console.error('planner', j.id, e?.message); }
     const stale = (x) => !(x?.leaseUntil && Date.parse(x.leaseUntil) > now);
     const pubWaiting = j.publish && (j.publish.state === 'requested' || (j.publish.state === 'publishing' && stale(j.publish)));
-    const pubAutoDue = j.status === 'ready' && j.schedule?.auto && Date.parse(j.schedule.at) <= now && (!j.publish || j.publish.state === 'failed');
+    const pubAutoDue = autoPublishDue(j, now) && !authBlocked;
     const shortWaiting = j.short && (j.short.state === 'requested' || (j.short.state === 'making' && stale(j.short)));
     if (['queued', 'approved'].includes(j.status) || quotaRetry(j) || (['analyzing', 'rendering'].includes(j.status) && stale(j))
       || (j.status === 'ready' && (pubWaiting || pubAutoDue || shortWaiting))) n++;
@@ -1392,7 +1414,9 @@ async function route(request, env) {
         const j = await kv(env).get(jobKey(id), 'json');
         if (!j) continue;
         let changed = false;
-        if (j.status === 'ready' && j.publish && ['failed', 'requested'].includes(j.publish.state)) {
+        await kv(env).delete('sv/youtube-auth-blocked'); // owner says go: try the login again once
+        if (j.status === 'ready' && j.short?.state === 'blocked') { Object.assign(j.short, { state: 'requested', attempts: 0, leaseUntil: null }); changed = true; }
+        if (j.status === 'ready' && j.publish && ['failed', 'requested', 'blocked'].includes(j.publish.state)) {
           j.publish.state = 'requested';
           j.publish.attempts = 0;
           j.publish.requestedAt = nowIso();

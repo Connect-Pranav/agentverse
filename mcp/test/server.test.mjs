@@ -725,3 +725,34 @@ test('engagement checker: reads comments before a new post, replies once, never 
   const r4 = await eng.checkEngagement(memKV(), {}, state, { ai, fetchImpl: li(200) });
   assert.equal(r4.status, 'LINKEDIN_NOT_CONNECTED');
 });
+
+test('expired YouTube login: posting pauses instead of looping; a past date can be moved; owner retry resumes', async () => {
+  const e = env();
+  e.GH_DISPATCH_TOKEN = undefined;
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: R, body: body === undefined ? undefined : JSON.stringify(body) }), e);
+  const past = new Date(Date.now() - 5 * 86400e3).toISOString();
+  const id = (await (await f('/api/songvideo', 'POST', { title: 'Song Z', publish_at: past })).json()).job.job_id;
+  await worker.fetch(new Request(B + `/api/songvideo/${id}/audio`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-type': 'audio/mpeg', 'content-length': '10' }, body: new Uint8Array(10) }), e);
+  await f('/api/songvideo/runner/claim', 'POST', {});
+  await f(`/api/songvideo/runner/${id}/analysis`, 'PUT', { durationS: 20, scenes: [{ start: 0, end: 20, image_prompt: 'x' }], youtube: { title: 'Song Z | Sunverse' } });
+  await f('/api/songvideo/runner/pending');
+  await f('/api/songvideo/runner/claim', 'POST', {});
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video?part=1&parts=1`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': '2' }, body: new Uint8Array([1, 2]) }), e);
+  await f('/api/songvideo/runner/pending'); // date has passed -> publish requested
+  assert.equal((await (await f('/api/songvideo/runner/claim', 'POST', {})).json()).stage, 'publish');
+  await f(`/api/songvideo/runner/${id}/fail`, 'POST', { error: 'HTTP 400 POST https://oauth2.googleapis.com/token: { "error": "invalid_grant" }', stage: 'publish' });
+  let j = (await (await f(`/api/songvideo/${id}`)).json()).job;
+  assert.equal(j.publish.state, 'blocked');
+  assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 0, 'no endless retry loop while the login is expired');
+  assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.publish.state, 'blocked', 'autopilot does not re-request');
+  // the old date can be replaced
+  const next = new Date(Date.now() + 86400e3).toISOString();
+  j = (await (await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: next })).json()).job;
+  assert.equal(j.schedule.publish_at.slice(0, 16), next.slice(0, 16));
+  assert.equal(j.publish, null);
+  // owner moves it to now and taps start: the block is lifted and the post is tried again
+  await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: new Date(Date.now() - 1000).toISOString() });
+  await f('/api/songvideo/start', 'POST', {});
+  assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 1);
+});
