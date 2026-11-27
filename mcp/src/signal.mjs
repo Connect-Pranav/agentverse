@@ -1694,7 +1694,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
   } catch (e) {
     run.stages.draft = 'FAILED';
     await patch({ stages: run.stages, generation_status: 'FAILED_AT_DRAFT', error_details: `draft: ${e.message}` });
-    return finalizeRun(kv, run.run_id);
+    return finalizeRun(kv, run.run_id, engagement);
   }
 
   // ---- Stage 3: visual — Adobe Express API (generate variation from the tagged template). No Canva, no fake IDs.
@@ -1743,7 +1743,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       persistence_status: ok ? 'PERSISTED_IN_KV' : 'FAILED_READBACK',
       error_details: ok ? run.error_details : `persistence: draft "${postId}" not found after save`,
     });
-    if (!ok) return finalizeRun(kv, run.run_id);
+    if (!ok) return finalizeRun(kv, run.run_id, engagement);
   }
 
   // ---- Stage 6: Telegram — exact persisted post, sent once per run
@@ -1782,11 +1782,11 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       error_details: sent ? run.error_details : 'telegram: message not delivered (bot token/chat id missing or Telegram API rejected it). The saved post is unaffected; re-run to retry only this stage.',
     });
   }
-  return finalizeRun(kv, run.run_id);
+  return finalizeRun(kv, run.run_id, engagement);
 }
 
 // Derives the final statuses from stage results and returns the persisted record (single source of truth).
-async function finalizeRun(kv, runId) {
+async function finalizeRun(kv, runId, engagement = null) {
   const s = await load(kv);
   const run = s.runs[runId];
   const draft = s.drafts[run.post_id] || null;

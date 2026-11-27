@@ -223,7 +223,7 @@ test('PRANAV SIGNAL: REST endpoints /api/signal and decision flow', async () => 
   assert.equal(runData.ok, true);
   // Adobe Express is not configured in this Worker, so the honest status is PARTIAL (never SUCCESS).
   assert.equal(runData.status, 'PARTIAL');
-  assert.equal(runData.run.case_number, 1);
+  assert.equal(runData.run.case_number, 5);
   assert.equal(runData.run.image_generation_status, 'WORKER_RENDERED');
 
   // POST /api/signal/decide approve
@@ -297,7 +297,7 @@ function tgStub() {
 }
 const envFor = () => ({ TELEGRAM_BOT_TOKEN: '1:x', TELEGRAM_CHAT_ID: '42', MCP_TOKEN: 't' });
 
-test('case selection: consecutive new runs pick Case #1, #2, #3 and persist usedCaseNumbers', async () => {
+test('case selection: consecutive new runs pick Case #5, #6, #7 (cases 1-4 already published) and persist usedCaseNumbers', async () => {
   const kv = memKv();
   const { f } = tgStub();
   const got = [];
@@ -305,9 +305,9 @@ test('case selection: consecutive new runs pick Case #1, #2, #3 and persist used
     const r = await signal.runLinkedinPostGenerator(kv, envFor(), { new_case: true }, f);
     got.push(r.case_number);
   }
-  assert.deepEqual(got, [1, 2, 3]);
+  assert.deepEqual(got, [5, 6, 7]);
   const s = await signal.load(kv);
-  assert.deepEqual(s.usedCaseNumbers, [1, 2, 3]);
+  assert.deepEqual(s.usedCaseNumbers, [1, 2, 3, 4, 5, 6, 7]);
 });
 
 test('retry on the same day resumes the SAME run/case and does not re-send Telegram', async () => {
@@ -321,7 +321,7 @@ test('retry on the same day resumes the SAME run/case and does not re-send Teleg
   assert.equal(b.case_number, a.case_number);
   assert.equal(sent.length, afterFirst, 'a resumed run must not send Telegram again');
   assert.equal(sent.filter((m) => m.reply_markup).length, 1, 'exactly one approval message (with buttons) per run');
-  assert.equal((await signal.load(kv)).usedCaseNumbers.length, 1);
+  assert.equal((await signal.load(kv)).usedCaseNumbers.length, 5);
 });
 
 test('Telegram receives the exact persisted post; templates and Canva supported', async () => {
@@ -334,8 +334,8 @@ test('Telegram receives the exact persisted post; templates and Canva supported'
   assert.equal(r.persistence_status, 'PERSISTED_IN_KV');
   assert.equal(r.telegram_status, 'SENT');
   assert.equal(r.case_number, d.case_number);
-  assert.equal(r.company, 'Eastman Kodak');
-  assert.ok(d.body.includes('Eastman Kodak'));
+  assert.equal(r.company, 'Yahoo');
+  assert.ok(d.body.includes('Yahoo'));
 
   const decode = (h) => h.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   const tg = decode(sent.map((m) => m.text).join('\n'));
@@ -375,10 +375,10 @@ test('dashboard endpoint serves the exact persisted record (and the case visual,
     const s = await signal.load(env.MEDIA);
     const saved = s.drafts[runJson.run.post_id];
     assert.equal(dash.state.draft.body, saved.body);
-    assert.equal(dash.state.case_number, 1);
+    assert.equal(dash.state.case_number, 5);
     assert.equal(dash.state.run.run_id, runJson.run.run_id);
     assert.equal(dash.state.visual.adobe_express_url, null);
-    assert.ok(dash.state.visual.svg.includes('EASTMAN KODAK') || dash.state.visual.svg.includes('Eastman Kodak'));
+    assert.ok(/yahoo/i.test(dash.state.visual.svg));
     // load() must not overwrite the case visual with the generic matrix on later reads
     const again = await signal.load(env.MEDIA);
     assert.equal(again.drafts[runJson.run.post_id].visual.svg, saved.visual.svg);
@@ -418,7 +418,7 @@ test('Adobe Express: configured run creates a real variation via the API (stubbe
     if (u.endsWith('/beta/generate-variation')) {
       const b = JSON.parse(init.body);
       assert.deepEqual(Object.keys(b.variationDetails.tagMappings).sort(), ['company', 'problem']);
-      assert.equal(b.variationDetails.tagMappings.company, 'Eastman Kodak');
+      assert.equal(b.variationDetails.tagMappings.company, 'Yahoo');
       return ok({ jobId: 'J1', statusUrl: 'https://express-api.adobe.io/status/J1' });
     }
     if (u.includes('/status/J1')) return ok({ jobId: 'J1', status: 'succeeded', document: { id: 'urn:aaid:sc:EU:abc', name: 'x', thumbnailUrl: 'https://t/x.png' } });
