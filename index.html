@@ -3332,6 +3332,7 @@ function mtRender(){
     h+=(j.video_url?'<video controls preload="metadata" playsinline class="mt-vid" '+(j.thumbnail_url?'poster="'+esc(j.thumbnail_url)+'"':'')+' src="'+esc(j.video_url)+'"></video>':'');
     h+='<div class="acts"><a href="'+esc(j.video_url)+'?dl=1" download><span data-i="download"></span>MP4'+(j.video_mb?' &middot; '+j.video_mb+' MB':'')+'</a>'+(j.thumbnail_url?'<a href="'+esc(j.thumbnail_url)+'" download><span data-i="image"></span>Thumbnail</a>':'')+'</div>';
     var sh=j.short;
+    if(sh&&sh.preview_url)h+='<p class="mt-sh">YouTube Short preview (vertical, ~40 s)</p><video controls preload="metadata" playsinline src="'+esc(sh.preview_url)+'" style="max-width:240px;border-radius:12px;display:block;margin:6px 0"></video>';
     if(sh&&sh.state==="published")h+='<div class="acts"><a href="'+esc(sh.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>Short is live</a></div>';
     else if(sh&&(sh.state==="requested"||sh.state==="making"))h+='<p class="mt-sh">Short: '+(sh.state==="making"?"cutting &amp; uploading…":"queued")+'</p>';
     else h+='<div class="acts"><button data-mt="short" type="button"><span data-i="film"></span>'+(sh&&sh.state==="failed"?"Retry YouTube Short":"Make YouTube Short (chorus, 40 s)")+'</button></div>'+(sh&&sh.error?'<p class="r">'+esc(String(sh.error).slice(0,160))+'</p>':'');

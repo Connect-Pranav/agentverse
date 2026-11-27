@@ -701,3 +701,27 @@ test('signal: stale unpublished drafts are dropped, next case after the 4 publis
   assert.equal(s.latestRunId, null);
   assert.equal(sig.pickCase(s).caseData.caseNumber, 5);
 });
+
+test('engagement checker: reads comments before a new post, replies once, never names employers, reports blocked reads', async () => {
+  const eng = await import('../src/engagement.mjs');
+  const kvs = memKV();
+  const state = { drafts: { d: { id: 'd', status: 'published', case_number: 4, company: 'BlackBerry', publishedUrl: 'https://www.linkedin.com/posts/x_bs-share-7532068409707053056--w5k/', publishedAt: '2026-11-27' } } };
+  const env0 = { LINKEDIN_ACCESS_TOKEN: 't', LINKEDIN_PERSON_URN: 'urn:li:person:me' };
+  const posted = [];
+  const li = (status) => async (u, init) => {
+    if (init?.method === 'POST') { posted.push(JSON.parse(init.body)); return new Response('{}', { status: 201 }); }
+    if (status !== 200) return new Response('no', { status });
+    return new Response(JSON.stringify({ elements: [{ '$URN': 'urn:li:comment:(a,1)', actor: 'urn:li:person:razn', message: { text: 'How did magicpin decide the stop/go gate?' } }, { '$URN': 'urn:li:comment:(a,2)', actor: 'urn:li:person:me', message: { text: 'mine' } }] }));
+  };
+  const ai = async () => '{"kind":"question","reply":"At magicpin we used margin dilution as the gate. Retention decides the rest."}';
+  const r1 = await eng.checkEngagement(kvs, env0, state, { ai, fetchImpl: li(200) });
+  assert.equal(r1.status, 'CHECKED'); assert.equal(r1.post.urn, 'urn:li:share:7532068409707053056');
+  assert.equal(r1.comments_seen, 1, 'own comment ignored'); assert.equal(posted.length, 1);
+  assert.ok(!/magicpin/i.test(posted[0].message.text), 'employer name removed');
+  const r2 = await eng.checkEngagement(kvs, env0, state, { ai, fetchImpl: li(200) });
+  assert.equal(posted.length, 1, 'same comment is never answered twice');
+  const r3 = await eng.checkEngagement(memKV(), env0, state, { ai, fetchImpl: li(403) });
+  assert.equal(r3.status, 'READ_NOT_ALLOWED');
+  const r4 = await eng.checkEngagement(memKV(), {}, state, { ai, fetchImpl: li(200) });
+  assert.equal(r4.status, 'LINKEDIN_NOT_CONNECTED');
+});

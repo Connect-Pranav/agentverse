@@ -3,6 +3,7 @@
 // Positioned for Pranav Kumar: RevOps | GTM Strategy & Execution | P&L Ownership | Funnel Optimization | AI & Automation.
 // Commercial Scaleups · B2B Platforms · Digital Marketplaces.
 
+import { checkEngagement } from './engagement.mjs';
 import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
 import * as adobe from './adobe_express.mjs';
@@ -1645,6 +1646,10 @@ function newRunRecord(caseData, postId) {
 // case_number) and only repeats stages that have not completed. Pass { new_case: true } or { topic_id }
 // to deliberately start a different run.
 export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl = fetch) {
+  // Before a NEW post: look at the last post's comments and answer them. Never blocks the new post.
+  let engagement = null;
+  try { if (!options.skipEngagement) engagement = await checkEngagement(kv, env, await load(kv), { ai: options.ai, fetchImpl }); }
+  catch (e) { engagement = { status: 'CHECK_FAILED', note: String(e?.message ?? e).slice(0, 160) }; }
   const today = todayDate();
   const postId = options.draftId || `post_${today}`;
   let s = await load(kv);
@@ -1800,7 +1805,7 @@ async function finalizeRun(kv, runId) {
   s.runs[runId] = run;
   logActivity(s, 'Linkedin_Post_Generator', `Run ${runId} (${run.post_id}, Case #${run.case_number} ${run.company}) → ${run.generation_status}. Telegram: ${run.telegram_status}. Visual: ${run.image_generation_status}.`);
   await save(kv, s);
-  return { ...run, draft_full: draft };
+  return { ...run, engagement_status: engagement?.status ?? null, engagement_replies: engagement?.replies?.filter((r) => r.posted).length ?? 0, draft_full: draft };
 }
 
 // -------------------------------------------------------------

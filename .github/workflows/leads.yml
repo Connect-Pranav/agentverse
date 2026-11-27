@@ -1,8 +1,8 @@
 name: AGENTVERSE lead scraper
+# STOPPED 2026-11-28 on the owner's request: the Reddit lead scraper no longer runs on a schedule.
+# Run it by hand from the Actions tab if it is ever wanted again.
 on:
-  schedule:
-    - cron: "17 */6 * * *"   # every 6 hours
-  workflow_dispatch: {}       # run by hand from the Actions tab
+  workflow_dispatch: {}
 permissions:
   contents: write
 concurrency: agentverse-data

@@ -1284,9 +1284,7 @@ def make_short(job, work):
     jid = job["id"]
     sh = job.get("short") or {}
     privacy = sh.get("privacy") if sh.get("privacy") in ("public", "unlisted", "private") else "public"
-    progress(jid, "short", "Connecting to your YouTube channel", 1, 4, 150)
-    token = yt_token()
-    progress(jid, "short", "Downloading the full video", 2, 4, 130)
+    progress(jid, "short", "Downloading the full video", 1, 4, 130)
     raw, _ = ganesha("GET", f"/api/songvideo/runner/{jid}/video", want="raw", timeout=900)
     src = os.path.join(work, "full.mp4")
     open(src, "wb").write(raw)
@@ -1308,13 +1306,22 @@ def make_short(job, work):
          f"[0:a]afade=t=in:d=0.6,afade=t=out:st={ln - 1.5:.2f}:d=1.5[aa]",
          "-map", "[v]", "-map", "[aa]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-r", str(FPS),
          "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out])
+    data = open(out, "rb").read()
+    try:  # the owner can watch the Short in the dashboard even if YouTube is not connected yet
+        if len(data) <= 24 * 1024 * 1024:
+            ganesha("PUT", f"/api/songvideo/runner/{jid}/short-preview", data, {"content-type": "video/mp4"}, timeout=300)
+        else:
+            log(f"[{jid}] Short is {len(data) / 1e6:.0f} MB: too big for the dashboard preview")
+    except Exception as e:
+        log(f"[{jid}] Short preview not saved: {redact(e)[:120]}")
+    progress(jid, "short", "Connecting to your YouTube channel", 3, 4, 60)
+    token = yt_token()
     full = (job.get("publish") or {}).get("videoId")
     cr = job.get("credits") or {}
     base_title = f"{song} #Shorts"[:100]
     desc = (f"Full song: https://youtu.be/{full}\n\n" if full else "Full song on the SUNVERSE channel.\n\n") + \
         f"Lyrics: {cr.get('lyrics', 'COCO')} | Singer: {cr.get('singer', 'KoBhit')}\n#Shorts #Sunverse #HindiSongs"
     tags = ((job.get("youtube") or {}).get("tags") or [])[:10] + ["shorts", "sunverse"]
-    data = open(out, "rb").read()
     meta = {"snippet": {"title": base_title, "description": desc, "tags": tags, "categoryId": "10"},
             "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True}}
     req = urllib.request.Request("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",

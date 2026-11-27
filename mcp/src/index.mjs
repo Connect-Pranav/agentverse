@@ -22,6 +22,7 @@ import * as crm from './crm.mjs';
 import * as vani from './vani.mjs';
 import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
+import * as engagement from './engagement.mjs';
 import * as signal from './signal.mjs';
 import { VISUAL_JPG_BASE64 } from './visual_jpg.mjs';
 
@@ -103,7 +104,7 @@ function view(env, request, j) {
     publish: j.publish ? { state: j.publish.state, privacy: j.publish.privacy, url: j.publish.url ?? null, video_id: j.publish.videoId ?? null, privacy_effective: j.publish.privacyEffective ?? null, error: j.publish.error ?? null, requested_at: j.publish.requestedAt ?? null, at: j.publish.at ?? null } : null,
     images: j.imgTicket ? (j.images ?? []).slice().sort((x, y) => x.n - y.n).map((i) => ({ n: i.n, summary: i.summary, url: `${b}/sv/${j.imgTicket}/${i.n}.jpg?v=${encodeURIComponent(i.at || '')}` })) : [],
     image_total: j.analysis?.scenes?.length ?? null,
-    short: j.short ? { state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
+    short: j.short ? { preview_url: j.short.preview && j.ticket ? `${b}/sv/${j.ticket}/short.mp4` : null, state: j.short.state, privacy: j.short.privacy, url: j.short.url ?? null, error: j.short.error ?? null, requested_at: j.short.requestedAt ?? null } : null,
     schedule: j.schedule ? { publish_at: j.schedule.at, auto: Boolean(j.schedule.auto), privacy: j.schedule.privacy } : null,
     corrections: (j.corrections ?? []).slice(-3), lyric_shift_s: j.lyricShift ?? 0, own_images: (j.own ?? []).length,
     instant_start: Boolean(env.GH_DISPATCH_TOKEN), queued_at: j.queuedAt ?? null, decided_at: j.decidedAt ?? null,
@@ -641,6 +642,12 @@ async function serveMedia(env, name, request) {
   }
   return streamVideo(env, j, `${safe}.mp4`, request);
 }
+async function serveShort(env, ticket) {
+  const j = await jobByTicket(env, 'ticket', ticket);
+  if (!j || !j.short?.preview) return new Response('Not found', { status: 404 });
+  const st = await kv(env).get(`sv/short/${j.id}`, 'stream');
+  return st ? new Response(st, { headers: { 'content-type': 'video/mp4', 'cache-control': 'private, max-age=600', 'x-robots-tag': 'noindex' } }) : new Response('Not found', { status: 404 });
+}
 function partTable(j) {
   const out = [];
   let off = 0;
@@ -792,6 +799,7 @@ async function route(request, env) {
     const img = j ? await kv(env).get(`sv/img/${j.id}/${Number(m[1])}`, 'stream') : null;
     return img ? new Response(img, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex' } }) : new Response('Not found', { status: 404 });
   }
+  if (seg[0] === 'sv' && seg[1] && seg[2] === 'short.mp4' && method === 'GET') return serveShort(env, seg[1]);
   if (seg[0] === 'sv' && seg[1] && method === 'GET') return serveMedia(env, seg[1], request);
   if (seg[0] === 'u' && seg[1]) {
     const j = /^[0-9a-f]{32}$/.test(seg[1]) ? await jobByTicket(env, 'uploadTicket', seg[1]) : null;
@@ -968,6 +976,8 @@ async function route(request, env) {
     if (seg[2] === 'notify-telegram') {
       return json({ ok: false, error: 'RETIRED', message: 'Use POST /api/signal/run; Telegram sends the persisted post once per run.' }, 410, { 'access-control-allow-origin': '*' });
     }
+
+    if (seg[2] === 'engagement' && method === 'GET') { owner(request, env); return json((await engagement.loadReport(k)) ?? { status: 'NEVER_RUN' }, 200, { 'cache-control': 'no-store' }); }
 
     // Dashboard read endpoint: serves exactly the persisted record of the latest run (no fallbacks, no mock data).
     if (seg[2] === 'draft' && method === 'GET') {
@@ -1231,7 +1241,7 @@ async function route(request, env) {
     if (seg[2] === 'run' && method === 'POST') {
       await runner(request, env); // owner token, or the GitHub Actions OIDC token; never anonymous
       const payload = await readJson(request).catch(() => ({}));
-      const pipelineRes = await signal.runLinkedinPostGenerator(k, env, payload);
+      const pipelineRes = await signal.runLinkedinPostGenerator(k, env, { ...payload, ai: (system, prompt) => cloudBrain(env, { system, prompt, quick: true }).then((r) => r.text) });
       const s = await signal.load(k);
       const { draft_full, ...runRecord } = pipelineRes;
       return json({
@@ -1433,6 +1443,14 @@ async function route(request, env) {
       return new Response(o.value, { headers: { 'content-type': o.metadata?.mime ?? 'image/jpeg', 'cache-control': 'no-store' } });
     }
     if (seg[4] === 'image' && method === 'POST') return cloudImage(env, (await readJson(request)).prompt);
+    if (seg[4] === 'short-preview' && method === 'PUT') {
+      const len = Number(request.headers.get('content-length') ?? 0);
+      if (!(len > 0 && len <= 24 * 1024 * 1024)) throw new HttpError(413, 'Short preview must be under 24 MB');
+      await kv(env).put(`sv/short/${j.id}`, await request.arrayBuffer(), { expirationTtl: 30 * 86400 });
+      j.short = { ...(j.short || {}), preview: true };
+      await saveJob(env, j);
+      return json({ ok: true });
+    }
     if (seg[4] === 'short-done' && method === 'POST') { const r = await markShort(env, j, await readJson(request)); ping(env, request, { title: 'Short is live', body: `${songName(r)} Short is on YouTube.`, url: r.short.url, tag: r.id + 's' }); return json({ job: { id: r.id, short: r.short } }); }
     if (seg[4] === 'progress' && method === 'POST') { const r = await saveProgress(env, j, await readJson(request)); return json({ ok: true, status: r.status }); }
     if (seg[4] === 'published' && method === 'POST') { const r = await markPublished(env, j, await readJson(request)); ping(env, request, { title: 'Live on YouTube', body: `${songName(r)} (${r.publish.privacyEffective}).`, url: r.publish.url, tag: r.id + 'p' }); return json({ job: { id: r.id, publish: r.publish } }); }
@@ -1460,7 +1478,6 @@ async function heartbeat(env, when = new Date()) {
   if (first && env.GH_DISPATCH_TOKEN) {
     const wf = ['growth.yml', 'leadgen.yml'];
     if (hour % 2 === 0) wf.push('agents.yml');
-    if (hour % 6 === 0) wf.push('leads.yml');
     out.dispatched = {};
     for (const w of wf) out.dispatched[w] = await kick(env, null, w);
   }
@@ -1469,7 +1486,7 @@ async function heartbeat(env, when = new Date()) {
       const k = kv(env);
       const st = await signal.load(k);
       if (!st.drafts?.[`post_${signal.todayDate()}`]) {
-        const r = await signal.runLinkedinPostGenerator(k, env, { trigger: 'worker_cron', time: when.toISOString() });
+        const r = await signal.runLinkedinPostGenerator(k, env, { trigger: 'worker_cron', time: when.toISOString(), ai: (system, prompt) => cloudBrain(env, { system, prompt, quick: true }).then((x) => x.text) });
         out.signal = r.generation_status;
       } else out.signal = 'already drafted today';
     } catch (e) { out.signalError = String(e?.message ?? e).slice(0, 200); }
