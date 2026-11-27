@@ -187,8 +187,11 @@ export async function load(kv) {
   // templates.mjs now owns all SVG generation.
   // Only fill in missing SVG; never overwrite an existing persisted visual.
   for (const d of Object.values(s.drafts || {})) {
-    if (d?.visual && !d.visual.svg) {
-      const caseNum = d.caseNumber || d.case_number;
+    // Also repair visuals made by the old matrix template, which printed Kodak's facts under any company name.
+    const caseNo = d?.caseNumber || d?.case_number;
+    const wrongFacts = d?.visual?.svg && caseNo !== 1 && /film gross margins|1,100 patents/.test(d.visual.svg);
+    if (d?.visual && (!d.visual.svg || wrongFacts)) {
+      const caseNum = caseNo;
       const cd = caseNum ? getCaseByNumber(caseNum) : null;
       if (cd) {
         d.visual.svg = generateVisualSvg(d.visual.archetype || pickTemplate(cd), { caseData: cd, hook: d.hook || '', body: d.body || '', takeaways: buildTakeaways(cd), theme: cd.theme });

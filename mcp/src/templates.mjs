@@ -531,34 +531,30 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
 
   if (!(/Kodak/i.test(company))) {
     dramaticH1 = `${company.toUpperCase()}: THE OPERATING FAILURE`;
-    dramaticH2 = 'WHEN MARKET DEMAND SHIFTED.';
+    dramaticH2 = `A ${theme.toUpperCase().slice(0, 34)} FAILURE.`;
     dramaticBadge = 'EXECUTIVE CASE STUDY';
   }
 
-  // 3-Part Strategic Breakdown
-  const col1Title = 'THE STRATEGY FAILURE';
-  const col1Lines = [
-    '• Protected 70% film gross margins at all costs.',
-    '• Viewed digital camera as an internal threat.',
-    '• Starved digital R&D to fund legacy cash cow.',
-    '• Delayed cannibalisation until market took over.',
-  ];
-
+  // 3-Part Strategic Breakdown: built ONLY from this case's own sourced fields (never another company's facts).
+  const sentences = (t = '') => String(t).split(/(?<=[.;])\s+|;\s*/).map((x) => x.trim()).filter(Boolean);
+  const bulletLines = (items, max = 9) => {
+    const out = [];
+    for (const it of items) {
+      wrap(it.charAt(0).toUpperCase() + it.slice(1).replace(/[.;]$/, '') + '.', 44).forEach((l, j) => out.push((j ? '   ' : '• ') + l));
+    }
+    if (out.length > max) { out.length = max; out[max - 1] = out[max - 1].replace(/\s*\S*$/, '…'); }
+    return out;
+  };
+  const cd = caseData || {};
+  const col1Title = 'THE PROBLEM';
+  const col1Lines = cd.documentedProblem ? bulletLines([...sentences(cd.documentedProblem), ...sentences(cd.rootCauseAnalysis || '')]) : bulletLines(['Case data missing']);
   const col2Title = 'THE BUSINESS OUTCOME';
-  const col2Lines = [
-    '• Filed Chapter 11 bankruptcy in Jan 2012.',
-    '• $5.1B peak market valuation wiped out.',
-    '• 145,000+ jobs permanently eliminated.',
-    '• Forced to liquidate 1,100 patents for $527M.',
-  ];
-
-  const col3Title = 'OPERATOR STRATEGY & FIX';
-  const col3Lines = [
-    '• Set explicit cannibalisation milestones.',
-    '• Reallocate capital before cash cows collapse.',
-    '• Scale is never proof of durability.',
-    '• Own the customer workflow, not the product.',
-  ];
+  const col2Lines = bulletLines(sentences(cd.businessImpact || cd.documentedResponse || 'Case data missing'));
+  const col3Title = 'OPERATOR FIX';
+  const col3Lines = bulletLines(sentences(cd.recommendedFix || 'Case data missing'));
+  const subLine = esc(String(cd.postAngle || hook || '').slice(0, 78));
+  let sourceLabel = esc(cd.evidenceType || 'Case bank');
+  try { if (cd.sourceUrl) sourceLabel += ' · ' + esc(new URL(cd.sourceUrl).hostname.replace(/^www\./, '')); } catch (_) {}
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" style="font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <defs>
@@ -614,7 +610,7 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
 
   <!-- Case Study Context Subhead -->
   <text x="60" y="190" fill="#38BDF8" font-size="15" font-weight="700" letter-spacing="1">EXECUTIVE CASE STUDY: ${company.toUpperCase()}</text>
-  <text x="360" y="190" fill="#94A3B8" font-size="14" font-weight="500">· Why defending 70% film gross margins killed a $10B industry leader</text>
+  <text x="360" y="190" fill="#94A3B8" font-size="14" font-weight="500">${subLine}</text>
 
   <!-- 3 Strategic Comparison Columns -->
 
@@ -623,7 +619,7 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
   <rect x="60" y="230" width="345" height="44" rx="14" fill="rgba(239,68,68,0.18)"/>
   <text x="232" y="258" fill="#FCA5A5" font-size="13" font-weight="800" text-anchor="middle" letter-spacing="1.2">❌ ${col1Title}</text>
   ${col1Lines.map((l, i) =>
-    `<text x="76" y="${305 + i * 55}" fill="#E2E8F0" font-size="13.5" font-weight="500">${esc(l)}</text>`
+    `<text x="76" y="${300 + i * 26}" fill="#E2E8F0" font-size="13.5" font-weight="500" xml:space="preserve">${esc(l)}</text>`
   ).join('\n  ')}
 
   <!-- Column 2: Business Outcome -->
@@ -631,7 +627,7 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
   <rect x="428" y="230" width="345" height="44" rx="14" fill="rgba(245,158,11,0.18)"/>
   <text x="600" y="258" fill="#FCD34D" font-size="13" font-weight="800" text-anchor="middle" letter-spacing="1.2">⚠️ ${col2Title}</text>
   ${col2Lines.map((l, i) =>
-    `<text x="444" y="${305 + i * 55}" fill="#E2E8F0" font-size="13.5" font-weight="500">${esc(l)}</text>`
+    `<text x="444" y="${300 + i * 26}" fill="#E2E8F0" font-size="13.5" font-weight="500" xml:space="preserve">${esc(l)}</text>`
   ).join('\n  ')}
 
   <!-- Column 3: Operator Strategy & Fix -->
@@ -639,7 +635,7 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
   <rect x="795" y="230" width="345" height="44" rx="14" fill="rgba(16,185,129,0.18)"/>
   <text x="967" y="258" fill="#6EE7B7" font-size="13" font-weight="800" text-anchor="middle" letter-spacing="1.2">✓ ${col3Title}</text>
   ${col3Lines.map((l, i) =>
-    `<text x="811" y="${305 + i * 55}" fill="#E2E8F0" font-size="13.5" font-weight="500">${esc(l)}</text>`
+    `<text x="811" y="${300 + i * 26}" fill="#E2E8F0" font-size="13.5" font-weight="500" xml:space="preserve">${esc(l)}</text>`
   ).join('\n  ')}
 
   <!-- Footer Branding -->
@@ -648,7 +644,7 @@ export function generateCompanyCaseMatrix({ caseData, hook }) {
   <text x="76" y="610" fill="#070B19" font-size="9" font-weight="900" text-anchor="middle">PK</text>
   <text x="96" y="610" fill="#F8FAFC" font-size="12.5" font-weight="700">PRANAV KUMAR</text>
   <text x="240" y="610" fill="#94A3B8" font-size="11.5">Commercial Scaleups &amp; Marketplaces · Operations &amp; Strategy Insight</text>
-  <text x="1140" y="610" fill="#64748B" font-size="11" text-anchor="end">Source: SEC Restructuring Filings &amp; Chapter 11 Record</text>
+  <text x="1140" y="610" fill="#64748B" font-size="11" text-anchor="end">Source: ${sourceLabel}</text>
 </svg>`;
 }
 

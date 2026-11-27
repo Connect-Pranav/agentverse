@@ -448,3 +448,16 @@ test('Adobe Express: API error is recorded, post kept, run is not SUCCESS', asyn
   assert.ok(r.error_details.includes('401'));
   assert.equal(r.persistence_status, 'PERSISTED_IN_KV');
 });
+
+test('case visual never shows another company\'s facts (old Kodak bullets are repaired on load)', async () => {
+  const { generateCompanyCaseMatrix } = await import('../src/templates.mjs');
+  const { CASE_BANK } = await import('../src/case_bank.mjs');
+  for (const c of CASE_BANK.filter((x) => x.caseNumber !== 1)) {
+    const svg = generateCompanyCaseMatrix({ caseData: c });
+    assert.ok(!/film gross margins|1,100 patents|Chapter 11 bankruptcy in Jan 2012/.test(svg), `case ${c.caseNumber} leaks Kodak facts`);
+  }
+  const kv = memKv();
+  await kv.put('signal/state', JSON.stringify({ schemaVersion: 3, drafts: { p: { id: 'p', case_number: 5, status: 'pending', visual: { archetype: 'company_case_matrix', svg: '<svg>Protected 70% film gross margins</svg>' } } }, runs: {}, usedCaseNumbers: [1, 2, 3, 4, 5] }));
+  const s = await signal.load(kv);
+  assert.ok(/Yahoo/i.test(s.drafts.p.visual.svg) && !/film gross/.test(s.drafts.p.visual.svg));
+});
