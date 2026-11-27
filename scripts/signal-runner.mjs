@@ -43,6 +43,7 @@ async function main() {
   if (!res.ok) fail(`Worker returned HTTP ${res.status}: ${text.slice(0, 300)}`);
 
   const r = data.run || {};
+  if (!data.run) fail(`Worker answered HTTP ${res.status} without a run record: ${text.slice(0, 400)}`);
   console.log(JSON.stringify({
     run_id: r.run_id, post_id: r.post_id, case_number: r.case_number, company: r.company,
     generation_status: r.generation_status, persistence_status: r.persistence_status,
