@@ -23,6 +23,7 @@ import * as vani from './vani.mjs';
 import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
 import * as engagement from './engagement.mjs';
+import { withFonts } from './editorial_templates.mjs';
 import * as signal from './signal.mjs';
 import { VISUAL_JPG_BASE64 } from './visual_jpg.mjs';
 
@@ -514,7 +515,7 @@ const TOOLS = [
   { name: 'daily_signal_rank', title: 'Rank daily signals', description: 'Score candidate topics by relevance, freshness, business impact, and discussion potential.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'pranav_pov_generate', title: 'Generate Pranav operator POV', description: 'Synthesize Pranav Kumar\'s commercial operator perspective (high-velocity commercial businesses, scaleups, and digital marketplaces lens).', inputSchema: { type: 'object', properties: { topic_id: { type: 'string' } }, additionalProperties: false } },
   { name: 'linkedin_post_draft', title: 'Draft LinkedIn post', description: 'Draft an original daily LinkedIn post with hook, analysis, operator POV, framework, and discussion question.', inputSchema: { type: 'object', properties: { topic_id: { type: 'string' } }, additionalProperties: false } },
-  { name: 'linkedin_visual_create', title: 'Create LinkedIn visual asset', description: 'Generate matching 1200x627 landscape (1.91:1) branded visual graphic (Navy, Cyan, Gold accents).', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
+  { name: 'linkedin_visual_create', title: 'Create LinkedIn visual asset', description: 'Generate the post visual in the Business Intelligence Editorial design system: 1200x1500 (4:5), built only from the case sourced fields.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
   { name: 'linkedin_post_quality_check', title: 'Run post quality check', description: 'Run factuality, originality, character count, anti-pattern, and brand voice quality checks.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
   { name: 'linkedin_post_submit_approval', title: 'Submit post for human approval', description: 'Submit draft post and visual to AgentVerse approval queue and send instant Telegram bot alert.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' } }, additionalProperties: false } },
   { name: 'linkedin_post_publish', title: 'Publish or package LinkedIn post', description: 'Publish approved post via official LinkedIn API or package for 1-click manual publishing.', inputSchema: { type: 'object', properties: { draft_id: { type: 'string' }, mode: { type: 'string', enum: ['api', 'manual', 'draft_only'] } }, additionalProperties: false } },
@@ -960,7 +961,8 @@ async function route(request, env) {
       const draftId = url.searchParams.get('post_id') || (dateParam ? `post_${dateParam}` : null);
       const d = (draftId && s.drafts[draftId]) || s.drafts[`post_${signal.todayDate()}`] || Object.values(s.drafts || {}).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
       if (!d?.visual?.svg) return json({ ok: false, error: 'NO_POST_GENERATED_YET' }, 404, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
-      const svg = d.visual.svg;
+      // Fonts are embedded on the way out so the file looks the same in any viewer.
+      const svg = withFonts(d.visual.svg, await signal.signalFontCss(env));
       return new Response(method === 'HEAD' ? null : svg, {
         status: 200,
         headers: {

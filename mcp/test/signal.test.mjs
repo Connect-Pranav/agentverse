@@ -145,9 +145,10 @@ test('PRANAV SIGNAL: Full autonomous flow via MCP tools and idempotency', async 
   assert.equal(visRes.status, 200);
   const visData = (await visRes.json()).result.structuredContent;
   assert.equal(visData.width, 1200);
-  assert.equal(visData.height, 627);
-  assert.equal(visData.aspectRatio, '1.91:1');
-  assert.ok(visData.svg.includes('PRANAV KUMAR'));
+  assert.equal(visData.height, 1500);
+  assert.equal(visData.aspectRatio, '4:5');
+  assert.ok(visData.svg.includes('data-design="bi-editorial-v1"'));
+  assert.ok(visData.svg.includes('/*@signal-fonts*/'), 'fonts are injected at serve time, not stored');
 
   // 6. Quality check
   const checkRes = await worker.fetch(new Request(BASE + '/mcp', {
@@ -460,4 +461,25 @@ test('case visual never shows another company\'s facts (old Kodak bullets are re
   await kv.put('signal/state', JSON.stringify({ schemaVersion: 3, drafts: { p: { id: 'p', case_number: 5, status: 'pending', visual: { archetype: 'company_case_matrix', svg: '<svg>Protected 70% film gross margins</svg>' } } }, runs: {}, usedCaseNumbers: [1, 2, 3, 4, 5] }));
   const s = await signal.load(kv);
   assert.ok(/Yahoo/i.test(s.drafts.p.visual.svg) && !/film gross/.test(s.drafts.p.visual.svg));
+});
+
+test('editorial visuals: every case renders in all three templates without cutting sourced text, unpublished drafts migrate', async () => {
+  const E = await import('../src/editorial_templates.mjs');
+  const { CASE_BANK } = await import('../src/case_bank.mjs');
+  for (const c of CASE_BANK) for (const [k, fn] of Object.entries(E.EDITORIAL_TEMPLATES)) {
+    const svg = fn({ caseData: c });
+    assert.ok(svg.startsWith('<svg') && svg.includes('viewBox="0 0 1200 1500"'), `${k} case ${c.caseNumber}`);
+    assert.ok(!svg.includes('…'), `${k} case ${c.caseNumber} had to shorten sourced text`);
+    assert.ok(svg.includes(E.sourceLabel(c).split(' · ').pop().slice(0, 12)) || svg.includes('Source:'), 'source footer present');
+    assert.ok(!/NaN|undefined/.test(svg), `${k} case ${c.caseNumber} has NaN/undefined`);
+  }
+  assert.ok(E.withFonts('<style>/*@signal-fonts*/</style>', '@font-face{}').includes('@font-face{}'));
+  const kv = memKv();
+  await kv.put('signal/state', JSON.stringify({ schemaVersion: 3, usedCaseNumbers: [1, 2, 3, 4, 5], runs: {}, drafts: {
+    a: { id: 'a', case_number: 5, status: 'pending', visual: { archetype: 'company_case_matrix', svg: '<svg>old</svg>' } },
+    b: { id: 'b', case_number: 4, status: 'published', visual: { archetype: 'company_case_matrix', svg: '<svg>kept</svg>' } } } }));
+  const s = await signal.load(kv);
+  assert.equal(s.drafts.a.visual.height, 1500);
+  assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-v1') && /Yahoo/.test(s.drafts.a.visual.svg));
+  assert.equal(s.drafts.b.visual.svg, '<svg>kept</svg>');
 });

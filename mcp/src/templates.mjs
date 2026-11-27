@@ -21,6 +21,8 @@ const wrap = (text = '', maxLen = 40) => {
 const svgText = (text, x, y, attrs = '') =>
   `<text x="${x}" y="${y}" ${attrs}>${esc(text)}</text>`;
 
+import { EDITORIAL_TEMPLATES, pickEditorialTemplate } from './editorial_templates.mjs';
+
 // ─── Template registry ───────────────────────────────────────
 // Each template is keyed by archetype name and returns an SVG string.
 // Params: { caseData, hook, body, takeaways, theme }
@@ -40,7 +42,10 @@ export const TEMPLATE_REGISTRY = {
   insight_grid: generateInsightGrid,
   // T7 — Company Case Matrix (existing, improved — default for Case Bank)
   company_case_matrix: generateCompanyCaseMatrix,
+  // Business Intelligence Editorial (1200x1500): the default for every new case post.
+  ...EDITORIAL_TEMPLATES,
 };
+export const isEditorialTemplate = (k) => Object.prototype.hasOwnProperty.call(EDITORIAL_TEMPLATES, k);
 
 // Theme → template mapping (rotates through 7 templates)
 export const THEME_TEMPLATE_MAP = {
@@ -68,6 +73,12 @@ export const THEME_TEMPLATE_MAP = {
 
 // Pick template for a given case
 export function pickTemplate(caseData) {
+  if (!caseData) return 'company_case_matrix';
+  return pickEditorialTemplate(caseData);
+}
+
+// Legacy rotation across the old 1200x627 templates (kept for posts already published with them).
+export function pickLegacyTemplate(caseData) {
   if (!caseData) return 'company_case_matrix';
   const theme = caseData.theme || '';
   // Rotate deterministically by case number so adjacent cases get different templates

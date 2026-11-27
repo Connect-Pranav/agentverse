@@ -8,6 +8,7 @@ import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
 import * as adobe from './adobe_express.mjs';
 import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
+import { withFonts } from './editorial_templates.mjs';
 import { CASE_BANK, getCaseByNumber, getNextUnusedCase, buildLinkedInPostFromCase } from './case_bank.mjs';
 import {
   TEMPLATE_REGISTRY,
@@ -15,6 +16,7 @@ import {
   CANVA_TEMPLATE_IDS,
   pickTemplate,
   generateVisualSvg,
+  isEditorialTemplate,
   buildTakeaways,
   generateCompanyCaseMatrix,
 } from './templates.mjs';
@@ -177,6 +179,20 @@ export async function load(kv) {
     s.runs = {}; s.latestRunId = null; s.signals = [];
     s.usedCaseNumbers = [...new Set([...s.usedCaseNumbers.map(Number), ...PUBLISHED_BASELINE])].sort((a, b) => a - b);
     s.schemaVersion = 3;
+  }
+  // v4: unpublished drafts are re-rendered in the Business Intelligence Editorial design (1200x1500).
+  // Published posts keep the visual they went out with.
+  if ((s.schemaVersion ?? 0) < 4) {
+    for (const d of Object.values(s.drafts)) {
+      const cd = getCaseByNumber(d?.caseNumber || d?.case_number);
+      if (!d?.visual || d.status === 'published' || !cd) continue;
+      const archetype = pickTemplate(cd);
+      const svg = generateVisualSvg(archetype, { caseData: cd, hook: d.hook || '', body: d.body || '', theme: cd.theme });
+      Object.assign(d.visual, { archetype, templateName: archetype, width: 1200, height: 1500, aspectRatio: '4:5', svg,
+        dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, canvaDesignId: null, canvaEditUrl: null, canvaExportUrl: null });
+      if (s.visuals?.[d.id]) s.visuals[d.id] = d.visual;
+    }
+    s.schemaVersion = 4;
   }
   s.latestDraftId = s.latestDraftId || null;
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };
@@ -845,7 +861,7 @@ What is the biggest operational bottleneck leaking revenue in your GTM motion ri
 }
 
 // -------------------------------------------------------------
-// 7. Visual Creative Agent (1200x627 Landscape 1.91:1)
+// 7. Visual Creative Agent (Business Intelligence Editorial, 1200x1500 portrait 4:5)
 // -------------------------------------------------------------
 export function getDefaultSvg(headline = 'THE B2B REVENUE LEAKAGE MATRIX', subline = 'Why buying more sales tools hides broken funnel mechanics — and how operators fix it') {
   const authorBadge = 'PRANAV KUMAR · REVOPS & GTM STRATEGY';
@@ -1533,7 +1549,9 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
   const svgVisual = generateVisualSvg(archetype, params);
 
   // Canva template metadata (Null = SVG-only; will be populated as Canva designs are created)
-  const canvaMeta = CANVA_TEMPLATE_IDS[archetype] || CANVA_TEMPLATE_IDS.company_case_matrix;
+  const editorial = isEditorialTemplate(archetype);
+  // Editorial visuals have no Canva design or static JPEG: never attach the Case #1 export to them.
+  const canvaMeta = editorial ? null : (CANVA_TEMPLATE_IDS[archetype] || CANVA_TEMPLATE_IDS.company_case_matrix);
 
   const headline = caseData ? `${caseData.company} — ${caseData.theme}` : (draft.topic || 'Business Insight');
   const subline = caseData ? `${caseData.period} · ${caseData.industry}` : '';
@@ -1542,8 +1560,8 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
     id: `vis_${id}`,
     draftId: id,
     width: 1200,
-    height: 627,
-    aspectRatio: '1.91:1',
+    height: editorial ? 1500 : 627,
+    aspectRatio: editorial ? '4:5' : '1.91:1',
     archetype,
     templateName: archetype,
     headline,
@@ -1562,7 +1580,7 @@ export async function createLinkedInVisual(kv, draftId = null, preferredArchetyp
 
   draft.visual = visual;
   s.visuals[id] = visual;
-  logActivity(s, 'Visual Creative Agent', `Generated 1200x627 visual asset using template "${archetype}"${canvaMeta?.designId ? ` (Canva ID: ${canvaMeta.designId})` : ' (SVG only — Canva ID pending)'} for draft "${id}".`);
+  logActivity(s, 'Visual Creative Agent', `Generated ${visual.width}x${visual.height} visual asset using template "${archetype}"${canvaMeta?.designId ? ` (Canva ID: ${canvaMeta.designId})` : ' (SVG only — Canva ID pending)'} for draft "${id}".`);
   await save(kv, s);
   return visual;
 }
@@ -1642,6 +1660,14 @@ function newRunRecord(caseData, postId) {
     error_details: null,
     stages: {},
   };
+}
+
+// Embedded @font-face CSS for the editorial visuals (served as a static asset; never bundled into each stored SVG).
+export async function signalFontCss(env) {
+  try {
+    const r = await env?.ASSETS?.fetch(new Request('https://assets.local/fonts/signal-fonts.css'));
+    return r && r.ok ? await r.text() : '';
+  } catch (_) { return ''; }
 }
 
 // Linkedin_Post_Generator: one Excel/CSV case per day -> draft -> visual -> persist -> Telegram.
@@ -1775,7 +1801,7 @@ export async function runLinkedinPostGenerator(kv, env, options = {}, fetchImpl 
       console.error('[signal] Telegram error:', e?.message);
     }
     if (sent && d.visual?.svg && run.stages.telegram_visual !== 'DONE') {
-      const okDoc = await telegram.sendTelegramDocument(env, `case-${run.case_number}-${String(run.company).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.svg`, d.visual.svg, 'image/svg+xml', `Visual — Case #${run.case_number} ${run.company} (${run.image_generation_status})`, fetchImpl);
+      const okDoc = await telegram.sendTelegramDocument(env, `case-${run.case_number}-${String(run.company).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.svg`, withFonts(d.visual.svg, await signalFontCss(env)), 'image/svg+xml', `Visual — Case #${run.case_number} ${run.company} (${run.image_generation_status})`, fetchImpl);
       if (okDoc) run.stages.telegram_visual = 'DONE';
     }
     run.stages.telegram = sent ? 'DONE' : 'FAILED';
