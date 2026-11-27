@@ -8,7 +8,7 @@ import * as work from './work.mjs';
 import * as telegram from './telegram.mjs';
 import * as adobe from './adobe_express.mjs';
 import { BUSINESS_PROBLEMS, PLAYBOOK_SERIES, PLAYBOOK_INSTRUCTIONS } from './playbook.mjs';
-import { withFonts } from './editorial_templates.mjs';
+import { withFonts, DESIGN_ID } from './editorial_templates.mjs';
 import { CASE_BANK, getCaseByNumber, getNextUnusedCase, buildLinkedInPostFromCase } from './case_bank.mjs';
 import {
   TEMPLATE_REGISTRY,
@@ -193,6 +193,18 @@ export async function load(kv) {
       if (s.visuals?.[d.id]) s.visuals[d.id] = d.visual;
     }
     s.schemaVersion = 5;
+  }
+  // Editorial layout updates reach drafts that are not published yet (published posts never change).
+  for (const d of Object.values(s.drafts)) {
+    const svg = d?.visual?.svg;
+    if (!svg || d.status === 'published' || !/data-design="bi-editorial-/.test(svg) || svg.includes(`data-design="${DESIGN_ID}"`)) continue;
+    const cd = getCaseByNumber(d.caseNumber || d.case_number);
+    if (!cd) continue;
+    const archetype = pickTemplate(cd);
+    const fresh = generateVisualSvg(archetype, { caseData: cd, hook: d.hook || '', body: d.body || '', theme: cd.theme });
+    Object.assign(d.visual, { archetype, templateName: archetype, svg: fresh, dataUri: `data:image/svg+xml;utf8,${encodeURIComponent(fresh)}` });
+    if (d.visual.gif) d.visual.gif = { ...d.visual.gif, stale: true };
+    if (s.visuals?.[d.id]) s.visuals[d.id] = d.visual;
   }
   s.latestDraftId = s.latestDraftId || null;
   s.metrics = s.metrics || { postsCreated: 0, approved: 0, published: 0, avgQualityScore: 92 };
@@ -1671,18 +1683,19 @@ export async function signalFontCss(env) {
 }
 
 // Stores the animated GIF for a post and sends it to Telegram once (the approval chat sees the motion version).
-export async function attachVisualGif(kv, env, postId, buf, fetchImpl = fetch) {
+export async function attachVisualGif(kv, env, postId, buf, fetchImpl = fetch, design = '') {
   const s = await load(kv);
   const d = s.drafts[postId];
   if (!d) throw new SignalError(404, `Draft "${postId}" not found.`);
-  await kv.put(`signal/gif/${postId}`, buf, { expirationTtl: 120 * 86400 });
+  design = design || d.visual?.gif?.design || '';
+  await kv.put(`signal/gif/${postId}`, buf, { expirationTtl: 120 * 86400, metadata: { design } });
   const already = Boolean(d.visual?.gif?.telegram_sent);
   let sent = already;
   if (!already && d.status !== 'published') {
     sent = await telegram.sendTelegramDocument(env, `case-${d.case_number || d.caseNumber || 'x'}-animated.gif`, buf, 'image/gif',
       `Animated visual for ${d.company || postId}. Same post, same facts; download from the dashboard to upload to LinkedIn.`, fetchImpl);
   }
-  d.visual = { ...(d.visual || {}), gif: { url: `/api/signal/visual.gif?post_id=${encodeURIComponent(postId)}`, bytes: buf.byteLength, updatedAt: nowIso(), telegram_sent: Boolean(sent) } };
+  d.visual = { ...(d.visual || {}), gif: { url: `/api/signal/visual.gif?post_id=${encodeURIComponent(postId)}`, bytes: buf.byteLength, updatedAt: nowIso(), design, telegram_sent: Boolean(sent) } };
   if (s.visuals?.[postId]) s.visuals[postId] = d.visual;
   logActivity(s, 'Visual Creative Agent', `Animated GIF stored for "${postId}" (${(buf.byteLength / 1024).toFixed(0)} KB)${sent && !already ? ', sent to Telegram' : ''}.`);
   await save(kv, s);

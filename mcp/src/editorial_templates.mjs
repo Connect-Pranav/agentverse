@@ -15,6 +15,8 @@ export const TOKENS = {
   lightBlue: '#EAF1FA', lightTeal: '#E7F3F0', lightCoral: '#FAEBE8', lightGrey: '#EEF1F4',
 };
 export const CANVAS = { w: 1200, h: 1500, m: 72 };
+// Bump when the editorial layouts change: unpublished drafts with an older id are re-rendered on load.
+export const DESIGN_ID = 'bi-editorial-v2';
 const CW = CANVAS.w - 2 * CANVAS.m; // 1056 content width
 const COL = (CW - 11 * 24) / 12;     // 66 px
 const span = (n) => n * COL + (n - 1) * 24;
@@ -182,7 +184,7 @@ export function sourceLabel(cd) {
 }
 
 const caseNo = (cd) => String(cd.caseNumber || '').padStart(2, '0');
-const svgOpen = (bg) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS.w} ${CANVAS.h}" width="${CANVAS.w}" height="${CANVAS.h}" data-design="bi-editorial-v1">
+const svgOpen = (bg) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS.w} ${CANVAS.h}" width="${CANVAS.w}" height="${CANVAS.h}" data-design="${DESIGN_ID}">
   <style>/*@signal-fonts*/</style>
   <rect width="${CANVAS.w}" height="${CANVAS.h}" fill="${bg}"/>`;
 

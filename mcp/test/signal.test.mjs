@@ -5,6 +5,7 @@ import * as signal from '../src/signal.mjs';
 
 function memKv() {
   const map = new Map();
+  const meta = new Map();
   return {
     async get(k, type) {
       const v = map.get(k);
@@ -12,8 +13,12 @@ function memKv() {
       if (type === 'json') return JSON.parse(v);
       return v;
     },
-    async put(k, v) {
-      map.set(k, typeof v === 'string' ? v : JSON.stringify(v));
+    async put(k, v, opts) {
+      map.set(k, v instanceof ArrayBuffer ? v : (typeof v === 'string' ? v : JSON.stringify(v)));
+      if (opts?.metadata) meta.set(k, opts.metadata);
+    },
+    async getWithMetadata(k) {
+      return { value: map.get(k) ?? null, metadata: meta.get(k) ?? null };
     },
     async delete(k) {
       map.delete(k);
@@ -147,7 +152,7 @@ test('PRANAV SIGNAL: Full autonomous flow via MCP tools and idempotency', async 
   assert.equal(visData.width, 1200);
   assert.equal(visData.height, 1500);
   assert.equal(visData.aspectRatio, '4:5');
-  assert.ok(visData.svg.includes('data-design="bi-editorial-v1"'));
+  assert.ok(visData.svg.includes('data-design="bi-editorial-'));
   assert.ok(visData.svg.includes('/*@signal-fonts*/'), 'fonts are injected at serve time, not stored');
 
   // 6. Quality check
@@ -493,7 +498,7 @@ test('editorial visuals: every case renders in every template without cutting so
   const s = await signal.load(kv);
   assert.equal(s.drafts.a.visual.height, 1500);
   assert.equal(s.drafts.a.visual.archetype, 'bi_data_story');
-  assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-v1') && /Yahoo/i.test(s.drafts.a.visual.svg));
+  assert.ok(s.drafts.a.visual.svg.includes('bi-editorial-') && /Yahoo/i.test(s.drafts.a.visual.svg));
   assert.equal(s.drafts.b.visual.svg, '<svg>kept</svg>');
 });
 
@@ -517,7 +522,7 @@ test('animation: frames sample SMIL correctly; finished frame equals the static 
   await signal.runLinkedinPostGenerator(kv, envFor(), { skipEngagement: true }, f);
   const st = await signal.load(kv);
   const gif = new TextEncoder().encode('GIF89a-test').buffer;
-  const r1 = await signal.attachVisualGif(kv, envFor(), st.latestDraftId, gif, f);
+  const r1 = await signal.attachVisualGif(kv, envFor(), st.latestDraftId, gif, f, 'bi-editorial-v2');
   const afterFirst = sent.length;
   const r2 = await signal.attachVisualGif(kv, envFor(), st.latestDraftId, gif, f);
   assert.equal(r1.bytes, gif.byteLength);
@@ -533,4 +538,14 @@ test('animation: frames sample SMIL correctly; finished frame equals the static 
   const anon = await worker.fetch(new Request(BASE + '/api/signal/visual-gif?post_id=x', { method: 'PUT', body: 'GIF89a', headers: { 'content-type': 'image/gif' } }), env);
   assert.ok(anon.status === 401 || anon.status === 503, `anonymous upload must be refused, got ${anon.status}`);
   assert.ok((await signal.load(kv)).drafts[st.latestDraftId].visual.gif.url.includes('visual.gif'));
+  assert.equal((await kv.getWithMetadata(`signal/gif/${st.latestDraftId}`)).metadata.design, 'bi-editorial-v2');
+
+  // A draft rendered with an older editorial layout is re-rendered on load; published ones are left alone.
+  const kv2 = memKv();
+  await kv2.put('signal/state', JSON.stringify({ schemaVersion: 5, usedCaseNumbers: [1, 2, 3, 4, 5], runs: {}, drafts: {
+    p: { id: 'p', case_number: 5, status: 'pending', visual: { archetype: 'bi_data_story', svg: '<svg data-design="bi-editorial-v1">old</svg>', gif: { url: 'x' } } },
+    q: { id: 'q', case_number: 4, status: 'published', visual: { archetype: 'bi_data_story', svg: '<svg data-design="bi-editorial-v1">kept</svg>' } } } }));
+  const s2 = await signal.load(kv2);
+  assert.ok(s2.drafts.p.visual.svg.includes(`data-design="${E.DESIGN_ID}"`) && s2.drafts.p.visual.gif.stale);
+  assert.ok(s2.drafts.q.visual.svg.includes('kept'));
 });

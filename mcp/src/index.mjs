@@ -921,9 +921,10 @@ async function route(request, env) {
     if (seg[2] === 'visual.gif' && (method === 'GET' || method === 'HEAD')) {
       const postId = url.searchParams.get('post_id') || (await signal.load(k)).latestDraftId || `post_${signal.todayDate()}`;
       if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(400, 'Bad post_id');
-      const gif = await k.get(`signal/gif/${postId}`, 'arrayBuffer');
+      const { value: gif, metadata } = await k.getWithMetadata(`signal/gif/${postId}`, 'arrayBuffer');
       if (!gif) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
       return new Response(method === 'HEAD' ? null : gif, { headers: {
+        'x-design': String(metadata?.design || ''), 'access-control-expose-headers': 'x-design',
         'content-type': 'image/gif', 'content-length': String(gif.byteLength), 'cache-control': 'public, max-age=300',
         'content-disposition': `inline; filename="pranav-signal-${postId}.gif"`, 'access-control-allow-origin': '*' } });
     }
@@ -936,7 +937,8 @@ async function route(request, env) {
       const buf = await request.arrayBuffer();
       const head = new TextDecoder().decode(new Uint8Array(buf, 0, 6));
       if (head !== 'GIF89a' && head !== 'GIF87a') throw new HttpError(415, 'Not a GIF');
-      const out = await signal.attachVisualGif(k, env, postId, buf);
+      const design = String(url.searchParams.get('design') || '').slice(0, 40);
+      const out = await signal.attachVisualGif(k, env, postId, buf, fetch, design);
       return json({ ok: true, ...out });
     }
 

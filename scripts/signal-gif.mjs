@@ -84,18 +84,19 @@ async function main() {
   const postId = res.headers.get('x-post-id');
   if (!postId) fail('Worker did not say which post this visual belongs to (x-post-id).');
   const svgText = await res.text();
-  if (!svgText.includes('data-design="bi-editorial-v1"')) { console.log(`Post ${postId} uses a legacy visual without animation: skipping.`); return; }
+  if (!svgText.includes('data-design="bi-editorial-')) { console.log(`Post ${postId} uses a legacy visual without animation: skipping.`); return; }
 
   const force = process.argv.includes('--force');
+  const design = (/data-design="([^"]+)"/.exec(svgText) || [])[1];
   const head = await fetch(`${url}/api/signal/visual.gif?post_id=${encodeURIComponent(postId)}`, { method: 'HEAD' });
-  if (head.ok && !force) { console.log(`GIF for ${postId} already exists.`); return; }
+  if (head.ok && !force && head.headers.get('x-design') === design) { console.log(`GIF for ${postId} (${design}) already exists.`); return; }
 
   const out = join(tmpdir(), `${postId}.gif`);
   const info = await renderGif(svgText, out);
   console.log(`🎞️  ${postId}: ${info.frames} frames, ${info.seconds}s, ${(info.bytes / 1024 / 1024).toFixed(2)} MB`);
   if (info.bytes > MAX_BYTES) fail(`GIF is ${(info.bytes / 1024 / 1024).toFixed(1)} MB, over the ${MAX_BYTES / 1024 / 1024} MB limit.`);
 
-  const up = await fetch(`${url}/api/signal/visual-gif?post_id=${encodeURIComponent(postId)}`, {
+  const up = await fetch(`${url}/api/signal/visual-gif?post_id=${encodeURIComponent(postId)}&design=${encodeURIComponent(design || '')}`, {
     method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/gif' }, body: readFileSync(out),
   });
   const text = await up.text();
