@@ -690,6 +690,14 @@ body.glass .stu-up input,body.glass .stu-up textarea{background:rgba(255,255,255
 .mt-tok{display:none;gap:8px}.mt-tok button,.mt-all{flex:none;font:600 12px var(--fb);color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:7px 14px;min-height:36px}
 .mt-up .btnp{width:100%;min-height:44px}
 .mt-up .btnp:disabled{opacity:.45}
+/* Studio: upload form, then the song library under it (left); current job, growth and planner (right).
+   Before, the short form column left a large empty area beside the tall right column. */
+.mt-grid{grid-template-areas:"up side" "lib side";grid-template-rows:auto 1fr}
+.mt-up{grid-area:up}.mt-side{grid-area:side}.mt-lib{grid-area:lib;min-width:0}
+.mt-lib .bhead{margin:4px 0 10px}
+.mt-lib .slist{max-height:none;overflow:visible;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:start}
+#mcpTile.in-col .mt-lib{display:none}
+@media(max-width:900px){.mt-grid{grid-template-areas:"up" "side" "lib";grid-template-rows:none}}
 .mt-side{display:flex;flex-direction:column;gap:16px;min-width:0}
 .mt-side>#growthTile{margin:0}
 .mt-side>.plan{order:3;margin:0}
@@ -1127,6 +1135,10 @@ body.glass .badge.warn{color:#fbbf24;border-color:rgba(251,191,36,.35)}
         <div class="plan" id="stuPlan"></div>
         <div class="mt-job" id="mtJob" aria-live="polite"><div class="empty"><b>No song yet.</b><br>Upload an MP3 and the live progress shows here.</div></div>
       </div>
+      <div class="mt-lib" id="mtLib">
+        <div class="bhead"><div class="ph"><h3>All songs</h3></div><span class="sub" id="stuNote" style="margin:0"></span></div>
+        <div id="stuJobs" class="slist"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -1190,12 +1202,7 @@ body.glass .badge.warn{color:#fbbf24;border-color:rgba(251,191,36,.35)}
   </div>
 </section>
 
-<section class="board stage view-hide" id="studio">
-  <div class="panel">
-    <div class="bhead"><div class="ph"><h3>All songs</h3></div><span class="sub" id="stuNote" style="margin:0"></span></div>
-    <div id="stuJobs" class="slist"></div>
-  </div>
-</section>
+<section class="board stage view-hide" id="studio" aria-hidden="true"></section>
 
 <section class="board stage view-hide" id="signal">
   <div class="sig-panel">
@@ -2700,7 +2707,7 @@ var VIEWS={
   agents:{t:"Agents",s:"Eight departments · tap one to watch it in the live feed",show:["wrap"],cls:"v-agents"},
   work:{t:"Work",s:"Everything the team made — approve, reject, copy",show:["board"],tab:"waiting"},
   leads:{t:"Leads",s:"People who need what you sell",show:["crm","board"],tab:"leads"},
-  studio:{t:"MCP · Song → Video",s:"Upload a song — get a finished Sunverse video on YouTube",show:["mcpTile","growthTile","studio"]},
+  studio:{t:"MCP · Song → Video",s:"Upload a song — get a finished Sunverse video on YouTube",show:["mcpTile","growthTile"]},
   keys:{t:"Keys & secrets",s:"Every token and API key AGENTVERSE uses, where it lives and how to change it",show:["keys"]},
   signal:{t:"PRANAV SIGNAL · LinkedIn Growth Studio",s:"Operator intelligence, daily signal scouting, AI visual & thought leadership publishing",show:["signal"]}
 };
@@ -3452,7 +3459,7 @@ function mtRender(){
     var overdue=sc&&Date.parse(sc.publish_at)<Date.now();
     if(sc)h+='<div class="mt-sched"><span data-i="calendar-clock"></span><span>Posts <b>'+esc(fmtWhen(sc.publish_at))+'</b> &middot; '+esc(sc.privacy)+(sc.auto?' &middot; automatic':'')+(j.status!=="ready"&&Date.parse(sc.publish_at)<Date.now()?' &middot; as soon as the video is ready':'')+'</span></div>';
     if(overdue&&j.status==="ready")h+='<div class="acts"><button class="ap" data-mt="sch-now" type="button"><span data-i="send"></span>Post now</button><button data-mt="sch-tmr" type="button"><span data-i="calendar-clock"></span>Tomorrow 10:00 AM</button></div>';
-    h+='<details class="mt-redo"'+(overdue?' open':'')+'><summary>'+(sc?(overdue?"Pick a new date (the old one has passed)":"Change posting date"):"Schedule YouTube post")+'</summary><div class="sch-ed"><input type="datetime-local" id="mtSchAt" value="'+esc(sc?toLocalInput(sc.publish_at):toLocalInput(planNext(1)[0].toISOString()))+'" aria-label="Post date and time"><select id="mtSchP" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>'+
+    h+='<details class="mt-redo"'+(overdue?' open':'')+'><summary>'+(sc?(overdue?"Pick a new date (the old one has passed)":"Change posting date"):"Schedule YouTube post")+'</summary><div class="sch-ed"><input type="datetime-local" id="mtSchAt" min="'+minLocalInput()+'" value="'+esc((sc&&!overdue)?toLocalInput(sc.publish_at):toLocalInput(planNext(1)[0].toISOString()))+'" aria-label="Post date and time"><select id="mtSchP" aria-label="Visibility"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></div>'+
       '<div class="acts"><button class="ap" data-mt="sch-save" type="button"><span data-i="calendar-clock"></span>'+(sc?"Save date":"Schedule — post automatically")+'</button>'+(sc?'<button data-mt="sch-del" type="button"><span data-i="x"></span>Remove from calendar</button>':'')+'</div></details>';
   }
   if(j.status==="needs_approval"){
@@ -3554,6 +3561,7 @@ $("mtJob").onclick=function(e){
   if(a==="sch-save"||a==="sch-del"){
     var bd=a==="sch-del"?{publish_at:null}:{publish_at:new Date($("mtSchAt").value).toISOString(),privacy:$("mtSchP").value,auto:true};
     if(a==="sch-save"&&!$("mtSchAt").value){ toast("Pick a date and time",false); return; }
+    if(a==="sch-save"&&isPastLocal($("mtSchAt").value)){ toast("That time has already passed. Pick a future date and time, or tap Post now",false); $("mtSchAt").value=minLocalInput(); return; }
     b.disabled=true;
     stuApi("POST","/api/songvideo/"+id+"/schedule",bd).then(function(r){ toast(a==="sch-del"?"Removed from the calendar":"Scheduled — posts automatically",true); upd(r.job); stuRender(); },function(e2){ toast(e2.message,false); b.disabled=false; });
     return;
@@ -3633,6 +3641,8 @@ $("mtJob").addEventListener("change",function(e){ if(e.target&&e.target.id==="mt
 var FIX_AREAS=[["lyrics","Lyrics missing / wrong"],["timing","Lyrics timing"],["images","Images / scenes"],["story","Story / characters"],["style","Look & colours"],["text","Title & YouTube text"]];
 STU.fixAreas=STU.fixAreas||{};
 function pad2(n){return (n<10?"0":"")+n;}
+function minLocalInput(){ return toLocalInput(new Date(Date.now()+60e3).toISOString()); }
+function isPastLocal(v){ return !v || new Date(v).getTime() < Date.now() - 60e3; }
 function toLocalInput(iso){ var d=new Date(iso); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())+"T"+pad2(d.getHours())+":"+pad2(d.getMinutes()); }
 function fmtWhen(iso){ var d=new Date(iso); return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+", "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }
 function songBase(name){ return String(name||"").replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").replace(/\s*usesuno\.com\s*/i," ").replace(/\s+/g," ").trim().slice(0,100); }
@@ -3667,6 +3677,10 @@ function mtPick(list){
   planPreview();
 }
 $("mtFile").onchange=function(){ mtPick(this.files); };
+/* the planner can't start in the past */
+function planMin(){ var d=new Date(); $("mtPlanDate").min=d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+planMin(); $("mtPlanDate").addEventListener("focus",planMin);
+$("mtPlanDate").addEventListener("change",function(){ if(this.value&&this.value<this.min){ toast("Pick today or a later date",false); this.value=this.min; } });
 ["mtPlanOn","mtPlanDate","mtPlanTime","mtPlanEvery","mtPlanAuto"].forEach(function(id){ $(id).addEventListener("change",planPreview); });
 setTimeout(function(){ if($("mtPlanPrev"))planPreview(); },3000);
 ["dragenter","dragover"].forEach(function(ev){ $("mtDrop").addEventListener(ev,function(e){e.preventDefault();$("mtDrop").classList.add("on");}); });
@@ -3720,7 +3734,7 @@ function stuRender(){
     if(j.youtube)h+='<button data-sc="title" data-id="'+j.job_id+'"><span data-i="copy"></span>Title</button><button data-sc="desc" data-id="'+j.job_id+'"><span data-i="copy"></span>Description</button>';
     if(pb==="published")h+='<a href="'+esc(j.publish.url)+'" target="_blank" rel="noopener"><span data-i="external-link"></span>YouTube</a>';
     h+='<button data-sa="delete" data-id="'+j.job_id+'"><span data-i="x"></span>Delete</button></div>';
-    if(pb!=="published"&&pb!=="publishing"&&pb!=="requested"&&j.status!=="rejected")h+='<div class="sch-row"><span data-i="calendar-clock"></span><input type="datetime-local" data-schat="'+j.job_id+'" value="'+(j.schedule?toLocalInput(j.schedule.publish_at):"")+'" aria-label="Post date"><select data-schp="'+j.job_id+'" aria-label="Visibility">'+["public","unlisted","private"].map(function(v){return '<option value="'+v+'"'+(j.schedule&&j.schedule.privacy===v?" selected":"")+'>'+v+'</option>';}).join("")+'</select>'+(j.schedule?'<button data-sa="unsched" data-id="'+j.job_id+'"><span data-i="x"></span>Unschedule</button>':'<span class="sub" style="margin:0">no posting date</span>')+'</div>';
+    if(pb!=="published"&&pb!=="publishing"&&pb!=="requested"&&j.status!=="rejected")h+='<div class="sch-row"><span data-i="calendar-clock"></span><input type="datetime-local" min="'+minLocalInput()+'" data-schat="'+j.job_id+'" value="'+(j.schedule&&Date.parse(j.schedule.publish_at)>Date.now()?toLocalInput(j.schedule.publish_at):"")+'" aria-label="Post date"><select data-schp="'+j.job_id+'" aria-label="Visibility">'+["public","unlisted","private"].map(function(v){return '<option value="'+v+'"'+(j.schedule&&j.schedule.privacy===v?" selected":"")+'>'+v+'</option>';}).join("")+'</select>'+(j.schedule?'<button data-sa="unsched" data-id="'+j.job_id+'"><span data-i="x"></span>Unschedule</button>':'<span class="sub" style="margin:0">no posting date</span>')+'</div>';
     h+='</div>'; }
   $("stuJobs").innerHTML=h;
   stuPlanRender();
@@ -3750,6 +3764,7 @@ $("stuJobs").addEventListener("change",function(e){
   var t=e.target,id=t.getAttribute("data-schat")||t.getAttribute("data-schp"); if(!id)return;
   var at=$("stuJobs").querySelector('[data-schat="'+id+'"]').value,pv=$("stuJobs").querySelector('[data-schp="'+id+'"]').value;
   if(!at){ if(t.getAttribute("data-schp"))toast("Pick a date first",false); return; }
+  if(isPastLocal(at)){ toast("That time has already passed. Pick a future date and time",false); return; }
   stuApi("POST","/api/songvideo/"+id+"/schedule",{publish_at:new Date(at).toISOString(),privacy:pv,auto:true}).then(function(){ toast("Scheduled — posts automatically",true); stuLoad(); },function(e2){ toast(e2.message,false); });
 });
 $("stuJobs").onclick=function(e){

@@ -129,7 +129,10 @@ async function setSchedule(env, j, a = {}) {
   if (a.publish_at === null || a.clear) { delete j.schedule; return saveJob(env, j); }
   if (j.publish && ['publishing', 'published'].includes(j.publish.state)) throw new HttpError(409, `Already ${j.publish.state} on YouTube`);
   if (j.publish && ['requested', 'failed', 'blocked'].includes(j.publish.state)) j.publish = null; // new date = fresh attempt
-  j.schedule = scheduleOf(a) ?? (j.schedule ? { ...j.schedule, auto: a.auto ?? j.schedule.auto, privacy: PRIVACY.includes(a.privacy) ? a.privacy : j.schedule.privacy } : null);
+  const next = scheduleOf(a);
+  // Back-dating is not allowed: a date more than 5 minutes in the past is refused ("Post now" uses the present time).
+  if (next && Date.parse(next.at) < Date.now() - 5 * 60e3) throw new HttpError(400, 'That time has already passed. Pick a future date and time, or use Post now.');
+  j.schedule = next ?? (j.schedule ? { ...j.schedule, auto: a.auto ?? j.schedule.auto, privacy: PRIVACY.includes(a.privacy) ? a.privacy : j.schedule.privacy } : null);
   if (!j.schedule) throw new HttpError(400, 'publish_at is required');
   return saveJob(env, j);
 }
@@ -458,7 +461,7 @@ async function markPublished(env, j, a) {
   if (!j.publish || j.publish.state !== 'publishing') throw new HttpError(409, 'Not publishing');
   const id = clean(a.video_id, 20);
   if (!/^[\w-]{6,20}$/.test(id)) throw new HttpError(400, 'video_id is required');
-  await kv(env).delete('sv/youtube-auth-blocked');
+  await ytAuthRecovered(env);
   Object.assign(j.publish, { state: 'published', videoId: id, url: `https://youtu.be/${id}`, privacyEffective: clean(a.privacy, 20) || j.publish.privacy, leaseUntil: null, error: null, at: nowIso() });
   j.progress = null;
   return saveJob(env, j);
@@ -470,6 +473,27 @@ async function markShort(env, j, a) {
   Object.assign(j.short, { state: 'published', videoId: id, url: `https://youtube.com/shorts/${id}`, leaseUntil: null, error: null, at: nowIso() });
   j.progress = null;
   return saveJob(env, j);
+}
+// A run just proved the YouTube login works again (the owner renewed YT_REFRESH_TOKEN): lift the block and
+// re-arm the posts it paused, so nobody has to find and tap Retry. Scheduled posts go back to their schedule
+// (posted at once if the time has passed, as the owner asked); posts the owner had requested by hand are requested again.
+async function ytAuthRecovered(env) {
+  const k = kv(env);
+  if (!(await k.get('sv/youtube-auth-blocked'))) return 0;
+  await k.delete('sv/youtube-auth-blocked');
+  let n = 0;
+  for (const id of (await index(env)).slice(0, 80)) {
+    const j = await k.get(jobKey(id), 'json');
+    if (!j) continue;
+    let changed = false;
+    if (j.publish?.state === 'blocked') {
+      j.publish = j.schedule?.auto ? null : { state: 'requested', privacy: j.publish.privacy || 'public', requestedAt: nowIso(), attempts: 0 };
+      changed = true;
+    }
+    if (j.short?.state === 'blocked') { Object.assign(j.short, { state: 'requested', error: null, attempts: 0, leaseUntil: null }); changed = true; }
+    if (changed) { await saveJob(env, j); n++; }
+  }
+  return n;
 }
 // An expired / revoked YouTube login cannot fix itself by retrying: stop and say so, instead of looping.
 const YT_AUTH_ERR = /invalid_grant|login expired|unauthorized_client|invalid_client|Token has been expired or revoked/i;
@@ -1419,7 +1443,9 @@ async function route(request, env) {
     if (seg[2] === 'runner' && !seg[3] && method === 'GET') return json(await growth.runnerState(k));
     if (seg[2] === 'runner' && seg[3] === 'report' && method === 'POST') {
       const before = growth.ownerView(await growth.load(k));
-      const v = growth.ownerView(await growth.runnerReport(k, await readJson(request)));
+      const rep = await readJson(request);
+      const v = growth.ownerView(await growth.runnerReport(k, rep));
+      if (!rep?.error && rep?.channel) await ytAuthRecovered(env); // the growth run read the channel: the login works
       const ns = v.new_subscribers.filter((x) => !before.new_subscribers.some((y) => y.id === x.id)).length;
       if (v.waiting > before.waiting) ping(env, request, { title: 'Comment replies need your OK', body: `${v.waiting - before.waiting} new repl${v.waiting - before.waiting > 1 ? 'ies' : 'y'} waiting in Growth.`, url: '/', tag: 'growth' });
       else if (ns) ping(env, request, { title: 'New subscribers', body: `${ns} new public subscriber${ns > 1 ? 's' : ''} on Sunverse.`, url: '/', tag: 'subs' });

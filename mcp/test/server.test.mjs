@@ -830,3 +830,40 @@ test('Keys & secrets: owner-only, presence only (never a value), GitHub status f
   assert.equal(d.github.find((x) => x.name === 'GROQ_API_KEY').set, false);
   assert.ok(d.github_checked_at);
 });
+
+test('song schedule: a back-dated time is refused, now and future are accepted', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: R, body: body === undefined ? undefined : JSON.stringify(body) }), e);
+  const id = (await (await f('/api/songvideo', 'POST', { title: 'Song Past' })).json()).job.job_id;
+  const old = await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: new Date(Date.now() - 3600e3).toISOString() });
+  assert.equal(old.status, 400);
+  assert.match((await old.json()).error, /already passed/);
+  assert.equal((await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: new Date().toISOString() })).status, 200, 'Post now');
+  assert.equal((await f(`/api/songvideo/${id}/schedule`, 'POST', { publish_at: new Date(Date.now() + 86400e3).toISOString() })).status, 200);
+});
+
+test('YouTube login renewed: a successful growth run lifts the block and the paused scheduled post goes out', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: R, body: body === undefined ? undefined : JSON.stringify(body) }), e);
+  const past = new Date(Date.now() - 5 * 86400e3).toISOString();
+  const id = (await (await f('/api/songvideo', 'POST', { title: 'Song R', publish_at: past })).json()).job.job_id;
+  await worker.fetch(new Request(B + `/api/songvideo/${id}/audio`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-type': 'audio/mpeg', 'content-length': '10' }, body: new Uint8Array(10) }), e);
+  await f('/api/songvideo/runner/claim', 'POST', {});
+  await f(`/api/songvideo/runner/${id}/analysis`, 'PUT', { durationS: 20, scenes: [{ start: 0, end: 20, image_prompt: 'x' }], youtube: { title: 'Song R | Sunverse' } });
+  await f('/api/songvideo/runner/pending');
+  await f('/api/songvideo/runner/claim', 'POST', {});
+  await worker.fetch(new Request(B + `/api/songvideo/runner/${id}/video?part=1&parts=1`, { method: 'PUT', headers: { authorization: 'Bearer tok', 'content-length': '2' }, body: new Uint8Array([1, 2]) }), e);
+  await f('/api/songvideo/runner/pending');
+  await f('/api/songvideo/runner/claim', 'POST', {});
+  await f(`/api/songvideo/runner/${id}/fail`, 'POST', { error: 'invalid_grant', stage: 'publish' });
+  assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.publish.state, 'blocked');
+  // a growth run that fails to log in changes nothing
+  await f('/api/growth/runner/report', 'POST', { error: 'invalid_grant' });
+  assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.publish.state, 'blocked');
+  // a growth run that read the channel proves the new token works
+  await f('/api/growth/runner/report', 'POST', { channel: { id: 'UC1', title: 'Sunverse', subs: 15, views: 2264, videos: 4 }, drafts: [], posted: [], failed: [], seen: [], new_subs: [] });
+  assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.publish, null, 're-armed on its schedule');
+  assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 1, 'the overdue scheduled post is requested again');
+});

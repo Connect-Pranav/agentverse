@@ -44,6 +44,12 @@ const ctx = { waitUntil() {}, passThroughOnException() {} };
 // Seed: one real LinkedIn run so the LinkedIn page has a draft and a visual.
 await worker.fetch(new Request('http://localhost/api/signal/run', { method: 'POST', headers: { authorization: 'Bearer dev', 'content-type': 'application/json' }, body: '{}' }), env, ctx).catch((e) => console.warn('seed run:', e.message));
 
+// Demo songs (labelled DEMO) so the Studio page has a library to lay out.
+for (const [title, days] of [['DEMO · Agya Do Raghuvar', 1], ['DEMO · Shiv Tandav', 3], ['DEMO · Abhimanyu', null], ['DEMO · Angad', null]]) {
+  const body = { title, ...(days ? { publish_at: new Date(Date.now() + days * 86400e3).toISOString() } : {}) };
+  await worker.fetch(new Request('http://localhost/api/songvideo', { method: 'POST', headers: { authorization: 'Bearer dev', 'content-type': 'application/json' }, body: JSON.stringify(body) }), env, ctx).catch(() => {});
+}
+
 http.createServer(async (req, res) => {
   try {
     const chunks = []; for await (const c of req) chunks.push(c);
