@@ -4600,7 +4600,7 @@ function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();
 
 /* ---------------- boot / intro ---------------- */
 function startLoops(){
-  setTitle("overview");
+  setTitle(VIEW||"overview"); /* a page opened before boot finished (e.g. #keys) keeps its title */
   if(location.hash==="#studio")setTimeout(function(){go("studio");},600);
   if(location.hash==="#keys")setTimeout(function(){go("keys");},600);
   if(location.hash==="#leads")setTimeout(function(){go("leads");},600);
