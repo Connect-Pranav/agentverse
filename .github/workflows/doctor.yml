@@ -1,0 +1,54 @@
+name: Code Doctor scan
+
+# Syntax, module links, tests, workflow YAML, committed secrets, live API and a real browser check of the
+# deployed dashboard at 1920 / 1440 / 390 px. Results go to the dashboard's Code Doctor (+).
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 0 * * *'   # 06:00 IST daily
+  workflow_dispatch:
+    inputs:
+      shots:
+        description: 'Print screenshots into the log'
+        type: boolean
+        default: false
+
+concurrency:
+  group: doctor
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Browser for the live UI check
+        run: |
+          npm install --no-save --no-package-lock --silent playwright@1.49
+          npx playwright install --with-deps chromium > /dev/null
+      - name: Wait for the new version to deploy
+        if: github.event_name == 'push'
+        run: sleep 150
+      - name: Scan
+        run: node scripts/doctor-scan.mjs
+        env:
+          DOCTOR_PRINT_SHOTS: ${{ inputs.shots && '1' || '' }}
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-doctor
+          path: |
+            doctor-report.json
+            doctor-*.jpg
+          if-no-files-found: ignore
+          retention-days: 14

@@ -13,3 +13,5 @@ mcp
 .dev.vars*
 .wrangler
 .gitignore
+doctor-report.json
+doctor-*.jpg

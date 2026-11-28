@@ -769,3 +769,46 @@ test('posting calendar is served for the dashboard', async () => {
   assert.equal(d.platforms.length, 6);
   assert.equal(d.platforms.find((p) => p.id === 'x').automated, false);
 });
+
+test('Code Doctor: owner-only health, runner-only report upload, safe repairs with re-check and history', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  assert.equal((await worker.fetch(new Request(B + '/api/doctor'), e)).status, 401, 'security findings are not public');
+  let d = await (await worker.fetch(new Request(B + '/api/doctor', { headers: R }), e)).json();
+  assert.ok(Array.isArray(d.checks) && d.checks.length >= 8);
+  assert.ok(d.checks.find((c) => c.id === 'cron' && c.status === 'fail'), 'no heartbeat yet is reported as a failure, not hidden');
+  assert.ok(d.checks.find((c) => c.id === 'scan' && c.status === 'warn'));
+  // report upload needs the runner token; content is sanitised
+  assert.equal((await worker.fetch(new Request(B + '/api/doctor/report', { method: 'PUT', body: '{}' }), e)).status, 401);
+  const rep = { commit: 'abc1234', tests: { pass: 3, fail: 0, total: 3 }, checks: [{ id: 'tests', area: 'Tests', title: '3/3 pass', status: 'pass' }, { id: 'x', title: 'weird', status: 'bogus' }] };
+  const up = await (await worker.fetch(new Request(B + '/api/doctor/report', { method: 'PUT', headers: R, body: JSON.stringify(rep) }), e)).json();
+  assert.deepEqual(up.summary, { pass: 1, warn: 0, fail: 0 });
+  d = await (await worker.fetch(new Request(B + '/api/doctor', { headers: R }), e)).json();
+  assert.equal(d.last_scan.commit, 'abc1234');
+  assert.ok(d.checks.some((c) => c.source === 'code scan' && c.status === 'info' && c.title === 'weird'));
+  assert.equal(d.history[0].action, 'scan');
+  // unknown repairs are refused; safe ones run, re-check and log
+  assert.equal((await worker.fetch(new Request(B + '/api/doctor/repair', { method: 'POST', headers: R, body: JSON.stringify({ action: 'rm -rf' }) }), e)).status, 400);
+  const fix = await (await worker.fetch(new Request(B + '/api/doctor/repair', { method: 'POST', headers: R, body: JSON.stringify({ action: 'publish_overdue_linkedin' }) }), e)).json();
+  assert.equal(fix.result, 'nothing was due');
+  d = await (await worker.fetch(new Request(B + '/api/doctor', { headers: R }), e)).json();
+  assert.equal(d.history[0].action, 'publish_overdue_linkedin');
+});
+
+test('Automation Control Center: states come from real records, not from the component existing', async () => {
+  const e = env();
+  const doctor = await import('../src/doctor.mjs');
+  const gh = { ok: true, at: new Date().toISOString(), latest: {
+    'growth.yml': { status: 'completed', conclusion: 'success', at: '2026-11-28T08:27:00Z' },
+    'leadgen.yml': { status: 'completed', conclusion: 'failure', at: '2026-11-28T08:07:00Z', failuresInRow: 4 },
+    'songvideo.yml': { status: 'in_progress', conclusion: null, at: '2026-11-28T08:33:00Z' } } };
+  const a = await doctor.automations(e, e.MEDIA, { gh });
+  const by = Object.fromEntries(a.automations.map((x) => [x.id, x]));
+  assert.equal(by.growth.state, 'completed');
+  assert.equal(by.leadgen.state, 'needs_attention');
+  assert.equal(by.song_render.state, 'running');
+  assert.equal(by.agents.state, 'idle', 'never ran = idle, not RUNNING');
+  assert.equal(by.reddit_leads.state, 'paused');
+  assert.equal(by.heartbeat.state, 'needs_attention');
+  assert.match(by.song_render.error, /GH_DISPATCH_TOKEN/);
+});

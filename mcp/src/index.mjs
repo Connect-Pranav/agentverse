@@ -23,6 +23,7 @@ import * as vani from './vani.mjs';
 import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
 import * as engagement from './engagement.mjs';
+import * as doctor from './doctor.mjs';
 import { nextSlot, calendar as postingCalendar, isSlotDay } from './post_schedule.mjs';
 import { withFonts } from './editorial_templates.mjs';
 import * as signal from './signal.mjs';
@@ -942,6 +943,19 @@ async function route(request, env) {
     }
     throw new HttpError(404, 'Not found');
   }
+  // Code Doctor + Automation Control Center
+  if (seg[0] === 'api' && seg[1] === 'doctor') {
+    const k = kv(env);
+    if (seg.length === 2 && method === 'GET') { owner(request, env); return json(await doctor.summary(env, k), 200, { 'cache-control': 'no-store' }); }
+    if (seg[2] === 'report' && method === 'PUT') { await runner(request, env); return json(await doctor.storeReport(k, await readJson(request, 1024 * 1024))); }
+    if (seg[2] === 'repair' && method === 'POST') {
+      owner(request, env);
+      try { return json(await doctor.repair(env, k, String((await readJson(request)).action || ''))); }
+      catch (e) { throw new HttpError(e.status || 500, e.message); }
+    }
+    if (seg[2] === 'repairs' && method === 'GET') return json({ repairs: doctor.SAFE_REPAIRS });
+  }
+  if (seg[0] === 'api' && seg[1] === 'automations' && method === 'GET') { owner(request, env); return json(await doctor.automations(env, kv(env)), 200, { 'cache-control': 'no-store' }); }
   // Posting calendar (IST) for every platform, with the next slot. Read-only, no secrets.
   if (seg[0] === 'api' && seg[1] === 'schedule' && method === 'GET') return json({ timezone: 'Asia/Kolkata', platforms: postingCalendar(new Date()) }, 200, { 'cache-control': 'no-store' });
   if (seg[0] === 'api' && seg[1] === 'signal') {
@@ -1579,6 +1593,7 @@ async function heartbeat(env, when = new Date()) {
       } else out.signal = 'already drafted today';
     } catch (e) { out.signalError = String(e?.message ?? e).slice(0, 200); }
   }
+  try { const gh = await doctor.githubRuns(env, kv(env)); out.github = gh.ok ? 'ok' : gh.error; } catch (_) {}
   try { await kv(env).put('system/heartbeat', JSON.stringify({ at: when.toISOString(), ...out }), { expirationTtl: 7 * 86400 }); } catch (_) {}
   return out;
 }

@@ -917,6 +917,61 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
 .sig-list-item b{display:block;font-size:13.5px;color:#fff;margin-bottom:4px}
 .sig-list-item small{color:var(--mut);font-size:11.5px;display:block;line-height:1.4}
 
+
+/* ===== Workspace layout (28 Nov 2026) =====
+   Root cause of the empty space: the overview was a 4-column grid where column "d" (Song Studio + Growth,
+   very tall) spanned every row, so rows 2+ were as tall as the song panel and the other columns left a large
+   empty area beside it. Now: system panels in a row across the top, Orchestrator | live feed | departments
+   in the middle (stretched to equal height), and the studio full width underneath where it has room. */
+@media(min-width:1101px){
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr)!important;grid-template-areas:"a a a" "b f c" "d d d"!important;grid-template-rows:auto auto auto!important;align-items:stretch!important;gap:18px}
+  .wrap>.col:nth-child(2){display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:stretch}
+  .wrap>.col:nth-child(3),.wrap>.col:nth-child(4){align-self:stretch}
+  .wrap>.col:nth-child(5){display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-self:start}
+  .wrap>.col:nth-child(3)>.panel:last-child,.wrap>.col:nth-child(4)>.panel:last-child{flex:1}
+  #pFocus{display:flex;flex-direction:column;min-height:0}
+  #pFocus .feed{flex:1;min-height:220px;max-height:none}
+  #wires{display:none}
+  .wrap.v-agents{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)!important;grid-template-areas:"c f"!important}
+}
+@media(min-width:761px) and (max-width:1100px){
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;grid-template-areas:"a a" "b c" "f f" "d d"!important;grid-template-rows:none!important}
+  .wrap>.col:nth-child(2){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  #wires{display:none}
+}
+/* ===== Code Doctor ===== */
+.doc-btn{position:relative;padding:6px 9px;border-color:rgba(52,211,153,.45);background:rgba(16,185,129,.10)}
+.doc-btn:hover{border-color:rgba(52,211,153,.8);background:rgba(16,185,129,.18)}
+.doc-cross{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;background:#10b981;color:#04130d}
+.doc-cross svg{width:15px;height:15px;stroke-width:3.2}
+.doc-dot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:#64748b;box-shadow:0 0 0 2px #0b0f17}
+.doc-dot.ok{background:#34d399}.doc-dot.warn{background:#fbbf24}.doc-dot.bad{background:#f87171}
+.doc-box{width:min(1040px,96vw)}
+.doc-tabs{display:flex;gap:6px;margin:4px 0 14px;border-bottom:1px solid rgba(255,255,255,.12)}
+.doc-tabs button{background:none;border:0;color:var(--mut);padding:8px 12px;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.doc-tabs button[aria-selected="true"]{color:#fff;border-bottom-color:#34d399}
+.doc-top{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;margin-bottom:14px}
+.doc-score{font:700 44px/1 var(--fm);color:#fff}
+.doc-score small{display:block;font:600 12px/1.4 Inter,system-ui,sans-serif;color:var(--mut);margin-top:4px}
+.doc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.doc-kpi{border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 12px}
+.doc-kpi b{display:block;font:700 22px/1.1 var(--fm)}
+.doc-kpi span{font-size:12px;color:var(--mut)}
+.doc-acts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.doc-list{display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden}
+.doc-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);align-items:start}
+.doc-row:first-child{border-top:0}
+.doc-row .st{width:10px;height:10px;border-radius:50%;margin-top:5px}
+.st.pass,.st.completed{background:#34d399}.st.warn,.st.scheduled{background:#fbbf24}.st.fail,.st.failed,.st.needs_attention{background:#f87171}.st.info,.st.idle,.st.paused{background:#64748b}.st.running{background:#60a5fa}.st.config_required{background:#c084fc}
+.doc-row b{font-size:13.5px;font-weight:600;color:#fff}
+.doc-row p{margin:3px 0 0;font-size:12.5px;color:var(--mut);white-space:pre-wrap;overflow-wrap:anywhere}
+.doc-row .fx{color:#a7f3d0}
+.doc-row .tag{font:600 11px/1 var(--fm);color:var(--mut);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding-top:4px}
+.doc-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.doc-table th{text-align:left;color:var(--mut);font-weight:600;padding:8px;border-bottom:1px solid rgba(255,255,255,.12)}
+.doc-table td{padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+.doc-table td small{color:var(--mut);display:block}
+@media(max-width:760px){.doc-top{grid-template-columns:1fr}.doc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.doc-table th:nth-child(3),.doc-table td:nth-child(3){display:none}}
 </style>
 </head>
 <body>
@@ -943,13 +998,14 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
   <div class="hc"><h1 class="av" id="title">AGENT<span class="a">VERSE</span></h1><span class="tag">autonomous social media &amp; growth agent team</span>
     <div class="askbar"><span class="o" aria-hidden="true"></span><input id="askIn" placeholder="Ask VANI… e.g. Foliocraft ke liye naya reel plan karo" aria-label="Ask VANI" autocomplete="off"><button id="askMic" aria-label="Speak to VANI"><span data-i="mic"></span></button></div></div>
   <div class="hr">
+    <div class="clock"><b></b><span id="clock">00:00:00</span></div>
+    <button class="ibtn doc-btn" id="docBtn" type="button" aria-label="Code Doctor: system health" title="Code Doctor"><span class="doc-cross" aria-hidden="true"><span data-i="plus"></span></span><span class="doc-dot" id="docDot" aria-hidden="true"></span></button>
     <select class="brandsel" id="brandSel" aria-label="Active brand"></select>
     <span class="brainchip" id="brainChip" title="Which AI brain the agents use">brain <b id="brainName">demo</b></span>
     <button class="toggle" id="autoBtn" aria-pressed="false"><span class="sw"></span>Autopilot</button>
     <button class="ibtn" id="runBtn" title="Run one cycle now"><span data-i="zap"></span>Run</button>
     <button class="ibtn" id="setBtn" aria-label="Settings"><span data-i="settings"></span></button>
     <button class="ibtn" id="pauseBtn" aria-pressed="false" aria-label="Pause animations"><span data-i="pause"></span></button>
-    <div class="clock"><b></b><span id="clock">00:00:00</span></div>
   </div>
 </header>
 <div class="ticker" aria-hidden="true"><div class="tr" id="ticker"></div></div>
@@ -1409,6 +1465,17 @@ body.is-app #vani.min{bottom:calc(20px + env(safe-area-inset-bottom))}
   </div>
 </div>
 
+<div id="doc" class="modal" role="dialog" aria-modal="true" aria-labelledby="docT">
+  <div class="sbox doc-box">
+    <div class="ph"><h2 id="docT">Code Doctor</h2><button class="ibtn" id="docX" type="button" aria-label="Close"><span data-i="x"></span></button></div>
+    <div class="doc-tabs" role="tablist">
+      <button type="button" role="tab" data-dt="health" aria-selected="true">System health</button>
+      <button type="button" role="tab" data-dt="auto" aria-selected="false">Automations</button>
+      <button type="button" role="tab" data-dt="hist" aria-selected="false">Repair history</button>
+    </div>
+    <div id="docBody" aria-live="polite"><div class="empty">Checking…</div></div>
+  </div>
+</div>
 <div id="sig" class="modal" role="dialog" aria-modal="true" aria-labelledby="sigT">
   <div class="sbox">
     <div class="ph"><h2 id="sigT">Signal</h2><button class="ibtn" id="sigX" aria-label="Close"><span data-i="x"></span></button></div>
@@ -4465,6 +4532,77 @@ function intro(){
 }
 renderBrands();updateBrain();
 if(document.fonts&&document.fonts.ready){document.fonts.ready.then(intro);}else{window.onload=intro;}
+
+/* ===== Code Doctor (+) ===== */
+var DOC={tab:"health",data:null,auto:null};
+function docIcons(root){var els=root.querySelectorAll("[data-i]");for(var i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}}
+function docAgo(t){ if(!t) return "never"; var s=(Date.now()-Date.parse(t))/1000; if(s<0) return "in "+docAgo(new Date(Date.now()-s*1000*2).toISOString()).replace(" ago",""); return s<90?Math.round(s)+"s ago":s<5400?Math.round(s/60)+" min ago":s<172800?Math.round(s/3600)+" h ago":Math.round(s/86400)+" days ago"; }
+var DOC_STATE={completed:"Completed",scheduled:"Scheduled",running:"Running",failed:"Failed",needs_attention:"Needs attention",paused:"Paused",idle:"Idle",config_required:"Configuration required",demo:"Demo"};
+function docNeedToken(){ return !(typeof SET!=="undefined"&&SET&&SET.mcpToken); }
+function docOpen(){ $("doc").classList.add("open"); docLoad(); }
+function docClose(){ $("doc").classList.remove("open"); }
+function docLoad(){
+  var b=$("docBody");
+  if(docNeedToken()){ b.innerHTML='<div class="empty"><b>Owner token needed.</b><br>Code Doctor shows security findings, so it only opens with your MCP token. Add it in Settings (the same token the Song Studio uses).</div>'; return; }
+  b.innerHTML='<div class="empty">Checking…</div>';
+  var p = DOC.tab==="auto" ? sigApi("GET","/api/automations") : sigApi("GET","/api/doctor");
+  p.then(function(d){ if(DOC.tab==="auto") DOC.auto=d; else DOC.data=d; docRender(); docDotSet(DOC.data); })
+   .catch(function(e){ b.innerHTML='<div class="empty"><b>Could not load.</b><br>'+esc(e.message)+'</div>'; });
+}
+function docDotSet(d){ var el=$("docDot"); if(!el||!d) return; el.className="doc-dot "+(d.counts.fail?"bad":d.counts.warn?"warn":"ok"); $("docBtn").title="Code Doctor · "+(d.counts.fail?d.counts.fail+" critical":d.counts.warn?d.counts.warn+" warnings":"healthy"); }
+function docRender(){
+  var b=$("docBody"), h="";
+  if(DOC.tab==="health"){
+    var d=DOC.data; if(!d){ docLoad(); return; }
+    var sc=d.last_scan;
+    h+='<div class="doc-top"><div class="doc-score">'+(d.health==null?"—":d.health)+'<small>code &amp; system health</small></div><div class="doc-kpis">'+
+      '<div class="doc-kpi"><b style="color:#f87171">'+d.counts.fail+'</b><span>critical</span></div>'+
+      '<div class="doc-kpi"><b style="color:#fbbf24">'+d.counts.warn+'</b><span>warnings</span></div>'+
+      '<div class="doc-kpi"><b style="color:#34d399">'+d.counts.pass+'</b><span>passed</span></div>'+
+      '<div class="doc-kpi"><b>'+(sc?docAgo(sc.at):"never")+'</b><span>last code scan'+(sc&&sc.tests?' · tests '+sc.tests.pass+'/'+sc.tests.total:'')+'</span></div></div></div>';
+    h+='<div class="doc-acts"><button class="ap" type="button" data-doc="rescan"><span data-i="search"></span>Re-check now</button>'+
+      (sc&&sc.run_url?'<a class="ibtn" target="_blank" rel="noopener" href="'+esc(sc.run_url)+'"><span data-i="external-link"></span>Full scan log</a>':'')+
+      '<span class="sub" style="align-self:center">Full code scans run on every deploy and daily at 06:00 IST.</span></div>';
+    var order={fail:0,warn:1,info:2,pass:3};
+    var list=d.checks.slice().sort(function(a,b2){return order[a.status]-order[b2.status];});
+    h+='<div class="doc-list">'+list.map(function(c){
+      return '<div class="doc-row"><span class="st '+c.status+'"></span><div><b>'+esc(c.title)+'</b>'+(c.detail?'<p>'+esc(c.detail)+'</p>':'')+(c.fix&&c.status!=="pass"?'<p class="fx">Fix: '+esc(c.fix)+'</p>':'')+
+        (c.repair&&c.status!=="pass"?'<div class="acts" style="margin-top:6px"><button class="ap" type="button" data-doc="repair" data-a="'+esc(c.repair)+'"><span data-i="zap"></span>Fix safely</button></div>':'')+
+        '</div><span class="tag">'+esc(c.area)+' · '+esc(c.source)+'</span></div>';
+    }).join("")+'</div>';
+  } else if(DOC.tab==="auto"){
+    var a=DOC.auto; if(!a){ docLoad(); return; }
+    h+='<div class="sub" style="margin-bottom:10px">'+(a.github.ok?'GitHub runs checked '+docAgo(a.github.at):'GitHub status unavailable: '+esc(a.github.error||""))+' · Worker heartbeat '+(a.heartbeat?docAgo(a.heartbeat.at):'never')+'</div>';
+    h+='<table class="doc-table"><thead><tr><th>Automation</th><th>Status</th><th>Trigger · schedule</th><th>Last · next</th></tr></thead><tbody>'+a.automations.map(function(x){
+      return '<tr><td><b>'+esc(x.name)+'</b><small>'+esc(x.dept)+' · output: '+esc(x.output||"")+'</small>'+(x.error?'<small style="color:#fca5a5">'+esc(x.error)+'</small>':'')+'</td>'+
+        '<td><span class="st '+x.state+'" style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px"></span>'+esc(DOC_STATE[x.state]||x.state)+(x.url?'<small><a href="'+esc(x.url)+'" target="_blank" rel="noopener">last run</a></small>':'')+'</td>'+
+        '<td>'+esc(x.trigger)+'<small>'+esc(x.schedule)+'</small></td>'+
+        '<td>'+esc(x.last?docAgo(x.last):"no run yet")+'<small>next: '+esc(x.next||"—")+'</small></td></tr>';
+    }).join("")+'</tbody></table>';
+  } else {
+    var hist=(DOC.data&&DOC.data.history)||[];
+    if(!DOC.data){ docLoad(); return; }
+    h+=hist.length?'<div class="doc-list">'+hist.map(function(x){ return '<div class="doc-row"><span class="st '+(x.verified==="still failing"?"fail":"pass")+'"></span><div><b>'+esc(x.action==="scan"?"Code scan":x.action.replace(/_/g," "))+'</b><p>'+esc(x.result||"")+(x.verified?' · re-check: '+esc(x.verified):'')+(x.commit?' · '+esc(String(x.commit).slice(0,7)):'')+'</p></div><span class="tag">'+esc(docAgo(x.at))+' · '+esc(x.by||"")+'</span></div>'; }).join("")+'</div>':'<div class="empty">No scans or repairs recorded yet.</div>';
+  }
+  b.innerHTML=h; docIcons(b);
+}
+(function(){
+  if(!$("docBtn")) return;
+  $("docBtn").onclick=docOpen; $("docX").onclick=docClose;
+  $("doc").addEventListener("click",function(e){ if(e.target===$("doc")) docClose(); });
+  var tabs=document.querySelectorAll(".doc-tabs button");
+  for(var i=0;i<tabs.length;i++) tabs[i].onclick=function(){ for(var j=0;j<tabs.length;j++) tabs[j].setAttribute("aria-selected",tabs[j]===this?"true":"false"); DOC.tab=this.getAttribute("data-dt"); docRender(); };
+  $("docBody").addEventListener("click",function(e){
+    var t=e.target.closest?e.target.closest("[data-doc]"):null; if(!t) return;
+    if(t.getAttribute("data-doc")==="rescan"){ DOC.data=null; docLoad(); return; }
+    t.disabled=true;
+    sigApi("POST","/api/doctor/repair",{action:t.getAttribute("data-a")}).then(function(r){ toast((r.verified?"Fixed and re-checked: ":"Ran, but the check still fails: ")+r.result, r.verified); DOC.data=null; docLoad(); })
+      .catch(function(err){ t.disabled=false; toast(err.message,false); });
+  });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&$("doc").classList.contains("open")) docClose(); });
+  function bg(){ if(docNeedToken()) return; sigApi("GET","/api/doctor").then(function(d){ DOC.data=d; docDotSet(d); }).catch(function(){}); }
+  setTimeout(bg,4000); setInterval(bg,5*60000);
+})();
 </script>
 </body>
 </html>
