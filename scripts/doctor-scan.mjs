@@ -118,12 +118,26 @@ else {
           }
           return res;
         });
-        add(`ui_${label}`, 'UI', `${label}: ${errors.length} console error(s), ${failed.length} failed request(s), overview ${m.emptyPct ?? '?'}% empty`,
-          errors.length || failed.length ? 'fail' : (m.overflowX > 2 || (m.emptyPct ?? 0) > 35) ? 'warn' : 'pass',
-          [...errors.slice(0, 5), ...failed.slice(0, 5), m.overflowX > 2 ? `page is ${m.overflowX}px wider than the screen` : ''].filter(Boolean).join('\n'));
         const shot = await page.screenshot({ type: 'jpeg', quality: 45, fullPage: label !== 'phone-390' });
         writeFileSync(join(ROOT, `doctor-${label}.jpg`), shot);
         if (process.env.DOCTOR_PRINT_SHOTS) console.log(`::group::shot ${label}\nSHOT_BEGIN ${label}\n${shot.toString('base64')}\nSHOT_END ${label}\n::endgroup::`);
+        // Every page: no sideways scroll, nothing sliding under the fixed sidebar, no script errors.
+        const pages = ['agents', 'work', 'leads', 'studio', 'signal', 'keys'], pageIssues = [];
+        for (const v of pages) {
+          await page.evaluate((v) => { try { switchView(v); } catch (e) { console.error('switchView ' + v + ': ' + e.message); } }, v);
+          await page.waitForTimeout(1200);
+          const r = await page.evaluate(() => {
+            const vw = document.documentElement.clientWidth, dock = document.querySelector('.dock');
+            const dr = dock && getComputedStyle(dock).display !== 'none' && vw > 760 ? dock.getBoundingClientRect() : null;
+            const blocks = [...document.querySelectorAll('body > .board, body > .wrap')].filter((b) => b.offsetParent !== null);
+            return { over: document.documentElement.scrollWidth - vw, under: dr ? blocks.filter((b) => b.getBoundingClientRect().left < dr.right - 1).map((b) => b.id) : [] };
+          });
+          if (r.over > 2) pageIssues.push(`${v}: page is ${r.over}px wider than the screen`);
+          if (r.under.length) pageIssues.push(`${v}: ${r.under.join(', ')} sits under the sidebar`);
+        }
+        add(`ui_${label}`, 'UI', `${label}: ${pages.length + 1} pages · ${errors.length} console error(s), ${failed.length} failed request(s), overview ${m.emptyPct ?? '?'}% empty`,
+          errors.length || failed.length ? 'fail' : (m.overflowX > 2 || pageIssues.length || (m.emptyPct ?? 0) > 35) ? 'warn' : 'pass',
+          [...errors.slice(0, 5), ...failed.slice(0, 5), m.overflowX > 2 ? `overview is ${m.overflowX}px wider than the screen` : '', ...pageIssues].filter(Boolean).join('\n'));
       } catch (e) { add(`ui_${label}`, 'UI', `${label}: page did not load`, 'fail', e.message); }
       await page.close();
     }
@@ -133,7 +147,9 @@ else {
 
 const summary = { pass: checks.filter((c) => c.status === 'pass').length, warn: checks.filter((c) => c.status === 'warn').length, fail: checks.filter((c) => c.status === 'fail').length };
 console.log(`\nCode Doctor: ${summary.pass} passed · ${summary.warn} warnings · ${summary.fail} critical`);
-const report = { commit: process.env.GITHUB_SHA || '', run_url: process.env.GITHUB_RUN_ID ? `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : '', tests, checks };
+const github_secrets = {};
+for (const [k, v] of Object.entries(process.env)) if (k.startsWith('HAS_') && (v === 'true' || v === 'false')) github_secrets[k.slice(4)] = v === 'true';
+const report = { github_secrets, commit: process.env.GITHUB_SHA || '', run_url: process.env.GITHUB_RUN_ID ? `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : '', tests, checks };
 writeFileSync(join(ROOT, 'doctor-report.json'), JSON.stringify(report, null, 2));
 
 if (!process.argv.includes('--no-upload') && base) {

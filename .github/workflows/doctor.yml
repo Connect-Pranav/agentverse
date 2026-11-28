@@ -42,6 +42,25 @@ jobs:
         run: node scripts/doctor-scan.mjs
         env:
           DOCTOR_PRINT_SHOTS: ${{ inputs.shots && '1' || '' }}
+          # presence only (true/false); secret values are never passed to the scan
+          HAS_SV_MCP_TOKEN: ${{ secrets.SV_MCP_TOKEN != '' }}
+          HAS_MCP_TOKEN: ${{ secrets.MCP_TOKEN != '' }}
+          HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+          HAS_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+          HAS_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY != '' }}
+          HAS_GROQ_API_KEY: ${{ secrets.GROQ_API_KEY != '' }}
+          HAS_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY != '' }}
+          HAS_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
+          HAS_YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID != '' }}
+          HAS_YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET != '' }}
+          HAS_YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN != '' }}
+          HAS_GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN != '' }}
+          HAS_LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN != '' }}
+          HAS_LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN != '' }}
+          HAS_REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID != '' }}
+          HAS_REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET != '' }}
+          HAS_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}
+          HAS_TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID != '' }}
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@v4

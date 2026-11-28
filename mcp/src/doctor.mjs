@@ -172,7 +172,12 @@ export async function storeReport(kv, body) {
     status: ['pass', 'warn', 'fail', 'info'].includes(c.status) ? c.status : 'info', detail: String(c.detail || '').slice(0, 1500), fix: c.fix ? String(c.fix).slice(0, 400) : null,
   })) : [];
   const summary = { pass: checks.filter((c) => c.status === 'pass').length, warn: checks.filter((c) => c.status === 'warn').length, fail: checks.filter((c) => c.status === 'fail').length };
-  const report = { at: new Date().toISOString(), commit: String(body?.commit || '').slice(0, 40), run_url: String(body?.run_url || '').slice(0, 300), tests: body?.tests || null, summary, checks };
+  // GitHub secret presence comes from doctor.yml as booleans (`secrets.X != ''`); values never leave GitHub.
+  const ghSecrets = {};
+  if (body?.github_secrets && typeof body.github_secrets === 'object') {
+    for (const k of Object.keys(body.github_secrets).slice(0, 60)) if (/^[A-Z][A-Z0-9_]{1,60}$/.test(k)) ghSecrets[k] = body.github_secrets[k] === true;
+  }
+  const report = { at: new Date().toISOString(), commit: String(body?.commit || '').slice(0, 40), run_url: String(body?.run_url || '').slice(0, 300), tests: body?.tests || null, summary, checks, github_secrets: ghSecrets };
   await kv.put('doctor/report', JSON.stringify(report));
   await addHistory(kv, { action: 'scan', by: 'doctor.yml', result: `${summary.pass} passed, ${summary.warn} warnings, ${summary.fail} critical`, commit: report.commit });
   return { ok: true, summary };
@@ -203,4 +208,58 @@ export async function repair(env, kv, action, { fetchImpl = fetch } = {}) {
   const still = after.filter((c) => c.repair === action && c.status !== 'pass');
   await addHistory(kv, { action, by: 'owner', result, verified: still.length ? 'still failing' : 'check passes now' });
   return { ok: true, action, result, verified: still.length === 0, checks: after };
+}
+
+// ---------- Keys & secrets catalogue ----------
+// One list of every credential AGENTVERSE uses, where it lives and how to change it. Status is presence only.
+export const WORKER_SECRETS = [
+  { name: 'MCP_TOKEN', purpose: 'Owner token: dashboard, MCP and runner uploads', required: true },
+  { name: 'TELEGRAM_BOT_TOKEN', purpose: 'Telegram approvals bot (replaces the hard-coded fallback)', required: true },
+  { name: 'TELEGRAM_CHAT_ID', purpose: 'Your Telegram chat for approvals' },
+  { name: 'GROQ_API_KEY', purpose: 'Cloud brain: Groq (free tier)' },
+  { name: 'GEMINI_API_KEY', purpose: 'Cloud brain: Gemini (free tier)' },
+  { name: 'OPENROUTER_API_KEY', purpose: 'Cloud brain fallback: OpenRouter free models' },
+  { name: 'GH_DISPATCH_TOKEN', purpose: 'Lets the Worker start GitHub workflows (song render, Shorts) at once' },
+  { name: 'LINKEDIN_ACCESS_TOKEN', purpose: 'LinkedIn publishing (also set by LinkedIn Auth)' },
+  { name: 'LINKEDIN_PERSON_URN', purpose: 'Your LinkedIn member id for posting' },
+  { name: 'LINKEDIN_CLIENT_ID', purpose: 'LinkedIn app for the Auth button' },
+  { name: 'LINKEDIN_CLIENT_SECRET', purpose: 'LinkedIn app secret for the Auth button' },
+  { name: 'SARVAM_API_KEY', purpose: 'VANI Indian-language voices' },
+  { name: 'ADOBE_CLIENT_ID', purpose: 'Adobe Express link on visuals (optional)' },
+  { name: 'ADOBE_CLIENT_SECRET', purpose: 'Adobe Express (optional)' },
+];
+export const GITHUB_SECRETS = [
+  { name: 'SV_MCP_TOKEN', used_by: 'agents, cloudflare, leadgen, growth, signal, songvideo', purpose: 'Same value as the Worker MCP_TOKEN' },
+  { name: 'MCP_TOKEN', used_by: 'signal', purpose: 'Same value as the Worker MCP_TOKEN' },
+  { name: 'CLOUDFLARE_API_TOKEN', used_by: 'cloudflare', purpose: 'Deploys the Worker' },
+  { name: 'CLOUDFLARE_ACCOUNT_ID', used_by: 'cloudflare', purpose: 'Cloudflare account for deploys' },
+  { name: 'GEMINI_API_KEY', used_by: 'agents, songvideo, growth, leads', purpose: 'Images, song analysis, agents' },
+  { name: 'GROQ_API_KEY', used_by: 'agents', purpose: '24/7 agent brain' },
+  { name: 'OPENROUTER_API_KEY', used_by: 'agents', purpose: 'Agent brain fallback' },
+  { name: 'OPENAI_API_KEY', used_by: 'songvideo', purpose: 'Optional image fallback for songs' },
+  { name: 'YT_CLIENT_ID', used_by: 'growth, leadgen, songvideo', purpose: 'YouTube OAuth app' },
+  { name: 'YT_CLIENT_SECRET', used_by: 'growth, leadgen, songvideo', purpose: 'YouTube OAuth app secret' },
+  { name: 'YT_REFRESH_TOKEN', used_by: 'growth, songvideo', purpose: 'YouTube posting (renew with scripts/yt-refresh-token.py)' },
+  { name: 'GMAIL_REFRESH_TOKEN', used_by: 'leadgen', purpose: 'Sends approved Foliocraft emails' },
+  { name: 'LINKEDIN_ACCESS_TOKEN', used_by: 'signal', purpose: 'LinkedIn engagement read' },
+  { name: 'LINKEDIN_PERSON_URN', used_by: 'signal', purpose: 'LinkedIn member id' },
+  { name: 'REDDIT_CLIENT_ID', used_by: 'leads', purpose: 'Reddit lead search (paused)' },
+  { name: 'REDDIT_CLIENT_SECRET', used_by: 'leads', purpose: 'Reddit lead search (paused)' },
+  { name: 'TELEGRAM_BOT_TOKEN', used_by: 'signal', purpose: 'Telegram from the LinkedIn runner' },
+  { name: 'TELEGRAM_CHAT_ID', used_by: 'signal', purpose: 'Telegram chat for the runner' },
+];
+export async function secretsStatus(env, kv) {
+  const report = await kv.get('doctor/report', 'json').catch(() => null);
+  const gh = (report && report.github_secrets) || {};
+  const known = Object.keys(gh).length > 0;
+  return {
+    worker: WORKER_SECRETS.map((s) => ({ ...s, set: Boolean(env[s.name] && String(env[s.name]).trim()) })),
+    github: GITHUB_SECRETS.map((s) => ({ ...s, set: known && s.name in gh ? gh[s.name] : null })),
+    github_checked_at: known ? report.at : null,
+    change: {
+      worker: 'cd mcp && npx wrangler secret put NAME   (or Cloudflare dashboard → Workers → agentverse → Settings → Variables and Secrets)',
+      worker_url: 'https://dash.cloudflare.com/?to=/:account/workers/services/view/agentverse/production/settings',
+      github_url: 'https://github.com/Connect-Pranav/agentverse/settings/secrets/actions',
+    },
+  };
 }

@@ -812,3 +812,21 @@ test('Automation Control Center: states come from real records, not from the com
   assert.equal(by.heartbeat.state, 'needs_attention');
   assert.match(by.song_render.error, /GH_DISPATCH_TOKEN/);
 });
+
+test('Keys & secrets: owner-only, presence only (never a value), GitHub status from the doctor scan', async () => {
+  const e = { ...env(), GROQ_API_KEY: 'gsk_live_secret_value_123' };
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  assert.equal((await worker.fetch(new Request(B + '/api/doctor/secrets'), e)).status, 401);
+  let res = await worker.fetch(new Request(B + '/api/doctor/secrets', { headers: R }), e);
+  const raw = await res.text();
+  assert.ok(!raw.includes('gsk_live_secret_value_123') && !raw.includes('"tok"'), 'no secret value is ever returned');
+  let d = JSON.parse(raw);
+  assert.equal(d.worker.find((x) => x.name === 'GROQ_API_KEY').set, true);
+  assert.equal(d.worker.find((x) => x.name === 'TELEGRAM_BOT_TOKEN').set, false);
+  assert.ok(d.github.every((x) => x.set === null), 'GitHub status is unknown until a scan reports it');
+  await worker.fetch(new Request(B + '/api/doctor/report', { method: 'PUT', headers: R, body: JSON.stringify({ checks: [], github_secrets: { YT_REFRESH_TOKEN: true, GROQ_API_KEY: false, 'bad name': true } }) }), e);
+  d = await (await worker.fetch(new Request(B + '/api/doctor/secrets', { headers: R }), e)).json();
+  assert.equal(d.github.find((x) => x.name === 'YT_REFRESH_TOKEN').set, true);
+  assert.equal(d.github.find((x) => x.name === 'GROQ_API_KEY').set, false);
+  assert.ok(d.github_checked_at);
+});

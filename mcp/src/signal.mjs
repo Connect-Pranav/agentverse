@@ -1612,10 +1612,9 @@ export async function checkPostQuality(kv, draftId = null) {
 
   const checks = {
     evaluatedAt: nowIso(),
-    hasHook: draft.hook && draft.hook.length > 20,
+    hasHook: Boolean(draft.hook && draft.hook.length > 20),
     hasDiscussionQuestion: text.includes('?'),
     traceableSources: Array.isArray(draft.sources) && draft.sources.length > 0,
-    noFakeClaims: true,
     noGenericFluff: !/wake up at|grind never stops|game changer|fast-paced world|motivational quote/i.test(text),
     hashtagCount: (text.match(/#[a-z0-9]+/gi) || []).length,
     wordCount,
@@ -1623,21 +1622,27 @@ export async function checkPostQuality(kv, draftId = null) {
     isWordCountOptimal: wordCount >= 140 && wordCount <= 265,
     visualAttached: Boolean(draft.visual),
     adobeExpressConnected: Boolean(draft.visual?.adobe_express_url),
-    scores: {
-      originality: 98,
-      factuality: 99,
-      brandVoiceAlignment: 96,
-      visualQuality: draft.visual ? 96 : 60,
-    },
   };
 
+  // Every number here is measured from the draft itself: the score is the share of checks that pass.
+  // (No originality / voice-match percentages: nothing in this pipeline measures those, so none are claimed.)
+  const list = {
+    hook: checks.hasHook,
+    discussion_question: checks.hasDiscussionQuestion,
+    traceable_source: checks.traceableSources,
+    no_generic_fluff: checks.noGenericFluff,
+    hashtags_25_or_fewer: checks.hashtagCount <= 25,
+    word_count_140_265: checks.isWordCountOptimal,
+    visual_attached: checks.visualAttached,
+  };
+  checks.list = list;
+  checks.passedCount = Object.values(list).filter(Boolean).length;
+  checks.totalCount = Object.keys(list).length;
   checks.passed = checks.hasHook &&
     checks.hasDiscussionQuestion &&
-    checks.noFakeClaims &&
     checks.hashtagCount <= 25 &&
     checks.isWordCountOptimal;
-
-  checks.overallScore = Math.round((checks.scores.originality + checks.scores.factuality + checks.scores.brandVoiceAlignment + checks.scores.visualQuality) / 4);
+  checks.overallScore = Math.round((checks.passedCount / checks.totalCount) * 100);
 
   draft.qualityCheck = checks;
   logActivity(s, 'Fact-check & Brand Guardian', `Quality check completed for "${id}". Score: ${checks.overallScore}/100 (Words: ${wordCount}, Passed: ${checks.passed}).`);

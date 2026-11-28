@@ -954,6 +954,7 @@ async function route(request, env) {
       catch (e) { throw new HttpError(e.status || 500, e.message); }
     }
     if (seg[2] === 'repairs' && method === 'GET') return json({ repairs: doctor.SAFE_REPAIRS });
+    if (seg[2] === 'secrets' && method === 'GET') { owner(request, env); return json(await doctor.secretsStatus(env, k), 200, { 'cache-control': 'no-store' }); }
   }
   if (seg[0] === 'api' && seg[1] === 'automations' && method === 'GET') { owner(request, env); return json(await doctor.automations(env, kv(env)), 200, { 'cache-control': 'no-store' }); }
   // Posting calendar (IST) for every platform, with the next slot. Read-only, no secrets.
@@ -1140,6 +1141,9 @@ async function route(request, env) {
             overall_score: activeDraft.qualityCheck.overallScore,
             passed: activeDraft.qualityCheck.passed,
             word_count: activeDraft.qualityCheck.wordCount,
+            checks: activeDraft.qualityCheck.list || null,
+            passed_count: activeDraft.qualityCheck.passedCount ?? null,
+            total_count: activeDraft.qualityCheck.totalCount ?? null,
           } : null,
           sources: [],
           benchmarks: [],
