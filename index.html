@@ -3923,6 +3923,39 @@ function sigLoad(){
   });
 }
 
+// Editorial visuals carry a font placeholder; the embedded fonts are loaded once and put into the SVG,
+// so the preview, SVG, JPEG and PDF all use Manrope / Inter / IBM Plex Mono.
+var SIG_FONT_CSS = null;
+function sigFonts(cb){
+  if(SIG_FONT_CSS !== null){ cb(SIG_FONT_CSS); return; }
+  fetch("/fonts/signal-fonts.css").then(function(r){ return r.ok ? r.text() : ""; })
+    .then(function(t){ SIG_FONT_CSS = t || ""; cb(SIG_FONT_CSS); })
+    .catch(function(){ SIG_FONT_CSS = ""; cb(""); });
+}
+function sigSvgSize(svgText){
+  var m = /viewBox="0 0 (\d+) (\d+)"/.exec(svgText || "");
+  return m ? { w: +m[1], h: +m[2] } : { w: 1200, h: 627 };
+}
+function sigRatioLabel(sz){
+  if(sz.w * 5 === sz.h * 4) return "4:5";
+  if(sz.w === sz.h) return "1:1";
+  return (Math.round(sz.w / sz.h * 100) / 100) + ":1";
+}
+function sigShowVisual(svgText){
+  var box = $("sigVisualContainer");
+  if(!box) return;
+  var sz = sigSvgSize(svgText);
+  box.style.aspectRatio = sz.w + "/" + sz.h;
+  if($("sigVisualTitle")) $("sigVisualTitle").textContent = sz.w + " × " + sz.h + " LinkedIn Visual";
+  if($("sigRatioBadge")) $("sigRatioBadge").textContent = sigRatioLabel(sz) + " Ratio";
+  if(svgText.indexOf("/*@signal-fonts*/") >= 0){
+    box.innerHTML = svgText;
+    sigFonts(function(css){ if(css) box.innerHTML = svgText.replace("/*@signal-fonts*/", css); });
+  } else {
+    box.innerHTML = svgText;
+  }
+}
+
 function sigRender(){
   if(!SIG.state) return;
   var s = SIG.state;
@@ -4306,38 +4339,6 @@ function sigInitControls(){
     };
   }
 
-  // Editorial visuals carry a font placeholder; the embedded fonts are loaded once and put into the SVG,
-  // so the preview, SVG, JPEG and PDF all use Manrope / Inter / IBM Plex Mono.
-  var SIG_FONT_CSS = null;
-  function sigFonts(cb){
-    if(SIG_FONT_CSS !== null){ cb(SIG_FONT_CSS); return; }
-    fetch("/fonts/signal-fonts.css").then(function(r){ return r.ok ? r.text() : ""; })
-      .then(function(t){ SIG_FONT_CSS = t || ""; cb(SIG_FONT_CSS); })
-      .catch(function(){ SIG_FONT_CSS = ""; cb(""); });
-  }
-  function sigSvgSize(svgText){
-    var m = /viewBox="0 0 (\d+) (\d+)"/.exec(svgText || "");
-    return m ? { w: +m[1], h: +m[2] } : { w: 1200, h: 627 };
-  }
-  function sigRatioLabel(sz){
-    if(sz.w * 5 === sz.h * 4) return "4:5";
-    if(sz.w === sz.h) return "1:1";
-    return (Math.round(sz.w / sz.h * 100) / 100) + ":1";
-  }
-  function sigShowVisual(svgText){
-    var box = $("sigVisualContainer");
-    if(!box) return;
-    var sz = sigSvgSize(svgText);
-    box.style.aspectRatio = sz.w + "/" + sz.h;
-    if($("sigVisualTitle")) $("sigVisualTitle").textContent = sz.w + " × " + sz.h + " LinkedIn Visual";
-    if($("sigRatioBadge")) $("sigRatioBadge").textContent = sigRatioLabel(sz) + " Ratio";
-    if(svgText.indexOf("/*@signal-fonts*/") >= 0){
-      box.innerHTML = svgText;
-      sigFonts(function(css){ if(css) box.innerHTML = svgText.replace("/*@signal-fonts*/", css); });
-    } else {
-      box.innerHTML = svgText;
-    }
-  }
 
   // Visual Download and Regeneration Logic
   function sigDownloadVisual(format){
