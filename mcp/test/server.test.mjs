@@ -867,3 +867,52 @@ test('YouTube login renewed: a successful growth run lifts the block and the pau
   assert.equal((await (await f(`/api/songvideo/${id}`)).json()).job.publish, null, 're-armed on its schedule');
   assert.equal((await (await f('/api/songvideo/runner/pending')).json()).pending, 1, 'the overdue scheduled post is requested again');
 });
+
+test('Connect YouTube in the dashboard: client saved server-side, Google sign-in, token never leaves the server except to runners', async () => {
+  const e = env();
+  const R = { authorization: 'Bearer tok', 'content-type': 'application/json' };
+  const f = (path, method = 'GET', body) => worker.fetch(new Request(B + path, { method, headers: R, body: body === undefined ? undefined : JSON.stringify(body) }), e);
+  assert.equal((await worker.fetch(new Request(B + '/api/youtube/status'), e)).status, 401);
+  let st = await (await f('/api/youtube/status')).json();
+  assert.equal(st.redirect_uri, B + '/api/youtube/callback');
+  assert.equal(st.connected, false);
+  assert.equal((await f('/api/youtube/connect', 'POST', {})).status, 409, 'needs the client first');
+  assert.equal((await f('/api/youtube/app', 'POST', { client_id: 'nope', client_secret: 'x' })).status, 400);
+  assert.equal((await f('/api/youtube/app', 'POST', { client_id: '123-abc.apps.googleusercontent.com', client_secret: 'GOCSPX-secret-value' })).status, 200);
+  const { url } = await (await f('/api/youtube/connect', 'POST', {})).json();
+  const u = new URL(url);
+  assert.equal(u.hostname, 'accounts.google.com');
+  assert.equal(u.searchParams.get('redirect_uri'), B + '/api/youtube/callback');
+  assert.match(u.searchParams.get('scope'), /youtube\.upload/);
+  // a forged state is refused
+  let cb = await worker.fetch(new Request(B + '/api/youtube/callback?state=' + 'a'.repeat(48) + '&code=x', { redirect: 'manual' }), e);
+  assert.equal(cb.status, 302);
+  assert.match(cb.headers.get('location'), /yt_error=/);
+  // the real callback exchanges the code and checks the channel
+  const real = globalThis.fetch;
+  globalThis.fetch = async (u2, init) => {
+    const s = String(u2);
+    if (s.startsWith('https://oauth2.googleapis.com/token')) { assert.match(String(init.body), /GOCSPX-secret-value/); return new Response(JSON.stringify({ access_token: 'at', refresh_token: 'rt-123', scope: 'x' })); }
+    if (s.includes('/youtube/v3/channels')) return new Response(JSON.stringify({ items: [{ id: 'UCsun', snippet: { title: 'Sunverse' } }] }));
+    return new Response('{}', { status: 404 });
+  };
+  try {
+    cb = await worker.fetch(new Request(B + '/api/youtube/callback?state=' + u.searchParams.get('state') + '&code=c0de', { redirect: 'manual' }), e);
+  } finally { globalThis.fetch = real; }
+  assert.equal(cb.status, 302);
+  assert.equal(cb.headers.get('location'), '/?yt=connected#keys');
+  const raw = await (await f('/api/youtube/status')).text();
+  assert.ok(!raw.includes('rt-123') && !raw.includes('GOCSPX-secret-value'), 'status never shows the token or secret');
+  st = JSON.parse(raw);
+  assert.equal(st.connected, true);
+  assert.equal(st.channel.title, 'Sunverse');
+  // runners (OIDC / runner token) get what they need to post
+  const c = await (await f('/api/youtube/runner/credentials')).json();
+  assert.deepEqual([c.connected, c.refresh_token, c.client_secret], [true, 'rt-123', 'GOCSPX-secret-value']);
+  assert.equal((await worker.fetch(new Request(B + '/api/youtube/runner/credentials'), e)).status, 401);
+  // the state can't be replayed
+  cb = await worker.fetch(new Request(B + '/api/youtube/callback?state=' + u.searchParams.get('state') + '&code=c0de', { redirect: 'manual' }), e);
+  assert.match(cb.headers.get('location'), /yt_error=/);
+  await f('/api/youtube/disconnect', 'POST', {});
+  assert.equal((await (await f('/api/youtube/runner/credentials')).json()).connected, false);
+});

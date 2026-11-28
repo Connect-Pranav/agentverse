@@ -947,6 +947,13 @@ body.glass .badge.warn{color:#fbbf24;border-color:rgba(251,191,36,.35)}
 @media(max-width:520px){.wrap>.col:nth-child(2){grid-template-columns:minmax(0,1fr)}.deps{grid-template-columns:minmax(0,1fr)}}
 
 /* ===== Keys & secrets ===== */
+.yt-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px}
+.yt-step{display:flex;flex-direction:column;gap:8px;min-width:0}
+.yt-step>b{font-weight:500;color:#ededed}.yt-step small{color:var(--mut);font-size:12.5px;line-height:1.5}
+.yt-step .kz-in{margin-top:0}
+.yt-state{font-size:13px;color:#a1a1a6;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.03)}
+.yt-state.ok{color:#4cc38a;border-color:rgba(76,195,138,.3)}
+@media(max-width:1100px){.yt-grid{grid-template-columns:minmax(0,1fr)}}
 .kz-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 .kz-wide{grid-column:1/-1}
 .kz-card .sub{margin-bottom:12px}
@@ -1400,6 +1407,25 @@ body.glass .badge.warn{color:#fbbf24;border-color:rgba(251,191,36,.35)}
 <!-- VANI voice agent -->
 <section class="board stage view-hide" id="keys" aria-label="Keys and secrets">
   <div class="kz-grid">
+    <section class="panel kz-card kz-wide" id="kzYt">
+      <div class="ph"><h3>YouTube posting</h3><span class="badge" id="ytBadge">—</span></div>
+      <div class="sub" id="ytSub">Connect the Sunverse channel once. The login stays on the AGENTVERSE server (never in this browser or in GitHub), and song videos, Shorts and replies use it.</div>
+      <div class="yt-grid">
+        <div class="yt-step">
+          <b>1 · Google OAuth client</b>
+          <small>Google Cloud → Google Auth Platform → Clients → Create client → <b>Web application</b>. Under Authorized redirect URIs add:</small>
+          <div class="kz-in"><input id="ytRedirect" readonly aria-label="Redirect URI"><button class="kz-btn" type="button" id="ytCopy"><span data-i="copy"></span> Copy</button></div>
+          <div class="kz-in"><input id="ytCid" autocomplete="off" spellcheck="false" placeholder="Client ID (…apps.googleusercontent.com)" aria-label="Client ID"></div>
+          <div class="kz-in"><input id="ytSec" type="password" autocomplete="off" spellcheck="false" placeholder="Client secret" aria-label="Client secret"><button class="kz-btn" type="button" id="ytSaveApp"><span data-i="check"></span> Save client</button></div>
+        </div>
+        <div class="yt-step">
+          <b>2 · Sign in with the Sunverse account</b>
+          <small>Google may say the app isn't verified: tap Advanced → Go to the app. Publish the app once (Audience → Publish app) so the login doesn't expire after 7 days.</small>
+          <div class="yt-state" id="ytState">—</div>
+          <div class="kz-acts"><button class="kz-btn kz-pri" type="button" id="ytConnect"><span data-i="youtube"></span> Connect YouTube</button><button class="kz-btn" type="button" id="ytDisconnect" style="display:none">Disconnect</button></div>
+        </div>
+      </div>
+    </section>
     <section class="panel kz-card" id="kzLocalCard">
       <div class="ph"><h3>This browser</h3><span class="badge">Local only</span></div>
       <div class="sub">Saved in this browser only (same storage as Settings). Never sent to GitHub or put in code.</div>
@@ -3455,7 +3481,7 @@ function mtRender(){
   }
   if(!(pub&&pub.state==="published")&&["failed","rejected"].indexOf(j.status)<0){
     var sc=j.schedule;
-    if(pub&&pub.state==="blocked"||(j.short&&j.short.state==="blocked"))h+='<div class="mt-ask"><p><b>Posting paused: YouTube login expired.</b> Retrying cannot fix this, so nothing will run until the login is renewed: run <code>scripts/yt-refresh-token.py</code>, put the new value in the <code>YT_REFRESH_TOKEN</code> secret, then tap Retry.</p><div class="acts"><button class="ap" data-mt="yt-retry" type="button"><span data-i="refresh-cw"></span>Retry YouTube now</button></div></div>';
+    if(pub&&pub.state==="blocked"||(j.short&&j.short.state==="blocked"))h+='<div class="mt-ask"><p><b>Posting paused: YouTube login expired.</b> Reconnect YouTube once: posting resumes by itself, no Retry needed.</p><div class="acts"><button class="ap" type="button" data-kz-open="yt"><span data-i="youtube"></span>Reconnect YouTube</button><button data-mt="yt-retry" type="button"><span data-i="refresh-cw"></span>Retry YouTube now</button></div></div>';
     var overdue=sc&&Date.parse(sc.publish_at)<Date.now();
     if(sc)h+='<div class="mt-sched"><span data-i="calendar-clock"></span><span>Posts <b>'+esc(fmtWhen(sc.publish_at))+'</b> &middot; '+esc(sc.privacy)+(sc.auto?' &middot; automatic':'')+(j.status!=="ready"&&Date.parse(sc.publish_at)<Date.now()?' &middot; as soon as the video is ready':'')+'</span></div>';
     if(overdue&&j.status==="ready")h+='<div class="acts"><button class="ap" data-mt="sch-now" type="button"><span data-i="send"></span>Post now</button><button data-mt="sch-tmr" type="button"><span data-i="calendar-clock"></span>Tomorrow 10:00 AM</button></div>';
@@ -3803,7 +3829,7 @@ function grRender(){
   if(!d){grSetup();return;}
   if(!d.connected){
     b.textContent="CONNECT YOUTUBE"; b.className="badge";
-    h='<div class="empty"><b>YouTube not connected yet.</b><br>Add GitHub secrets YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN (scope youtube.force-ssl) — steps in mcp/README.md.'+(d.last_error?'<br><span class="r">Last run: '+esc(d.last_error.message)+'</span>':'')+'</div>';
+    h='<div class="empty"><b>YouTube not connected yet.</b><br>Open <a href="#keys" data-kz-open="yt" style="color:#fff;text-decoration:underline">Keys → YouTube</a> and tap Connect YouTube.'+(d.last_error?'<br><span class="r">Last run: '+esc(d.last_error.message)+'</span>':'')+'</div>';
     $("grBody").innerHTML=h; return;
   }
   b.textContent=d.waiting?d.waiting+" WAITING":"LIVE"; b.className="badge "+(d.waiting?"":"run");
@@ -4572,6 +4598,7 @@ function renderAll(){renderBrands();renderBoard();refreshStats();updateTicker();
 function startLoops(){
   setTitle("overview");
   if(location.hash==="#studio")setTimeout(function(){go("studio");},600);
+  if(location.hash==="#keys")setTimeout(function(){go("keys");},600);
   if(location.hash==="#leads")setTimeout(function(){go("leads");},600);
   if(location.hash==="#signal")setTimeout(function(){go("signal");},600);
   setTimeout(function(){document.body.classList.add("ready");},1200);
@@ -4646,7 +4673,7 @@ function kzServer(){
     if(d.change){ $("kzWorkerCmd").textContent=d.change.worker.split("   ")[0]; if(d.change.worker_url)$("kzWorkerLink").href=d.change.worker_url; if(d.change.github_url)$("kzGithubLink").href=d.change.github_url; }
   }).catch(function(e){ var m='<div class="empty">Could not read server status: '+esc(e.message)+'</div>'; $("kzWorker").innerHTML=m; $("kzGithub").innerHTML=m; });
 }
-function kzLoad(){ kzLocalRender(); kzServer(); }
+function kzLoad(){ kzLocalRender(); kzServer(); ytLoad(); }
 $("kzSave").onclick=function(){
   var ins=$("kzLocal").querySelectorAll("[data-kz]"), n=0, tokChanged=false;
   for(var i=0;i<ins.length;i++){ var v=String(ins[i].value||"").replace(/^[\s"'`]+|[\s"'`]+$/g,"").replace(/\s+/g,""); var k=ins[i].getAttribute("data-kz");
@@ -4655,7 +4682,33 @@ $("kzSave").onclick=function(){
   saveSet(); updateBrain(); kzLocalRender(); $("kzLocalMsg").textContent=n+" key"+(n>1?"s":"")+" saved in this browser"; toast("Keys saved in this browser",true);
   if(tokChanged){ kzServer(); try{ docLoad&&docLoad(); }catch(e){} }
 };
-(function(){ var b=document.querySelectorAll("[data-kz-open]"); for(var i=0;i<b.length;i++) b[i].onclick=function(){ try{ if($("settings").className.indexOf("open")>=0)$("setClose").click(); }catch(e){} go("keys"); }; })();
+document.addEventListener("click",function(e){ var b=e.target.closest?e.target.closest("[data-kz-open]"):null; if(!b)return; e.preventDefault();
+  try{ if($("settings").className.indexOf("open")>=0)$("setClose").click(); }catch(x){} go("keys");
+  if(b.getAttribute("data-kz-open")==="yt") setTimeout(function(){ var c=$("kzYt"); if(c)c.scrollIntoView({behavior:"smooth",block:"start"}); },500); });
+/* YouTube connect (server-side OAuth; the refresh token never reaches the browser) */
+function ytLoad(){
+  if(!SET.mcpToken){ $("ytState").textContent="Add the AGENTVERSE owner token below first."; $("ytBadge").textContent="locked"; $("ytRedirect").value=location.origin+"/api/youtube/callback"; return; }
+  sigApi("GET","/api/youtube/status").then(function(d){
+    $("ytRedirect").value=d.redirect_uri; if(d.client_id&&!$("ytCid").value)$("ytCid").value=d.client_id;
+    $("ytSec").placeholder=d.app_set?"Client secret saved · paste to replace":"Client secret";
+    var st=$("ytState"); st.className="yt-state"+(d.connected?" ok":"");
+    st.textContent=d.connected?("Connected to "+((d.channel&&d.channel.title)||"YouTube")+" · "+ago(Date.parse(d.connected_at))+" ago"):(d.app_set?"Client saved. Tap Connect YouTube.":"Save the Google client first.");
+    $("ytBadge").textContent=d.connected?"connected":(d.app_set?"not signed in":"not set up"); $("ytBadge").className="badge"+(d.connected?" run":" warn");
+    $("ytConnect").innerHTML=icon("youtube")+(d.connected?" Reconnect":" Connect YouTube"); $("ytDisconnect").style.display=d.connected?"":"none";
+  }).catch(function(e){ $("ytState").textContent="Could not read status: "+e.message; });
+}
+$("ytCopy").onclick=function(){ copyText($("ytRedirect").value); };
+$("ytSaveApp").onclick=function(){
+  var cid=$("ytCid").value.trim(), sec=$("ytSec").value.trim();
+  if(!cid||!sec){ toast("Paste both the Client ID and the Client secret",false); return; }
+  sigApi("POST","/api/youtube/app",{client_id:cid,client_secret:sec}).then(function(){ $("ytSec").value=""; toast("Google client saved on the server",true); ytLoad(); },function(e){ toast(e.message,false); });
+};
+$("ytConnect").onclick=function(){ sigApi("POST","/api/youtube/connect",{}).then(function(d){ location.href=d.url; },function(e){ toast(e.message,false); }); };
+$("ytDisconnect").onclick=function(){ if(!confirm("Disconnect YouTube? Posting stops until you connect again."))return; sigApi("POST","/api/youtube/disconnect",{}).then(function(){ toast("YouTube disconnected",true); ytLoad(); },function(e){ toast(e.message,false); }); };
+(function(){ var q=new URLSearchParams(location.search); if(!q.has("yt")&&!q.has("yt_error"))return;
+  var ok=q.get("yt")==="connected", err=q.get("yt_error");
+  history.replaceState(null,"",location.pathname+"#keys");
+  setTimeout(function(){ go("keys"); toast(ok?"YouTube connected · posting resumes by itself":("YouTube not connected: "+err),ok); },700); })();
 /* ===== Code Doctor (+) ===== */
 var DOC={tab:"health",data:null,auto:null};
 function docIcons(root){var els=root.querySelectorAll("[data-i]");for(var i=0;i<els.length;i++){var n=els[i].getAttribute("data-i");if(ICONS[n])els[i].outerHTML=icon(n);}}

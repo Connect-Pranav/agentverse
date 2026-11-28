@@ -84,7 +84,7 @@ export async function automations(env, kv, { gh = null, now = Date.now() } = {})
       error: env.GH_DISPATCH_TOKEN ? null : 'GH_DISPATCH_TOKEN not set: the Worker cannot wake the renderer, it waits for GitHub cron', output: 'Song Studio' },
     { id: 'youtube_post', name: 'YouTube auto-post', dept: 'Publishing', trigger: 'Song schedule', schedule: 'Sunday 10:00 AM IST',
       state: ytBlocked ? 'needs_attention' : 'scheduled', next: fmtIst(nextSlot('youtube_long', new Date(now))),
-      error: ytBlocked ? `YouTube login expired (${ytBlocked.error || 'invalid_grant'}): renew YT_REFRESH_TOKEN` : null, last: ytBlocked?.at || null, output: 'YouTube channel' },
+      error: ytBlocked ? `YouTube login expired (${ytBlocked.error || 'invalid_grant'}): reconnect in Keys → YouTube` : null, last: ytBlocked?.at || null, output: 'YouTube channel' },
     { id: 'youtube_shorts', name: 'YouTube Shorts', dept: 'Publishing', trigger: 'After a song is posted', schedule: 'Thu 7 PM, Fri 6:30 PM, Sat 7:30 PM IST',
       state: ytBlocked ? 'needs_attention' : 'scheduled', next: fmtIst(nextSlot('youtube_short', new Date(now))), error: ytBlocked ? 'Blocked by the expired YouTube login' : null, output: 'YouTube Shorts' },
     { id: 'growth', name: 'Sunverse YouTube growth', dept: 'Growth', trigger: 'growth.yml', schedule: 'hourly at :27',
@@ -119,7 +119,7 @@ export async function runtimeChecks(env, kv, { now = Date.now() } = {}) {
   C.push(env.GH_DISPATCH_TOKEN ? check('gh_dispatch', 'Automation', 'Worker can start GitHub runners', 'pass', 'GH_DISPATCH_TOKEN set')
     : check('gh_dispatch', 'Automation', 'Worker cannot start GitHub runners', 'warn', 'renders, scans and posts wait for GitHub cron (up to an hour, often throttled)', 'Create a fine-grained token with Actions: write on Connect-Pranav/agentverse and set GH_DISPATCH_TOKEN'));
   const yt = await kv.get('sv/youtube-auth-blocked', 'json');
-  C.push(yt ? check('youtube_auth', 'Integrations', 'YouTube login expired', 'fail', `${String(yt.error || '').slice(0, 120)} (since ${ago(now - Date.parse(yt.at))} ago)`, 'Run scripts/yt-refresh-token.py, update YT_REFRESH_TOKEN, then tap Retry YouTube now')
+  C.push(yt ? check('youtube_auth', 'Integrations', 'YouTube login expired', 'fail', `${String(yt.error || '').slice(0, 120)} (since ${ago(now - Date.parse(yt.at))} ago)`, 'Open Keys → YouTube and tap Connect YouTube (posting resumes by itself)')
     : check('youtube_auth', 'Integrations', 'No YouTube login error recorded', 'pass', 'posting is not blocked'));
   const li = env.LINKEDIN_ACCESS_TOKEN || await kv.get('signal/linkedin_token');
   C.push(li ? check('linkedin', 'Integrations', 'LinkedIn is connected', 'pass', 'posting token present')
@@ -239,7 +239,7 @@ export const GITHUB_SECRETS = [
   { name: 'OPENAI_API_KEY', used_by: 'songvideo', purpose: 'Optional image fallback for songs' },
   { name: 'YT_CLIENT_ID', used_by: 'growth, leadgen, songvideo', purpose: 'YouTube OAuth app' },
   { name: 'YT_CLIENT_SECRET', used_by: 'growth, leadgen, songvideo', purpose: 'YouTube OAuth app secret' },
-  { name: 'YT_REFRESH_TOKEN', used_by: 'growth, songvideo', purpose: 'YouTube posting (renew with scripts/yt-refresh-token.py)' },
+  { name: 'YT_REFRESH_TOKEN', used_by: 'growth, songvideo', purpose: 'YouTube posting fallback (Keys → YouTube → Connect replaces it)' },
   { name: 'GMAIL_REFRESH_TOKEN', used_by: 'leadgen', purpose: 'Sends approved Foliocraft emails' },
   { name: 'LINKEDIN_ACCESS_TOKEN', used_by: 'signal', purpose: 'LinkedIn engagement read' },
   { name: 'LINKEDIN_PERSON_URN', used_by: 'signal', purpose: 'LinkedIn member id' },

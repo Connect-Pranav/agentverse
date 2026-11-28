@@ -24,6 +24,7 @@ import * as telegram from './telegram.mjs';
 import * as work from './work.mjs';
 import * as engagement from './engagement.mjs';
 import * as doctor from './doctor.mjs';
+import * as ytAuth from './youtube_auth.mjs';
 import { nextSlot, calendar as postingCalendar, isSlotDay } from './post_schedule.mjs';
 import { withFonts } from './editorial_templates.mjs';
 import * as signal from './signal.mjs';
@@ -968,6 +969,25 @@ async function route(request, env) {
     throw new HttpError(404, 'Not found');
   }
   // Code Doctor + Automation Control Center
+  // Connect YouTube from the dashboard: owner saves the OAuth client, signs in with Google, token stays in KV.
+  if (seg[0] === 'api' && seg[1] === 'youtube' && ['status', 'app', 'connect', 'callback', 'disconnect', 'runner'].includes(seg[2])) {
+    const k = kv(env), origin = base(env, request);
+    try {
+      if (seg[2] === 'callback' && method === 'GET') {
+        let to = '/?yt=connected#keys';
+        try { await ytAuth.callback(k, origin, url.searchParams); await ytAuthRecovered(env); }
+        catch (e) { to = `/?yt_error=${encodeURIComponent(e.message)}#keys`; }
+        return new Response(null, { status: 302, headers: { location: to, 'cache-control': 'no-store' } });
+      }
+      if (seg[2] === 'runner' && seg[3] === 'credentials' && method === 'GET') { await runner(request, env); return json(await ytAuth.runnerCredentials(k), 200, { 'cache-control': 'no-store' }); }
+      owner(request, env);
+      if (seg[2] === 'status' && method === 'GET') return json(await ytAuth.status(k, origin), 200, { 'cache-control': 'no-store' });
+      if (seg[2] === 'app' && method === 'POST') return json(await ytAuth.saveApp(k, await readJson(request)));
+      if (seg[2] === 'connect' && method === 'POST') return json(await ytAuth.start(k, origin));
+      if (seg[2] === 'disconnect' && method === 'POST') return json(await ytAuth.disconnect(k));
+    } catch (e) { if (e instanceof ytAuth.YtAuthError) throw new HttpError(e.status, e.message); throw e; }
+    throw new HttpError(405, 'Method not allowed');
+  }
   if (seg[0] === 'api' && seg[1] === 'doctor') {
     const k = kv(env);
     if (seg.length === 2 && method === 'GET') { owner(request, env); return json(await doctor.summary(env, k), 200, { 'cache-control': 'no-store' }); }

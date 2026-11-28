@@ -1157,21 +1157,33 @@ def render(job, work):
 
 
 # ---------------- YouTube (only after the owner pressed "Post to YouTube") ----------------
-def yt_token():
+def yt_creds():
+    """YouTube login: the one connected in AGENTVERSE (Keys -> YouTube) first, then the GitHub secrets."""
+    try:
+        c = ganesha("GET", "/api/youtube/runner/credentials", timeout=30)
+        if c.get("connected") and c.get("refresh_token"):
+            return c["client_id"], c["client_secret"], c["refresh_token"], "AGENTVERSE"
+    except Exception as e:
+        log(f"[youtube] dashboard login not available ({redact(e)}); using repo secrets")
     cid, sec, rt = (os.environ.get(k, "").strip() for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"))
+    return cid, sec, rt, "repo secrets"
+
+
+def yt_token():
+    cid, sec, rt, src = yt_creds()
     if not (cid and sec and rt):
-        raise RuntimeError("YouTube is not connected: add repo secrets YT_CLIENT_ID, YT_CLIENT_SECRET and YT_REFRESH_TOKEN")
+        raise RuntimeError("YouTube is not connected: open AGENTVERSE -> Keys -> YouTube and tap Connect YouTube")
     body = urllib.parse.urlencode({"client_id": cid, "client_secret": sec, "refresh_token": rt, "grant_type": "refresh_token"}).encode()
     try:
         r = http("POST", "https://oauth2.googleapis.com/token", body, {"content-type": "application/x-www-form-urlencoded"}, 60)
     except Exception as e:
         if "invalid_grant" in str(e):
-            raise RuntimeError("YouTube login expired (invalid_grant). Make a new token with scripts/yt-refresh-token.py and update the YT_REFRESH_TOKEN secret. "
-                               "If the Google OAuth app is in 'Testing' mode, tokens expire every 7 days: set it to 'In production' once.") from None
-        raise RuntimeError(f"Google OAuth token refresh failed ({redact(e)}). Please verify or refresh YT_REFRESH_TOKEN in repo secrets.") from None
+            raise RuntimeError(f"YouTube login expired (invalid_grant, from {src}). Open AGENTVERSE -> Keys -> YouTube and tap Connect YouTube again. "
+                               "If the Google OAuth app is in 'Testing' mode, tokens expire every 7 days: publish it once ('In production').") from None
+        raise RuntimeError(f"Google OAuth token refresh failed ({redact(e)}). Reconnect YouTube in AGENTVERSE -> Keys.") from None
     if not r.get("access_token"):
         err = r.get("error_description") or r.get("error") or "token expired or revoked"
-        raise RuntimeError(f"Google did not return an access token ({err}). Please regenerate YT_REFRESH_TOKEN in repo secrets.")
+        raise RuntimeError(f"Google did not return an access token ({err}). Reconnect YouTube in AGENTVERSE -> Keys.")
     return r["access_token"]
 
 
