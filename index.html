@@ -1415,8 +1415,9 @@ body.glass .badge.warn{color:#fbbf24;border-color:rgba(251,191,36,.35)}
           <b>1 · Google OAuth client</b>
           <small>Google Cloud → Google Auth Platform → Clients → Create client → <b>Web application</b>. Under Authorized redirect URIs add:</small>
           <div class="kz-in"><input id="ytRedirect" readonly aria-label="Redirect URI"><button class="kz-btn" type="button" id="ytCopy"><span data-i="copy"></span> Copy</button></div>
-          <div class="kz-in"><input id="ytCid" autocomplete="off" spellcheck="false" placeholder="Client ID (…apps.googleusercontent.com)" aria-label="Client ID"></div>
-          <div class="kz-in"><input id="ytSec" type="password" autocomplete="off" spellcheck="false" placeholder="Client secret" aria-label="Client secret"><button class="kz-btn" type="button" id="ytSaveApp"><span data-i="check"></span> Save client</button></div>
+          <div class="kz-in"><input id="ytCid" type="password" autocomplete="off" spellcheck="false" placeholder="Client ID (…apps.googleusercontent.com)" aria-label="Client ID"><button class="kz-btn" type="button" id="ytCidEye" aria-label="Show client ID">Show</button></div>
+          <div class="kz-in"><input id="ytSec" type="password" autocomplete="new-password" spellcheck="false" placeholder="Client secret" aria-label="Client secret"><button class="kz-btn" type="button" id="ytSecEye" aria-label="Show client secret">Show</button></div>
+          <div class="kz-acts" style="margin-top:0"><button class="kz-btn" type="button" id="ytEdit"><span data-i="pen-line"></span> Edit client</button><button class="kz-btn kz-pri" type="button" id="ytSaveApp"><span data-i="check"></span> Save client</button><button class="kz-btn" type="button" id="ytCancel">Cancel</button></div>
         </div>
         <div class="yt-step">
           <b>2 · Sign in with the Sunverse account</b>
@@ -4686,11 +4687,24 @@ document.addEventListener("click",function(e){ var b=e.target.closest?e.target.c
   try{ if($("settings").className.indexOf("open")>=0)$("setClose").click(); }catch(x){} go("keys");
   if(b.getAttribute("data-kz-open")==="yt") setTimeout(function(){ var c=$("kzYt"); if(c)c.scrollIntoView({behavior:"smooth",block:"start"}); },500); });
 /* YouTube connect (server-side OAuth; the refresh token never reaches the browser) */
+var YT_APP=null;
+/* Saved client: fields locked and hidden, Edit unlocks them; the saved secret is never sent back, so the box stays empty. */
+function ytLock(locked){
+  var cid=$("ytCid"), sec=$("ytSec");
+  cid.readOnly=locked; sec.readOnly=locked; cid.type="password"; sec.type="password"; $("ytCidEye").textContent="Show"; $("ytSecEye").textContent="Show";
+  cid.value=(YT_APP&&YT_APP.client_id)||""; sec.value="";
+  sec.placeholder=(YT_APP&&YT_APP.app_set)?(locked?"Client secret saved (hidden)":"Paste a new secret, or leave empty to keep the saved one"):"Client secret";
+  $("ytSecEye").style.display=locked?"none":""; /* the saved secret is never sent back, so there is nothing to show */
+  $("ytEdit").style.display=locked?"":"none"; $("ytSaveApp").style.display=locked?"none":""; $("ytCancel").style.display=(!locked&&YT_APP&&YT_APP.app_set)?"":"none";
+}
+$("ytEdit").onclick=function(){ ytLock(false); $("ytCid").focus(); };
+$("ytCancel").onclick=function(){ ytLock(true); };
+$("ytCidEye").onclick=function(){ var i=$("ytCid"),h=i.type==="password"; i.type=h?"text":"password"; this.textContent=h?"Hide":"Show"; };
+$("ytSecEye").onclick=function(){ var i=$("ytSec"),h=i.type==="password"; i.type=h?"text":"password"; this.textContent=h?"Hide":"Show"; };
 function ytLoad(){
   if(!SET.mcpToken){ $("ytState").textContent="Add the AGENTVERSE owner token below first."; $("ytBadge").textContent="locked"; $("ytRedirect").value=location.origin+"/api/youtube/callback"; return; }
   sigApi("GET","/api/youtube/status").then(function(d){
-    $("ytRedirect").value=d.redirect_uri; if(d.client_id&&!$("ytCid").value)$("ytCid").value=d.client_id;
-    $("ytSec").placeholder=d.app_set?"Client secret saved · paste to replace":"Client secret";
+    $("ytRedirect").value=d.redirect_uri; YT_APP=d; ytLock(d.app_set);
     var st=$("ytState"); st.className="yt-state"+(d.connected?" ok":"");
     st.textContent=d.connected?("Connected to "+((d.channel&&d.channel.title)||"YouTube")+" · "+ago(Date.parse(d.connected_at))+" ago"):(d.app_set?"Client saved. Tap Connect YouTube.":"Save the Google client first.");
     $("ytBadge").textContent=d.connected?"connected":(d.app_set?"not signed in":"not set up"); $("ytBadge").className="badge"+(d.connected?" run":" warn");
@@ -4699,9 +4713,9 @@ function ytLoad(){
 }
 $("ytCopy").onclick=function(){ copyText($("ytRedirect").value); };
 $("ytSaveApp").onclick=function(){
-  var cid=$("ytCid").value.trim(), sec=$("ytSec").value.trim();
-  if(!cid||!sec){ toast("Paste both the Client ID and the Client secret",false); return; }
-  sigApi("POST","/api/youtube/app",{client_id:cid,client_secret:sec}).then(function(){ $("ytSec").value=""; toast("Google client saved on the server",true); ytLoad(); },function(e){ toast(e.message,false); });
+  var cid=$("ytCid").value.trim(), sec=$("ytSec").value.trim(), had=YT_APP&&YT_APP.app_set;
+  if(!cid||(!sec&&!had)){ toast("Paste both the Client ID and the Client secret",false); return; }
+  sigApi("POST","/api/youtube/app",sec?{client_id:cid,client_secret:sec}:{client_id:cid,keep_secret:true}).then(function(){ $("ytSec").value=""; toast("Google client saved on the server",true); ytLoad(); },function(e){ toast(e.message,false); });
 };
 $("ytConnect").onclick=function(){ sigApi("POST","/api/youtube/connect",{}).then(function(d){ location.href=d.url; },function(e){ toast(e.message,false); }); };
 $("ytDisconnect").onclick=function(){ if(!confirm("Disconnect YouTube? Posting stops until you connect again."))return; sigApi("POST","/api/youtube/disconnect",{}).then(function(){ toast("YouTube disconnected",true); ytLoad(); },function(e){ toast(e.message,false); }); };

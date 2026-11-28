@@ -27,10 +27,15 @@ export async function status(kv, origin) {
 
 export async function saveApp(kv, body) {
   const client_id = String(body?.client_id || '').trim();
-  const client_secret = String(body?.client_secret || '').trim();
+  let client_secret = String(body?.client_secret || '').trim();
   if (!/^[\w-]+\.apps\.googleusercontent\.com$/.test(client_id)) throw new YtAuthError(400, 'Client ID should end with .apps.googleusercontent.com');
-  if (client_secret.length < 10 || /\s/.test(client_secret)) throw new YtAuthError(400, 'Client secret looks wrong');
   const old = await kv.get(APP, 'json');
+  // "keep the saved secret" only makes sense for the same client: a new client always needs its own secret
+  if (!client_secret && body?.keep_secret && old?.client_secret) {
+    if (old.client_id !== client_id) throw new YtAuthError(400, 'A new Client ID needs its own Client secret');
+    client_secret = old.client_secret;
+  }
+  if (client_secret.length < 10 || /\s/.test(client_secret)) throw new YtAuthError(400, 'Client secret looks wrong');
   await kv.put(APP, JSON.stringify({ client_id, client_secret, at: new Date().toISOString() }));
   // a token belongs to the client that made it: a new client needs a new sign-in
   if (old?.client_id && old.client_id !== client_id) await kv.delete(TOK);

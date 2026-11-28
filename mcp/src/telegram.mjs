@@ -9,10 +9,10 @@
 //   TELEGRAM_CHAT_ID     Owner chat ID from @userinfobot or /start
 
 const TG_API = 'https://api.telegram.org';
-const DEFAULT_BOT_TOKEN = '8852122727:AAHbi2M5gjSvH5HbKohyHS6Z_DOrRdGH_SI';
+// The bot token comes only from the Worker secret TELEGRAM_BOT_TOKEN (never from code).
 
 export async function sendTelegramMessage(env, text, replyMarkup = null, fetchImpl = fetch, targetChatId = null) {
-  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  const token = env.TELEGRAM_BOT_TOKEN;
   let chatId = targetChatId || env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try {
@@ -43,7 +43,7 @@ export async function sendTelegramMessage(env, text, replyMarkup = null, fetchIm
 }
 
 export async function sendTelegramPhoto(env, photoUrl, caption = '', replyMarkup = null, fetchImpl = fetch, targetChatId = null) {
-  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  const token = env.TELEGRAM_BOT_TOKEN;
   let chatId = targetChatId || env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try {
@@ -74,7 +74,7 @@ export async function sendTelegramPhoto(env, photoUrl, caption = '', replyMarkup
 }
 
 export async function sendTelegramDocument(env, filename, content, mime = 'image/svg+xml', caption = '', fetchImpl = fetch) {
-  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  const token = env.TELEGRAM_BOT_TOKEN;
   let chatId = env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try { chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id')); } catch {}
@@ -94,7 +94,7 @@ export async function sendTelegramDocument(env, filename, content, mime = 'image
 }
 
 export async function notifyApproval(env, { id, type, title, brand, summary, estCost }, fetchImpl = fetch, targetChatId = null) {
-  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  const token = env.TELEGRAM_BOT_TOKEN;
   let chatId = targetChatId || env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try {
@@ -130,7 +130,7 @@ export async function handleWebhook(env, update, onAction, fetchImpl = fetch) {
     const msg = update.message;
     const chatId = msg.chat?.id;
     const fromName = msg.from?.first_name || 'there';
-    const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+    const token = env.TELEGRAM_BOT_TOKEN;
     if (chatId) {
       if (env.KV) {
         try {
@@ -186,7 +186,7 @@ export async function handleWebhook(env, update, onAction, fetchImpl = fetch) {
   }
 
   // Answer callback query so user sees popup alert
-  const botToken = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  const botToken = env.TELEGRAM_BOT_TOKEN;
   if (botToken && cq.id) {
     try {
       await fetchImpl(`${TG_API}/bot${botToken}/answerCallbackQuery`, {
@@ -227,7 +227,7 @@ function escapeHtml(str) {
 
 // Sends an MP4 so Telegram plays it inline (sendDocument would show it as a file).
 export async function sendTelegramVideo(env, filename, content, caption = '', fetchImpl = fetch) {
-  const token = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  const token = env.TELEGRAM_BOT_TOKEN;
   let chatId = env.TELEGRAM_CHAT_ID;
   if (!chatId && env.KV) {
     try { chatId = (await env.KV.get('tg/chat_id')) || (await env.KV.get('signal/telegram_chat_id')); } catch {}

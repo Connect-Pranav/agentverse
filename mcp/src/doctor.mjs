@@ -115,7 +115,7 @@ export async function runtimeChecks(env, kv, { now = Date.now() } = {}) {
   C.push(env.MCP_TOKEN ? check('owner_token', 'Security', 'Owner/runner token is set', 'pass', 'MCP_TOKEN present')
     : check('owner_token', 'Security', 'MCP_TOKEN is not set', 'fail', 'owner routes are locked', 'Set the MCP_TOKEN secret on the Worker'));
   C.push(env.TELEGRAM_BOT_TOKEN ? check('telegram', 'Security', 'Telegram bot token comes from a secret', 'pass', 'TELEGRAM_BOT_TOKEN set')
-    : check('telegram', 'Security', 'Telegram bot token is hard-coded in public code', 'fail', 'mcp/src/telegram.mjs falls back to a token in the repository', 'Revoke it in BotFather, set TELEGRAM_BOT_TOKEN on the Worker, then remove the fallback'));
+    : check('telegram', 'Integrations', 'Telegram approvals are off', 'warn', 'TELEGRAM_BOT_TOKEN is not set on the Worker', 'Set the TELEGRAM_BOT_TOKEN secret on the Worker'));
   C.push(env.GH_DISPATCH_TOKEN ? check('gh_dispatch', 'Automation', 'Worker can start GitHub runners', 'pass', 'GH_DISPATCH_TOKEN set')
     : check('gh_dispatch', 'Automation', 'Worker cannot start GitHub runners', 'warn', 'renders, scans and posts wait for GitHub cron (up to an hour, often throttled)', 'Create a fine-grained token with Actions: write on Connect-Pranav/agentverse and set GH_DISPATCH_TOKEN'));
   const yt = await kv.get('sv/youtube-auth-blocked', 'json');
@@ -214,7 +214,7 @@ export async function repair(env, kv, action, { fetchImpl = fetch } = {}) {
 // One list of every credential AGENTVERSE uses, where it lives and how to change it. Status is presence only.
 export const WORKER_SECRETS = [
   { name: 'MCP_TOKEN', purpose: 'Owner token: dashboard, MCP and runner uploads', required: true },
-  { name: 'TELEGRAM_BOT_TOKEN', purpose: 'Telegram approvals bot (replaces the hard-coded fallback)', required: true },
+  { name: 'TELEGRAM_BOT_TOKEN', purpose: 'Telegram approvals bot', required: true },
   { name: 'TELEGRAM_CHAT_ID', purpose: 'Your Telegram chat for approvals' },
   { name: 'GROQ_API_KEY', purpose: 'Cloud brain: Groq (free tier)' },
   { name: 'GEMINI_API_KEY', purpose: 'Cloud brain: Gemini (free tier)' },
