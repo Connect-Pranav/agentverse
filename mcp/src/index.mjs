@@ -982,6 +982,7 @@ async function route(request, env) {
       if (seg[2] === 'runner' && seg[3] === 'credentials' && method === 'GET') { await runner(request, env); return json(await ytAuth.runnerCredentials(k), 200, { 'cache-control': 'no-store' }); }
       owner(request, env);
       if (seg[2] === 'status' && method === 'GET') return json(await ytAuth.status(k, origin), 200, { 'cache-control': 'no-store' });
+      if (seg[2] === 'app' && seg[3] === 'remove' && method === 'POST') return json(await ytAuth.removeApp(k));
       if (seg[2] === 'app' && method === 'POST') return json(await ytAuth.saveApp(k, await readJson(request)));
       if (seg[2] === 'connect' && method === 'POST') return json(await ytAuth.start(k, origin));
       if (seg[2] === 'disconnect' && method === 'POST') return json(await ytAuth.disconnect(k));

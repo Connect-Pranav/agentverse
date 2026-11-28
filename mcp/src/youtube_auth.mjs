@@ -79,6 +79,9 @@ export async function callback(kv, origin, params, fetchImpl = fetch) {
   return { ok: true, channel };
 }
 
+// Forget the Google client (and the login made with it) so a new client can be added.
+export async function removeApp(kv) { await kv.delete(APP); await kv.delete(TOK); return { ok: true }; }
+
 export async function disconnect(kv) { await kv.delete(TOK); return { ok: true }; }
 
 // For GitHub runners only (runner auth): the credentials the YouTube steps use.

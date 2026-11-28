@@ -915,4 +915,10 @@ test('Connect YouTube in the dashboard: client saved server-side, Google sign-in
   assert.match(cb.headers.get('location'), /yt_error=/);
   await f('/api/youtube/disconnect', 'POST', {});
   assert.equal((await (await f('/api/youtube/runner/credentials')).json()).connected, false);
+  // remove the client entirely, then a different one can be added
+  await f('/api/youtube/app/remove', 'POST', {});
+  st = await (await f('/api/youtube/status')).json();
+  assert.deepEqual([st.app_set, st.client_id, st.connected], [false, null, false]);
+  assert.equal((await f('/api/youtube/app', 'POST', { client_id: '999-new.apps.googleusercontent.com', client_secret: 'GOCSPX-another-one' })).status, 200);
+  assert.equal((await (await f('/api/youtube/status')).json()).client_id, '999-new.apps.googleusercontent.com');
 });
